@@ -1,6 +1,6 @@
 # Каталог issues
 
-Скачано из GitHub (`gh issue list`). Номера и Blocked by — как в репозитории.
+Скачано из GitHub (`gh issue list`). Номера и Blocked by — как в репозитории. Assignee: `plyuschevmax`.
 
 | # | Milestone | Title | Labels | Blocked by |
 | --- | --- | --- | --- | --- |
