@@ -20,6 +20,7 @@ import {
   TELEGRAM_HANDLER_IDS,
   wireTelegram,
 } from "../../src/telegram/index.js";
+import { memoryDayListStore } from "../helpers/day-list-store.js";
 import { repoRoot } from "../helpers/repo-root.js";
 
 const project: Project = {
@@ -237,6 +238,7 @@ it("INV-12: реестр хендлеров бота перебирается и
   wireTelegram(bot, {
     directory: directoryOf([lead]),
     identity: identityFor(lead.userId),
+    dayList: memoryDayListStore(),
   });
   const registered = registeredHandlers();
   expect(registered.map((handler) => handler.id)).toEqual([
@@ -253,6 +255,7 @@ it("INV-12: не-участник получает отказ без данны�
   wireTelegram(bot, {
     directory: directoryOf([lead]),
     identity: identityFor(lead.userId),
+    dayList: memoryDayListStore(),
   });
   await sendStart(bot, 999);
   expect(replies).toEqual(["Нет доступа"]);
@@ -265,6 +268,7 @@ it("INV-12: пользователь без членства не видит д�
   wireTelegram(bot, {
     directory: directoryOf([lead]),
     identity: identityFor(member.userId),
+    dayList: memoryDayListStore(),
   });
   await sendStart(bot, telegramUserId);
   expect(replies).toEqual(["Нет доступа"]);
@@ -277,6 +281,7 @@ it("INV-12: участник проходит, ответ без данных п
   wireTelegram(bot, {
     directory: directoryOf([lead]),
     identity: identityFor(lead.userId),
+    dayList: memoryDayListStore(),
   });
   await sendStart(bot, telegramUserId);
   expect(replies).toEqual(["Доступ есть"]);

@@ -8,11 +8,19 @@ export type {
   MemberRef,
   ProjectActor,
   Task,
+  TaskList,
+  TaskListItem,
   TaskStatus,
 } from "./types.js";
 export { BLOCKER_SIGNALS, TASK_STATUSES } from "./types.js";
 export { weightOf } from "./weight.js";
 export { isAllowedTransition, transitionStatus } from "./transitions.js";
+export {
+  addTaskToTodayList,
+  checkDayListItem,
+  openDayList,
+  setListMessageId,
+} from "./day-list.js";
 export {
   closeActiveBlockers,
   declareBlocker,

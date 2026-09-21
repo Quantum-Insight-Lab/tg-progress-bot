@@ -58,3 +58,22 @@ export type Task = {
   priority: Priority;
   createdByUserId: string;
 };
+
+export type TaskListItem = {
+  id: string;
+  projectId: string;
+  listId: string;
+  taskId: string;
+  position: number;
+  isDone: boolean;
+  carriedFromListId: string | null;
+};
+
+export type TaskList = {
+  id: string;
+  projectId: string;
+  listDate: string;
+  topicId: number | null;
+  messageId: number | null;
+  items: TaskListItem[];
+};
