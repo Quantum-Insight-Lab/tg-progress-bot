@@ -1,11 +1,15 @@
 import { clock, type Clock } from "../../src/infrastructure/clock.js";
-import type { Blocker, IssueRef, MemberRef, Task, TaskList } from "../../src/domain/tasks/index.js";
-import type { DayListStore } from "../../src/telegram/index.js";
+import type { Blocker, MemberRef, Task, TaskList } from "../../src/domain/tasks/index.js";
+import type { DayListStore, PendingTaskDraft, ProjectIssue } from "../../src/telegram/day-list.js";
+
+export function sampleIssue(projectId: string): ProjectIssue {
+  return { id: "issue-1", projectId, number: 1, title: "Issue" };
+}
 
 export function memoryDayListStore(init?: {
   clock?: Clock;
   timeZone?: string;
-  issues?: readonly IssueRef[];
+  issues?: readonly ProjectIssue[];
   lists?: TaskList[];
   roster?: readonly MemberRef[];
   leads?: readonly { userId: string; telegramUserId: string }[];
@@ -16,23 +20,21 @@ export function memoryDayListStore(init?: {
   const lists: TaskList[] = init?.lists === undefined ? [] : [...init.lists];
   const tasks = new Map<string, { task: Task; blockers: Blocker[] }>();
   const leads = init?.leads ?? [];
+  const issues = init?.issues === undefined ? [] : [...init.issues];
+  const pending = new Map<string, PendingTaskDraft>();
   let nextId = 0;
   return {
     lists,
     tasks,
     clock: init?.clock ?? clock,
     timeZoneOf: () => init?.timeZone ?? "Asia/Bangkok",
-    findIssue: (projectId, issueId) => {
-      const listed = init?.issues?.find(
-        (issue) => issue.id === issueId && issue.projectId === projectId,
-      );
-      if (listed !== undefined) {
-        return listed;
-      }
-      if (init?.issues !== undefined) {
-        return undefined;
-      }
-      return { id: issueId, projectId };
+    issuesOf: (projectId) => issues.filter((issue) => issue.projectId === projectId),
+    pendingOf: (userId) => pending.get(userId),
+    savePendingTask: (draft) => {
+      pending.set(draft.userId, draft);
+    },
+    clearPendingTask: (userId) => {
+      pending.delete(userId);
     },
     listsOf: (projectId) => lists.filter((list) => list.projectId === projectId),
     saveList: (list) => {

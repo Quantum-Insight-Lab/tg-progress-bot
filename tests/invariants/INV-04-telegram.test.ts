@@ -5,7 +5,8 @@ import { createClock } from "../../src/infrastructure/clock.js";
 import { CHECK_CALLBACK_PREFIX } from "../../src/telegram/day-list.js";
 import { CONFIRM_CALLBACK_PREFIX, CONFIRM_QUESTION } from "../../src/telegram/callbacks.js";
 import { resetBotForTests, wireTelegram } from "../../src/telegram/index.js";
-import { memoryDayListStore } from "../helpers/day-list-store.js";
+import { memoryDayListStore, sampleIssue } from "../helpers/day-list-store.js";
+import { sendTask as sendTaskUpdate } from "../helpers/telegram-task.js";
 
 const projectId = "p1";
 const chatId = 100;
@@ -59,6 +60,7 @@ function wire(bot: Bot) {
       current: () => new Date("2026-09-21T05:00:00.000Z"),
     }),
     timeZone: "Asia/Bangkok",
+    issues: [sampleIssue(projectId)],
     roster: [
       { projectId, userId: member.userId },
       { projectId, userId: lead.userId },
@@ -99,16 +101,9 @@ function wire(bot: Bot) {
 }
 
 async function sendTask(bot: Bot): Promise<void> {
-  await bot.handleUpdate({
-    update_id: 1,
-    message: {
-      message_id: 1,
-      date: 1,
-      chat: { id: chatId, type: "group", title: "Секретный" },
-      from: { id: memberTelegramId, is_bot: false, first_name: "A" },
-      text: "/task issue-1 Шаг",
-      entities: [{ offset: 0, length: 5, type: "bot_command" }],
-    },
+  await sendTaskUpdate(bot, {
+    chatId,
+    telegramUserId: memberTelegramId,
   });
 }
 

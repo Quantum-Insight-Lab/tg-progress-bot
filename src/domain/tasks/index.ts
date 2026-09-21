@@ -14,6 +14,10 @@ export type {
 } from "./types.js";
 export { BLOCKER_SIGNALS, TASK_STATUSES } from "./types.js";
 export { weightOf } from "./weight.js";
+export {
+  pickIssueFromMirror,
+  requireIssuesInMirror,
+} from "./issue.js";
 export { isAllowedTransition, transitionStatus } from "./transitions.js";
 export {
   addTaskToTodayList,

@@ -7,6 +7,8 @@ import {
   checkDayListItem,
   createTask,
   openDayList,
+  pickIssueFromMirror,
+  requireIssuesInMirror,
   setListMessageId,
   type Blocker,
   type IssueRef,
@@ -20,14 +22,37 @@ import {
   type ProjectAccess,
   type ProjectMember,
 } from "../domain/projects/index.js";
-import { CONFIRM_QUESTION, confirmKeyboard, CHECK_CALLBACK_PREFIX, MENU_CALLBACK_PREFIX } from "./callbacks.js";
+import { DomainError } from "../domain/shared/errors.js";
+import {
+  CHECK_CALLBACK_PREFIX,
+  CONFIRM_QUESTION,
+  ISSUE_CALLBACK_PREFIX,
+  ISSUE_PICK_PROMPT,
+  MENU_CALLBACK_PREFIX,
+  confirmKeyboard,
+  issuePickerKeyboard,
+} from "./callbacks.js";
 
 export { CHECK_CALLBACK_PREFIX, MENU_CALLBACK_PREFIX } from "./callbacks.js";
+
+export type ProjectIssue = IssueRef & {
+  number: number;
+  title: string;
+};
+
+export type PendingTaskDraft = {
+  projectId: string;
+  userId: string;
+  title: string;
+};
 
 export type DayListStore = {
   clock: Clock;
   timeZoneOf: (projectId: string) => string | undefined;
-  findIssue: (projectId: string, issueId: string) => IssueRef | undefined;
+  issuesOf: (projectId: string) => readonly ProjectIssue[];
+  pendingOf: (userId: string) => PendingTaskDraft | undefined;
+  savePendingTask: (draft: PendingTaskDraft) => void;
+  clearPendingTask: (userId: string) => void;
   listsOf: (projectId: string) => TaskList[];
   saveList: (list: TaskList) => void;
   taskOf: (taskId: string) => { task: Task; blockers: Blocker[] } | undefined;
@@ -102,24 +127,15 @@ export function renderDayList(
   return { text: lines.join("\n"), keyboard };
 }
 
-function parseTaskCommand(text: string | undefined): {
-  issueId: string;
-  title: string;
-} | undefined {
+function parseTaskCommand(text: string | undefined): { title: string } | undefined {
   if (text === undefined) {
     return undefined;
   }
-  const body = text.replace(/^\/task(?:@\S+)?\s+/u, "").trim();
-  const space = body.indexOf(" ");
-  if (space <= 0) {
+  const title = text.replace(/^\/task(?:@\S+)?/u, "").trim();
+  if (title.length === 0) {
     return undefined;
   }
-  const issueId = body.slice(0, space).trim();
-  const title = body.slice(space + 1).trim();
-  if (issueId.length === 0 || title.length === 0) {
-    return undefined;
-  }
-  return { issueId, title };
+  return { title };
 }
 
 function openItemsOf(lists: readonly TaskList[]): TaskListItem[] {
@@ -204,20 +220,60 @@ export async function onTaskCommand(
 ): Promise<void> {
   const parsed = parseTaskCommand(ctx.message?.text);
   if (parsed === undefined) {
-    await ctx.reply("Нужны issue и формулировка");
+    await ctx.reply("Нужна формулировка");
     return;
   }
+  const mirrored = store.issuesOf(access.projectId);
+  requireIssuesInMirror(mirrored, access.projectId);
+  store.savePendingTask({
+    projectId: access.projectId,
+    userId: member.userId,
+    title: parsed.title,
+  });
+  const markup = issuePickerKeyboard(mirrored);
+  const threadId = ctx.message?.message_thread_id;
+  if (threadId === undefined) {
+    await ctx.reply(ISSUE_PICK_PROMPT, { reply_markup: markup });
+    return;
+  }
+  await ctx.reply(ISSUE_PICK_PROMPT, {
+    reply_markup: markup,
+    message_thread_id: threadId,
+  });
+}
+
+export async function onPickIssueCallback(
+  ctx: Context,
+  access: ProjectAccess,
+  member: ProjectMember,
+  store: DayListStore,
+): Promise<void> {
+  const data = ctx.callbackQuery?.data;
+  if (data === undefined || !data.startsWith(ISSUE_CALLBACK_PREFIX)) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const issueId = data.slice(ISSUE_CALLBACK_PREFIX.length);
+  const draft = store.pendingOf(member.userId);
+  if (draft === undefined || draft.projectId !== access.projectId) {
+    throw new DomainError("invalid_transition", "Нужна формулировка");
+  }
+  const issue = pickIssueFromMirror(
+    store.issuesOf(access.projectId),
+    access.projectId,
+    issueId,
+  );
   const list = ensureTodayList(access, member, store);
   const lists = store.listsOf(access.projectId);
   const created = createTask({
     id: store.newId(),
     projectId: access.projectId,
-    issueId: parsed.issueId,
+    issueId: issue.id,
     assigneeId: member.userId,
-    title: parsed.title,
+    title: draft.title,
     createdByUserId: member.userId,
     target: "today",
-    issue: store.findIssue(access.projectId, parsed.issueId),
+    issue,
     assignee: { projectId: access.projectId, userId: member.userId },
     actor: {
       userId: member.userId,
@@ -233,7 +289,9 @@ export async function onTaskCommand(
   });
   store.saveTask(created.task, []);
   store.saveList(added.list);
+  store.clearPendingTask(member.userId);
   await publishList(ctx, store, added.list);
+  await ctx.answerCallbackQuery();
 }
 
 export async function onCheckCallback(

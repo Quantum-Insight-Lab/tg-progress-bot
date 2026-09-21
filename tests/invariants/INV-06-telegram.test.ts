@@ -13,8 +13,9 @@ import {
   resetBotForTests,
   wireTelegram,
 } from "../../src/telegram/index.js";
-import { memoryDayListStore } from "../helpers/day-list-store.js";
+import { memoryDayListStore, sampleIssue } from "../helpers/day-list-store.js";
 import { repoRoot } from "../helpers/repo-root.js";
+import { sendTask as sendTaskUpdate } from "../helpers/telegram-task.js";
 
 const projectId = "p1";
 const chatId = 100;
@@ -60,16 +61,11 @@ async function sendTask(
   title = "Шаг",
   updateId = 1,
 ): Promise<void> {
-  await bot.handleUpdate({
-    update_id: updateId,
-    message: {
-      message_id: updateId,
-      date: updateId,
-      chat: { id: chatId, type: "group", title: "Секретный" },
-      from: { id: telegramUserId, is_bot: false, first_name: "A" },
-      text: `/task issue-1 ${title}`,
-      entities: [{ offset: 0, length: 5, type: "bot_command" }],
-    },
+  await sendTaskUpdate(bot, {
+    chatId,
+    telegramUserId,
+    title,
+    updateId,
   });
 }
 
@@ -80,6 +76,7 @@ it("INV-06: второй /task правит то же сообщение, не �
       current: () => new Date("2026-09-21T05:00:00.000Z"),
     }),
     timeZone: "Asia/Bangkok",
+    issues: [sampleIssue(projectId)],
   });
   const captured = intercept(bot);
   wireTelegram(bot, {
@@ -99,7 +96,7 @@ it("INV-06: второй /task правит то же сообщение, не �
   await sendTask(bot, "Вторая");
   const listSends = captured.methods.filter((method) => method === "sendMessage");
   const edits = captured.methods.filter((method) => method === "editMessageText");
-  expect(listSends).toHaveLength(1);
+  expect(listSends).toHaveLength(3);
   expect(edits).toHaveLength(1);
   expect(dayList.lists).toHaveLength(1);
   expect(captured.texts.some((text) => text.includes("21.09"))).toBe(true);
@@ -134,6 +131,7 @@ it("INV-06: C-5 полный список — отказ, второе сооб�
     }),
     timeZone: "Asia/Bangkok",
     lists: [full],
+    issues: [sampleIssue(projectId)],
   });
   const captured = intercept(bot);
   wireTelegram(bot, {
@@ -150,9 +148,9 @@ it("INV-06: C-5 полный список — отказ, второе сооб�
     dayList,
   });
   await sendTask(bot, "Лишняя");
-  expect(captured.texts).toEqual(["Список дня заполнен"]);
+  expect(captured.texts).toEqual(["Выберите issue", "Список дня заполнен"]);
   expect(captured.methods.filter((method) => method === "sendMessage")).toHaveLength(
-    1,
+    2,
   );
   expect(captured.methods.filter((method) => method === "editMessageText")).toEqual(
     [],
@@ -167,6 +165,7 @@ it("INV-06: галочка редактирует то же сообщение",
       current: () => new Date("2026-09-21T05:00:00.000Z"),
     }),
     timeZone: "Asia/Bangkok",
+    issues: [sampleIssue(projectId)],
   });
   const captured = intercept(bot);
   wireTelegram(bot, {
@@ -234,6 +233,7 @@ it("INV-06: перенос через границу суток в таймзо�
       current: () => now,
     }),
     timeZone: "Asia/Bangkok",
+    issues: [sampleIssue(projectId)],
   });
   const captured = intercept(bot);
   wireTelegram(bot, {

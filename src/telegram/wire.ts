@@ -5,10 +5,15 @@ import {
   bindGuardedCommand,
   type IdentityDirectories,
 } from "./bind.js";
-import { TASK_ACT_CALLBACK_PATTERN, itemIdFromCallback } from "./callbacks.js";
+import {
+  ISSUE_CALLBACK_PREFIX,
+  TASK_ACT_CALLBACK_PATTERN,
+  itemIdFromCallback,
+} from "./callbacks.js";
 import {
   CHECK_CALLBACK_PREFIX,
   onCheckCallback,
+  onPickIssueCallback,
   onTaskCommand,
   type DayListStore,
 } from "./day-list.js";
@@ -18,6 +23,7 @@ import { onTaskActCallback } from "./task-actions.js";
 export const TELEGRAM_HANDLER_IDS = [
   "telegram.start",
   "telegram.task",
+  "telegram.pick_issue",
   "telegram.check",
   "telegram.act",
 ] as const;
@@ -60,6 +66,16 @@ export function wireTelegram(bot: Bot, deps: TelegramDeps): void {
     identity,
     onAuthorized: async (ctx, access, member) => {
       await onTaskCommand(ctx, access, member, deps.dayList);
+    },
+  });
+  bindGuardedCallbackQuery({
+    bot,
+    id: "telegram.pick_issue",
+    trigger: new RegExp(`^${ISSUE_CALLBACK_PREFIX}`),
+    directory: deps.directory,
+    identity,
+    onAuthorized: async (ctx, access, member) => {
+      await onPickIssueCallback(ctx, access, member, deps.dayList);
     },
   });
   bindGuardedCallbackQuery({

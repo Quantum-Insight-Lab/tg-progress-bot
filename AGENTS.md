@@ -37,6 +37,7 @@ src/config     ничего не импортирует из src
 | Переход статуса задачи | `transitionStatus` в `src/domain/tasks` (INV-03) |
 | Галочка и DONE | `checkTask` / `uncheckTask` / `confirmTask` в `src/domain/tasks` (INV-04, INV-05) |
 | Список дня | `openDayList` / `addTaskToTodayList` / `checkDayListItem` / `carryOverOpenItems` в `src/domain/tasks` (INV-06, INV-07, INV-14, C-5) |
+| Выбор issue | `requireIssuesInMirror` / `pickIssueFromMirror` в `src/domain/tasks` (INV-01) |
 | Симметрия BLOCKED | `detectBlocker` / `dismissBlocker` / `resolveBlocker` в `src/domain/tasks` (INV-13) |
 | Вес задачи | `weightOf` из приоритета в `src/config` (INV-15) |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
