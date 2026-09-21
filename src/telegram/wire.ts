@@ -26,6 +26,7 @@ import {
   onScreenCommand,
   onStartMenu,
 } from "./screens.js";
+import { onReportCommand } from "./reports.js";
 import { onTaskActCallback } from "./task-actions.js";
 import {
   onBlockerReasonMessage,
@@ -46,6 +47,7 @@ export const TELEGRAM_HANDLER_IDS = [
   "telegram.plan",
   "telegram.blockers",
   "telegram.github",
+  "telegram.report",
   "telegram.blocker_dismiss",
   "telegram.blocker_reason",
 ] as const;
@@ -79,7 +81,8 @@ export function wireTelegram(bot: Bot, deps: TelegramDeps): void {
       return undefined;
     },
     findProjectIdByPrivateUser: (userId) =>
-      deps.dayList.pendingAskOf(userId)?.projectId,
+      deps.dayList.pendingAskOf(userId)?.projectId ??
+      deps.identity.findProjectIdsByUserId?.(userId)?.[0],
   };
   const screenIdentity = {
     findProjectIdsByUserId: deps.identity.findProjectIdsByUserId,
@@ -183,6 +186,22 @@ export function wireTelegram(bot: Bot, deps: TelegramDeps): void {
       },
     });
   }
+  bindGuardedCommand({
+    bot,
+    id: "telegram.report",
+    command: "report",
+    directory: deps.directory,
+    identity,
+    onAuthorized: async (ctx, access, member) => {
+      await onReportCommand(
+        ctx,
+        access,
+        member,
+        deps.directory,
+        screenIdentity,
+      );
+    },
+  });
   bindGuardedCallbackQuery({
     bot,
     id: "telegram.blocker_dismiss",

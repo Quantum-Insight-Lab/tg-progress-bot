@@ -1,9 +1,11 @@
 import { blockersBoard } from "./blockers-board.js";
+import { dailyDigest } from "./daily-digest.js";
 import { doneFeed } from "./done-feed.js";
 import { githubState } from "./github-state.js";
 import { workBoard } from "./in-progress-board.js";
 import { planQueue } from "./plan-queue.js";
 import { projectProgress } from "./project-progress.js";
+import { reportTargets } from "./report-targets.js";
 import { todayList } from "./today-list.js";
 import type { ScreenReader } from "./types.js";
 
@@ -22,15 +24,18 @@ export type {
   WorkCard,
   WorkItem,
 } from "./types.js";
+export type { DailyProjectSlice, DigestTask } from "./daily-digest.js";
 export { dayNumberOf } from "./day-number.js";
 export type { DayNumberItem } from "./day-number.js";
 
 export {
   blockersBoard,
+  dailyDigest,
   doneFeed,
   githubState,
   planQueue,
   projectProgress,
+  reportTargets,
   todayList,
   workBoard,
 };
