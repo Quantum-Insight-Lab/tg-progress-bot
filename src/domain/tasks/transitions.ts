@@ -1,7 +1,7 @@
 import { DomainError } from "../shared/errors.js";
 import type { Task, TaskStatus } from "./types.js";
 
-/** INV-03: таблица из docs/04 без REVIEW/DONE/BLOCKED — их добавит #9. */
+/** INV-03: таблица переходов из docs/04. */
 export function isAllowedTransition(
   from: TaskStatus | null,
   to: TaskStatus,
@@ -19,6 +19,24 @@ export function isAllowedTransition(
     return true;
   }
   if (from === "IN_PROGRESS" && to === "PLANNED") {
+    return true;
+  }
+  if (from === "IN_PROGRESS" && to === "BLOCKED") {
+    return true;
+  }
+  if (from === "BLOCKED" && to === "IN_PROGRESS") {
+    return true;
+  }
+  if (from === "IN_PROGRESS" && to === "REVIEW") {
+    return true;
+  }
+  if (from === "BLOCKED" && to === "REVIEW") {
+    return true;
+  }
+  if (from === "REVIEW" && to === "IN_PROGRESS") {
+    return true;
+  }
+  if (from === "REVIEW" && to === "DONE") {
     return true;
   }
   return false;

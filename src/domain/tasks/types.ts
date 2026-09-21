@@ -23,6 +23,31 @@ export type MemberRef = {
   userId: string;
 };
 
+export type ProjectActor = {
+  userId: string;
+  role: ActorRole;
+  projectId: string;
+};
+
+export const BLOCKER_SIGNALS = [
+  "no_check",
+  "no_issue_activity",
+  "pr_stale",
+  "ci_red",
+  "no_branch",
+] as const;
+
+export type BlockerSignal = (typeof BLOCKER_SIGNALS)[number];
+
+export type Blocker = {
+  id: string;
+  taskId: string;
+  source: string;
+  signalType: BlockerSignal | null;
+  reason: string | null;
+  active: boolean;
+};
+
 export type Task = {
   id: string;
   projectId: string;
