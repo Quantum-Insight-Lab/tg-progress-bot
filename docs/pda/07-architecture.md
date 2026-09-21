@@ -62,6 +62,7 @@ src/
   domain/
     projects/       Project, Stage, ProjectMember, права доступа
     tasks/          Task, переходы, Blocker, список дня
+    progress/       ProgressSnapshot, расчёт процента
     shared/         типы-значения, ошибки домена, время и таймзоны
   events/           журнал, публикация, сгенерированные типы и схемы
   projections/      по одной проекции на файл, имена как в 06

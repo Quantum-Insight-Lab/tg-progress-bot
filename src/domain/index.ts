@@ -2,3 +2,4 @@ export { DomainError, DOMAIN_ERROR_CODES, type DomainErrorCode } from "./shared/
 export * from "./projects/index.js";
 export * from "./tasks/index.js";
 export * from "./github/index.js";
+export * from "./progress/index.js";

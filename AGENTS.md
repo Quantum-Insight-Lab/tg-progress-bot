@@ -40,6 +40,7 @@ src/config     ничего не импортирует из src
 | Выбор issue | `requireIssuesInMirror` / `pickIssueFromMirror` в `src/domain/tasks` (INV-01) |
 | Симметрия BLOCKED | `detectBlocker` / `dismissBlocker` / `resolveBlocker` в `src/domain/tasks` (INV-13) |
 | Вес задачи | `weightOf` из приоритета в `src/config` (INV-15) |
+| Прогресс | `progressOfProject` / `takeProgressSnapshot` в `src/domain/progress` (INV-10, INV-11) |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |
 | Валидация внешних данных | Zod-схемы, для событий — сгенерированные из реестра |
