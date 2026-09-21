@@ -41,6 +41,8 @@ src/config     ничего не импортирует из src
 | Симметрия BLOCKED | `detectBlocker` / `dismissBlocker` / `resolveBlocker` в `src/domain/tasks` (INV-13) |
 | Вес задачи | `weightOf` из приоритета в `src/config` (INV-15) |
 | Прогресс | `progressOfProject` / `takeProgressSnapshot` в `src/domain/progress` (INV-10, INV-11) |
+| Экраны | проекции в `src/projections`, хендлеры через factory-guard (S-5, INV-12) |
+| Номер дня пункта | `dayNumberOf` в `src/projections/day-number.ts` |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |
 | Валидация внешних данных | Zod-схемы, для событий — сгенерированные из реестра |

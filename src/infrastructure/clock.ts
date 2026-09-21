@@ -7,6 +7,7 @@ export type Instant = {
 export type Clock = {
   now: (timeZone: string) => Instant;
   calendarDate: (timeZone: string) => string;
+  calendarDateAt: (iso: string, timeZone: string) => string;
 };
 
 export type ClockDeps = {
@@ -35,6 +36,9 @@ export function createClock(deps: ClockDeps = {}): Clock {
     },
     calendarDate(timeZone: string): string {
       return calendarDateInZone(current(), timeZone);
+    },
+    calendarDateAt(iso: string, timeZone: string): string {
+      return calendarDateInZone(new Date(iso), timeZone);
     },
   };
 }
