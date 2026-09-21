@@ -1,4 +1,4 @@
-export type ScreenKind = "progress" | "work" | "done" | "plan" | "github";
+export type ScreenKind = "progress" | "work" | "done" | "plan" | "blockers" | "github";
 
 export type ProgressTaskRow = {
   projectId: string;
@@ -64,10 +64,34 @@ export type GithubCard = {
   failingChecks: { pullRequestNumber: number; conclusion: string }[];
 };
 
+export type DeclaredBlockerItem = {
+  title: string;
+  reason: string;
+  waitingIssueTitles: string[];
+  requiredAction: string | null;
+};
+
+export type StaleBlockerItem = {
+  title: string;
+  pullRequestNumber: number | null;
+  idleDays: number | null;
+  ciRed: boolean;
+  noBranch: boolean;
+  noIssueActivity: boolean;
+};
+
+export type BlockersCard = {
+  projectId: string;
+  name: string;
+  declared: DeclaredBlockerItem[];
+  stale: StaleBlockerItem[];
+};
+
 export type ScreenReader = {
   projectProgress: (projectIds: readonly string[]) => Promise<ProjectProgressCard[]>;
   workBoard: (projectIds: readonly string[]) => Promise<WorkCard[]>;
   doneFeed: (projectIds: readonly string[]) => Promise<DoneCard[]>;
   planQueue: (projectIds: readonly string[]) => Promise<PlanCard[]>;
+  blockersBoard: (projectIds: readonly string[]) => Promise<BlockersCard[]>;
   githubState: (projectIds: readonly string[]) => Promise<GithubCard[]>;
 };

@@ -44,6 +44,7 @@ export const TELEGRAM_HANDLER_IDS = [
   "telegram.work",
   "telegram.done",
   "telegram.plan",
+  "telegram.blockers",
   "telegram.github",
   "telegram.blocker_dismiss",
   "telegram.blocker_reason",
@@ -150,11 +151,16 @@ export function wireTelegram(bot: Bot, deps: TelegramDeps): void {
       );
     },
   });
-  const commands: { id: (typeof TELEGRAM_HANDLER_IDS)[number]; command: "progress" | "work" | "done" | "plan" | "github"; kind: "progress" | "work" | "done" | "plan" | "github" }[] = [
+  const commands: {
+    id: (typeof TELEGRAM_HANDLER_IDS)[number];
+    command: "progress" | "work" | "done" | "plan" | "blockers" | "github";
+    kind: "progress" | "work" | "done" | "plan" | "blockers" | "github";
+  }[] = [
     { id: "telegram.progress", command: "progress", kind: "progress" },
     { id: "telegram.work", command: "work", kind: "work" },
     { id: "telegram.done", command: "done", kind: "done" },
     { id: "telegram.plan", command: "plan", kind: "plan" },
+    { id: "telegram.blockers", command: "blockers", kind: "blockers" },
     { id: "telegram.github", command: "github", kind: "github" },
   ];
   for (const entry of commands) {

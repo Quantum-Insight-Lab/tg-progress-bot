@@ -42,7 +42,7 @@ src/config     ничего не импортирует из src
 | Застой | `isStale` / `mayReAsk` / `signalsDue` / `applyStaleSignals` в `src/domain/tasks` (C-1, C-2) |
 | Вес задачи | `weightOf` из приоритета в `src/config` (INV-15) |
 | Прогресс | `progressOfProject` / `takeProgressSnapshot` в `src/domain/progress` (INV-10, INV-11) |
-| Экраны | проекции в `src/projections`, хендлеры через factory-guard (S-5, INV-12) |
+| Экраны | проекции в `src/projections` (`blockersBoard` — «Блокеры»), хендлеры через factory-guard (S-5, INV-12) |
 | Номер дня пункта | `dayNumberOf` в `src/projections/day-number.ts` |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |

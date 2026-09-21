@@ -213,6 +213,86 @@ function renderPlan(cards: Awaited<ReturnType<ScreenReader["planQueue"]>>): stri
     .join("\n\n");
 }
 
+function escapeMarkdown(value: string): string {
+  return value.replace(/[_*[\]`]/g, "\\$&");
+}
+
+function withPeriod(value: string): string {
+  return /[.!?…]$/.test(value) ? value : `${value}.`;
+}
+
+function daysWord(days: number): string {
+  const mod10 = days % 10;
+  const mod100 = days % 100;
+  if (mod10 === 1 && mod100 !== 11) {
+    return "день";
+  }
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return "дня";
+  }
+  return "дней";
+}
+
+function impactLine(titles: readonly string[]): string {
+  if (titles.length === 0) {
+    return `Влияние: ${formatProgress(null)}.`;
+  }
+  return `Влияние: блокирует ${escapeMarkdown(titles.join(", "))}.`;
+}
+
+function staleFactsLine(item: {
+  pullRequestNumber: number | null;
+  idleDays: number | null;
+  ciRed: boolean;
+  noBranch: boolean;
+  noIssueActivity: boolean;
+}): string {
+  const bits: string[] = [];
+  if (item.pullRequestNumber !== null) {
+    let pr = `PR #${String(item.pullRequestNumber)}`;
+    if (item.idleDays !== null) {
+      pr += ` без движения ${String(item.idleDays)} ${daysWord(item.idleDays)}`;
+    }
+    bits.push(pr);
+  }
+  if (item.ciRed) {
+    bits.push("CI красный");
+  }
+  if (item.noBranch) {
+    bits.push("нет ветки и PR");
+  }
+  if (item.noIssueActivity && bits.length === 0) {
+    bits.push("нет активности по issue");
+  }
+  if (bits.length === 0) {
+    return "Причина не уточнена.";
+  }
+  return `${bits.join(", ")}. Причина не уточнена.`;
+}
+
+function renderBlockers(
+  cards: Awaited<ReturnType<ScreenReader["blockersBoard"]>>,
+): string {
+  return cards
+    .map((card) => {
+      const lines = [card.name];
+      for (const item of card.declared) {
+        lines.push(`⚠️ **${escapeMarkdown(item.title)}**`);
+        lines.push(`Причина: ${withPeriod(escapeMarkdown(item.reason))}`);
+        lines.push(impactLine(item.waitingIssueTitles));
+        lines.push(
+          `Что требуется: ${withPeriod(escapeMarkdown(item.requiredAction ?? formatProgress(null)))}`,
+        );
+      }
+      for (const item of card.stale) {
+        lines.push(`⏳ **${escapeMarkdown(item.title)}**`);
+        lines.push(staleFactsLine(item));
+      }
+      return lines.join("\n");
+    })
+    .join("\n\n");
+}
+
 function renderGithub(cards: Awaited<ReturnType<ScreenReader["githubState"]>>): string {
   return cards
     .map((card) => {
@@ -292,11 +372,16 @@ async function showScreen(
     text = renderDone(await screens.doneFeed(projectIds));
   } else if (kind === "plan") {
     text = renderPlan(await screens.planQueue(projectIds));
+  } else if (kind === "blockers") {
+    text = renderBlockers(await screens.blockersBoard(projectIds));
   } else {
     text = renderGithub(await screens.githubState(projectIds));
   }
   if (text.length === 0) {
     text = formatProgress(null);
   }
-  await ctx.reply(text);
+  await ctx.reply(
+    text,
+    kind === "blockers" ? { parse_mode: "Markdown" } : {},
+  );
 }
