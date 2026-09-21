@@ -7,6 +7,8 @@ export const PRIO_CALLBACK_PREFIX = "pri:";
 export const CANCEL_CALLBACK_PREFIX = "can:";
 export const ASSIGN_CALLBACK_PREFIX = "asg:";
 export const CONFIRM_CALLBACK_PREFIX = "confirm:";
+export const ISSUE_CALLBACK_PREFIX = "iss:";
+export const ISSUE_PICK_PROMPT = "Выберите issue";
 
 export const TASK_ACT_CALLBACK_PATTERN =
   /^(menu|plan|pri|can|asg|confirm):/;
@@ -19,6 +21,17 @@ export function confirmKeyboard(itemId: string): InlineKeyboard {
     "Подтвердить",
     `${CONFIRM_CALLBACK_PREFIX}${itemId}`,
   );
+}
+
+export function issuePickerKeyboard(
+  issues: readonly { id: string; number: number; title: string }[],
+): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  for (const issue of issues) {
+    const label = `#${String(issue.number)} ${issue.title}`.slice(0, 64);
+    keyboard.text(label, `${ISSUE_CALLBACK_PREFIX}${issue.id}`).row();
+  }
+  return keyboard;
 }
 
 export function itemIdFromCallback(data: string | undefined): string | undefined {

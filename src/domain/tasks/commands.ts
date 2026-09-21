@@ -8,6 +8,7 @@ import {
   hasActiveBlocker,
   type BlockerResolvedEvent,
 } from "./blockers.js";
+import { pickIssueFromMirror } from "./issue.js";
 import { transitionStatus } from "./transitions.js";
 import type {
   ActorRole,
@@ -103,13 +104,11 @@ export function createTask(input: {
   idempotencyKey: string;
 }): { task: Task; event: TaskCreatedEvent } {
   assertActorCanWrite(input.actor.role);
-  if (
-    input.issue === undefined ||
-    input.issue.id !== input.issueId ||
-    input.issue.projectId !== input.projectId
-  ) {
-    throw new DomainError("invalid_transition", "Нужен issue своего проекта");
-  }
+  pickIssueFromMirror(
+    input.issue === undefined ? [] : [input.issue],
+    input.projectId,
+    input.issueId,
+  );
   if (
     input.assignee === undefined ||
     input.assignee.userId !== input.assigneeId ||
