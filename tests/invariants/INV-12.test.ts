@@ -1,4 +1,7 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join, relative } from "node:path";
 import { beforeEach, expect, it } from "vitest";
+import type { Bot, Transformer } from "grammy";
 import { DomainError } from "../../src/domain/shared/errors.js";
 import {
   addMember,
@@ -7,10 +10,17 @@ import {
   removeMember,
   requireMember,
   resetHandlerRegistry,
+  type MemberDirectory,
   type Project,
   type ProjectMember,
 } from "../../src/domain/projects/index.js";
 import { EVENT_TYPES } from "../../src/events/generated/event-types.js";
+import {
+  resetBotForTests,
+  TELEGRAM_HANDLER_IDS,
+  wireTelegram,
+} from "../../src/telegram/index.js";
+import { repoRoot } from "../helpers/repo-root.js";
 
 const project: Project = {
   id: "p1",
@@ -162,4 +172,131 @@ it("lead снимает участника; доступ после снятия
       ),
     ),
   ).toThrow(DomainError);
+});
+
+const leak = /Секретный|p1|org\/repo/i;
+const chatId = 100;
+const telegramUserId = 200;
+
+function directoryOf(roster: readonly ProjectMember[]): MemberDirectory {
+  return {
+    find: (projectId, userId) =>
+      roster.find((m) => m.projectId === projectId && m.userId === userId),
+  };
+}
+
+function identityFor(userId: string) {
+  return {
+    findProjectByChatId: (id: string) =>
+      id === String(chatId) ? { id: project.id } : undefined,
+    findUserByTelegramId: (id: string) =>
+      id === String(telegramUserId) ? { id: userId } : undefined,
+  };
+}
+
+function interceptReplies(bot: Bot): string[] {
+  const texts: string[] = [];
+  const fake: Transformer = (_prev, method, payload) => {
+    if (method === "sendMessage" && payload !== undefined && "text" in payload) {
+      texts.push(String(payload.text));
+    }
+    return Promise.resolve({ ok: true, result: true as never });
+  };
+  bot.api.config.use(fake);
+  return texts;
+}
+
+async function sendStart(bot: Bot, fromId: number): Promise<void> {
+  await bot.handleUpdate({
+    update_id: 1,
+    message: {
+      message_id: 1,
+      date: 1,
+      chat: { id: chatId, type: "group", title: project.name },
+      from: { id: fromId, is_bot: false, first_name: "A" },
+      text: "/start",
+      entities: [{ offset: 0, length: 6, type: "bot_command" }],
+    },
+  });
+}
+
+function listTelegramTs(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      listTelegramTs(full, acc);
+    } else if (entry.name.endsWith(".ts")) {
+      acc.push(full);
+    }
+  }
+  return acc;
+}
+
+it("INV-12: реестр хендлеров бота перебирается и каждый с guard", () => {
+  const bot = resetBotForTests();
+  wireTelegram(bot, {
+    directory: directoryOf([lead]),
+    identity: identityFor(lead.userId),
+  });
+  const registered = registeredHandlers();
+  expect(registered.map((handler) => handler.id)).toEqual([
+    ...TELEGRAM_HANDLER_IDS,
+  ]);
+  for (const handler of registered) {
+    expect(handler.guarded).toBe(true);
+  }
+});
+
+it("INV-12: не-участник получает отказ без данных проекта", async () => {
+  const bot = resetBotForTests();
+  const replies = interceptReplies(bot);
+  wireTelegram(bot, {
+    directory: directoryOf([lead]),
+    identity: identityFor(lead.userId),
+  });
+  await sendStart(bot, 999);
+  expect(replies).toEqual(["Нет доступа"]);
+  expect(replies.join("\n")).not.toMatch(leak);
+});
+
+it("INV-12: пользователь без членства не видит данные проекта", async () => {
+  const bot = resetBotForTests();
+  const replies = interceptReplies(bot);
+  wireTelegram(bot, {
+    directory: directoryOf([lead]),
+    identity: identityFor(member.userId),
+  });
+  await sendStart(bot, telegramUserId);
+  expect(replies).toEqual(["Нет доступа"]);
+  expect(replies.join("\n")).not.toMatch(leak);
+});
+
+it("INV-12: участник проходит, ответ без данных проекта", async () => {
+  const bot = resetBotForTests();
+  const replies = interceptReplies(bot);
+  wireTelegram(bot, {
+    directory: directoryOf([lead]),
+    identity: identityFor(lead.userId),
+  });
+  await sendStart(bot, telegramUserId);
+  expect(replies).toEqual(["Доступ есть"]);
+  expect(replies.join("\n")).not.toMatch(leak);
+});
+
+it("INV-12: grammY-регистрация только через bind.ts", () => {
+  const attach = /\.(command|hears|callbackQuery|inlineQuery|on|use)\s*\(/;
+  const hits: string[] = [];
+  for (const file of listTelegramTs(join(repoRoot, "src/telegram"))) {
+    const path = relative(repoRoot, file).replaceAll("\\", "/");
+    if (path === "src/telegram/bind.ts") {
+      continue;
+    }
+    if (attach.test(readFileSync(file, "utf8"))) {
+      hits.push(path);
+    }
+  }
+  expect(hits).toEqual([]);
+  expect(readFileSync(join(repoRoot, "src/telegram/bind.ts"), "utf8")).toContain(
+    "registerGuardedHandler",
+  );
 });
