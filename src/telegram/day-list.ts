@@ -3,6 +3,7 @@ import type { Context } from "grammy";
 import type { Clock } from "../infrastructure/clock.js";
 import {
   addTaskToTodayList,
+  carryOverOpenItems,
   checkDayListItem,
   createTask,
   openDayList,
@@ -42,21 +43,49 @@ function headingOf(listDate: string): string {
   return `${day}.${month}`;
 }
 
+function dayNumberOf(
+  item: TaskListItem,
+  lists: readonly TaskList[],
+): number {
+  let day = 1;
+  let fromId = item.carriedFromListId;
+  while (fromId !== null) {
+    day += 1;
+    const previous = lists
+      .find((list) => list.id === fromId)
+      ?.items.find((entry) => entry.taskId === item.taskId);
+    fromId = previous?.carriedFromListId ?? null;
+  }
+  return day;
+}
+
+function lineOf(
+  item: TaskListItem,
+  title: string,
+  lists: readonly TaskList[],
+): string {
+  const mark = item.isDone ? "✅" : "☐";
+  const day = dayNumberOf(item, lists);
+  if (item.carriedFromListId === null || day <= 1) {
+    return `${mark} ${title}`;
+  }
+  return `${mark} ${title} · день ${String(day)}`;
+}
+
 export function renderDayList(
   list: TaskList,
   tasks: ReadonlyMap<string, Task>,
+  lists: readonly TaskList[] = [list],
 ): { text: string; keyboard: InlineKeyboard } {
   const lines = [headingOf(list.listDate)];
   const keyboard = new InlineKeyboard();
   for (const item of list.items) {
     const task = tasks.get(item.taskId);
     const title = task?.title ?? item.taskId;
-    if (item.isDone) {
-      lines.push(`✅ ${title}`);
-      continue;
+    lines.push(lineOf(item, title, lists));
+    if (!item.isDone) {
+      keyboard.text("✓", `${CHECK_CALLBACK_PREFIX}${item.id}`).row();
     }
-    lines.push(`☐ ${title}`);
-    keyboard.text("✓", `${CHECK_CALLBACK_PREFIX}${item.id}`).row();
   }
   return { text: lines.join("\n"), keyboard };
 }
@@ -96,8 +125,44 @@ function tasksMap(store: DayListStore, list: TaskList): Map<string, Task> {
   return map;
 }
 
+function ensureTodayList(
+  access: ProjectAccess,
+  member: ProjectMember,
+  store: DayListStore,
+): TaskList {
+  const timeZone = store.timeZoneOf(access.projectId);
+  if (timeZone === undefined) {
+    requireMember(undefined);
+    throw new Error("unreachable");
+  }
+  const lists = store.listsOf(access.projectId);
+  const opened = openDayList({
+    lists,
+    projectId: access.projectId,
+    listDate: store.clock.calendarDate(timeZone),
+    newListId: store.newId(),
+    topicId: member.topicId,
+  });
+  if (!opened.created) {
+    return opened.list;
+  }
+  const carried = carryOverOpenItems({
+    lists,
+    targetList: opened.list,
+    itemIdFor: () => store.newId(),
+  });
+  for (const list of carried.lists) {
+    store.saveList(list);
+  }
+  return carried.targetList;
+}
+
 async function publishList(ctx: Context, store: DayListStore, list: TaskList): Promise<void> {
-  const rendered = renderDayList(list, tasksMap(store, list));
+  const rendered = renderDayList(
+    list,
+    tasksMap(store, list),
+    store.listsOf(list.projectId),
+  );
   const chatId = ctx.chat?.id;
   if (list.messageId !== null) {
     if (chatId === undefined) {
@@ -130,19 +195,8 @@ export async function onTaskCommand(
     await ctx.reply("Нужны issue и формулировка");
     return;
   }
-  const timeZone = store.timeZoneOf(access.projectId);
-  if (timeZone === undefined) {
-    requireMember(undefined);
-    return;
-  }
+  const list = ensureTodayList(access, member, store);
   const lists = store.listsOf(access.projectId);
-  const opened = openDayList({
-    lists,
-    projectId: access.projectId,
-    listDate: store.clock.calendarDate(timeZone),
-    newListId: store.newId(),
-    topicId: member.topicId,
-  });
   const created = createTask({
     id: store.newId(),
     projectId: access.projectId,
@@ -160,7 +214,7 @@ export async function onTaskCommand(
     idempotencyKey: store.newId(),
   });
   const added = addTaskToTodayList({
-    list: opened.list,
+    list,
     task: created.task,
     itemId: store.newId(),
     openItemsForTask: openItemsOf(lists),

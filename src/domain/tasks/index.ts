@@ -17,9 +17,11 @@ export { weightOf } from "./weight.js";
 export { isAllowedTransition, transitionStatus } from "./transitions.js";
 export {
   addTaskToTodayList,
+  carryOverOpenItems,
   checkDayListItem,
   openDayList,
   setListMessageId,
+  type TaskCarriedOverEvent,
 } from "./day-list.js";
 export {
   closeActiveBlockers,

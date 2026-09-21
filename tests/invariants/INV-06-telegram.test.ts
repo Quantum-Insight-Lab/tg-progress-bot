@@ -55,12 +55,16 @@ function intercept(bot: Bot): {
   return { texts, methods };
 }
 
-async function sendTask(bot: Bot, title = "Шаг"): Promise<void> {
+async function sendTask(
+  bot: Bot,
+  title = "Шаг",
+  updateId = 1,
+): Promise<void> {
   await bot.handleUpdate({
-    update_id: 1,
+    update_id: updateId,
     message: {
-      message_id: 1,
-      date: 1,
+      message_id: updateId,
+      date: updateId,
       chat: { id: chatId, type: "group", title: "Секретный" },
       from: { id: telegramUserId, is_bot: false, first_name: "A" },
       text: `/task issue-1 ${title}`,
@@ -220,4 +224,47 @@ it("INV-06: sendChecklist в telegram нет", () => {
   }
   walk(root);
   expect(hits).toEqual([]);
+});
+
+it("INV-06: перенос через границу суток в таймзоне проекта", async () => {
+  let now = new Date("2026-09-20T16:00:00.000Z");
+  const bot = resetBotForTests();
+  const dayList = memoryDayListStore({
+    clock: createClock({
+      current: () => now,
+    }),
+    timeZone: "Asia/Bangkok",
+  });
+  const captured = intercept(bot);
+  wireTelegram(bot, {
+    directory: {
+      find: (pid, uid) =>
+        pid === projectId && uid === lead.userId ? lead : undefined,
+    },
+    identity: {
+      findProjectByChatId: (id) =>
+        id === String(chatId) ? { id: projectId } : undefined,
+      findUserByTelegramId: (id) =>
+        id === String(telegramUserId) ? { id: lead.userId } : undefined,
+    },
+    dayList,
+  });
+  await sendTask(bot, "Вчерашняя", 1);
+  expect(dayList.lists).toHaveLength(1);
+  expect(dayList.lists[0]?.listDate).toBe("2026-09-20");
+  now = new Date("2026-09-20T17:00:00.000Z");
+  await sendTask(bot, "Новая", 2);
+  const dates = dayList.lists.map((list) => list.listDate).sort();
+  expect(dates).toEqual(["2026-09-20", "2026-09-21"]);
+  const yesterday = dayList.lists.find((list) => list.listDate === "2026-09-20");
+  const today = dayList.lists.find((list) => list.listDate === "2026-09-21");
+  expect(yesterday?.items[0]?.isDone).toBe(true);
+  expect(today?.items).toHaveLength(2);
+  const carried = today?.items.find((item) => item.carriedFromListId !== null);
+  const openCarried = today?.items.filter((item) => !item.isDone && item.carriedFromListId !== null);
+  expect(carried?.carriedFromListId).toBe(yesterday?.id);
+  expect(openCarried).toHaveLength(1);
+  expect(captured.texts.some((text) => text.includes("21.09"))).toBe(true);
+  expect(captured.texts.some((text) => text.includes("день 2"))).toBe(true);
+  expect(captured.texts.some((text) => text.includes("Вчерашняя"))).toBe(true);
 });
