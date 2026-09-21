@@ -1,3 +1,4 @@
+import { blockersBoard } from "./blockers-board.js";
 import { doneFeed } from "./done-feed.js";
 import { githubState } from "./github-state.js";
 import { workBoard } from "./in-progress-board.js";
@@ -7,6 +8,8 @@ import { todayList } from "./today-list.js";
 import type { ScreenReader } from "./types.js";
 
 export type {
+  BlockersCard,
+  DeclaredBlockerItem,
   DoneCard,
   GithubCard,
   PlanCard,
@@ -15,6 +18,7 @@ export type {
   ProjectProgressCard,
   ScreenKind,
   ScreenReader,
+  StaleBlockerItem,
   WorkCard,
   WorkItem,
 } from "./types.js";
@@ -22,6 +26,7 @@ export { dayNumberOf } from "./day-number.js";
 export type { DayNumberItem } from "./day-number.js";
 
 export {
+  blockersBoard,
   doneFeed,
   githubState,
   planQueue,
@@ -36,6 +41,7 @@ export function dbScreenReader(): ScreenReader {
     workBoard,
     doneFeed,
     planQueue,
+    blockersBoard,
     githubState,
   };
 }
@@ -46,6 +52,7 @@ export function emptyScreenReader(): ScreenReader {
     workBoard: async () => [],
     doneFeed: async () => [],
     planQueue: async () => [],
+    blockersBoard: async () => [],
     githubState: async () => [],
   };
 }

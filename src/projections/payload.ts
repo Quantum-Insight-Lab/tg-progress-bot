@@ -10,6 +10,14 @@ export function stringField(payload: unknown, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+export function numberField(payload: unknown, key: string): number | undefined {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+  const value = payload[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 export function occurredIso(value: unknown): string | null {
   if (value instanceof Date) {
     return value.toISOString();

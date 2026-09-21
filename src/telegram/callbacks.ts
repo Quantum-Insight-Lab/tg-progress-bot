@@ -49,6 +49,8 @@ export function screensKeyboard(): InlineKeyboard {
     .row()
     .text("📋 ПЛАН", `${SCREEN_CALLBACK_PREFIX}plan`)
     .row()
+    .text("⚠️ БЛОКЕРЫ", `${SCREEN_CALLBACK_PREFIX}blockers`)
+    .row()
     .text("🐙 GITHUB", `${SCREEN_CALLBACK_PREFIX}github`);
 }
 
