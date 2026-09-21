@@ -33,6 +33,7 @@ src/config     ничего не импортирует из src
 | Логирование | единственный логгер в `src/infrastructure/logger.ts` |
 | Ошибки домена | класс `DomainError` из `src/domain/shared/errors.ts` с кодом причины |
 | Telegram | единственный экземпляр grammY-бота в `src/telegram/bot.ts` |
+| Регистрация хендлеров | `registerGuardedHandler` в `src/domain/projects` (INV-12) |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |
 | Валидация внешних данных | Zod-схемы, для событий — сгенерированные из реестра |
