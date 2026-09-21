@@ -8,4 +8,4 @@ export {
   recordMilestoneUpdated,
   recordPullRequestUpdated,
 } from "./facts.js";
-export { githubSyncLagMs, isReconcileDue } from "./reconcile.js";
+export { githubSyncLagMs, githubSignalsAllowed, isReconcileDue } from "./reconcile.js";

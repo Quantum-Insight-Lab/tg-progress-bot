@@ -12,6 +12,7 @@ export type IdentityDirectories = {
   findProjectByChatId: (chatId: string) => { id: string } | undefined;
   findUserByTelegramId: (telegramUserId: string) => { id: string } | undefined;
   findProjectIdByCallback?: (data: string | undefined) => string | undefined;
+  findProjectIdByPrivateUser?: (userId: string) => string | undefined;
 };
 
 export function resolveAccess(
@@ -34,10 +35,14 @@ export function resolveAccess(
     }
   }
   const projectId = identity.findProjectIdByCallback?.(ctx.callbackQuery?.data);
-  if (projectId === undefined) {
-    return undefined;
+  if (projectId !== undefined) {
+    return { projectId, userId: user.id };
   }
-  return { projectId, userId: user.id };
+  const privateProjectId = identity.findProjectIdByPrivateUser?.(user.id);
+  if (privateProjectId !== undefined) {
+    return { projectId: privateProjectId, userId: user.id };
+  }
+  return undefined;
 }
 
 async function replyDenied(ctx: Context, error: unknown): Promise<boolean> {
@@ -131,6 +136,42 @@ export function bindGuardedCallbackQuery(input: {
     identity: input.identity,
     attach: (instance, listener) => {
       instance.callbackQuery(input.trigger, listener);
+    },
+    onAuthorized: input.onAuthorized,
+  });
+}
+
+/** Текст в личке: тот же factory-guard (INV-12). */
+export function bindGuardedPrivateText(input: {
+  bot: Bot;
+  id: string;
+  directory: MemberDirectory;
+  identity: IdentityDirectories;
+  shouldHandle: (ctx: Context) => boolean;
+  onAuthorized: (
+    ctx: Context,
+    access: ProjectAccess,
+    member: ProjectMember,
+  ) => Promise<void>;
+}): void {
+  bindGuardedListener({
+    bot: input.bot,
+    id: input.id,
+    directory: input.directory,
+    identity: input.identity,
+    attach: (instance, listener) => {
+      instance.on("message:text", async (ctx, next) => {
+        const text = ctx.message?.text ?? "";
+        if (
+          text.startsWith("/") ||
+          ctx.chat?.type !== "private" ||
+          !input.shouldHandle(ctx)
+        ) {
+          await next();
+          return;
+        }
+        await listener(ctx);
+      });
     },
     onAuthorized: input.onAuthorized,
   });

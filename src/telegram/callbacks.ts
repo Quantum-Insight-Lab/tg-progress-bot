@@ -9,8 +9,11 @@ export const ASSIGN_CALLBACK_PREFIX = "asg:";
 export const CONFIRM_CALLBACK_PREFIX = "confirm:";
 export const ISSUE_CALLBACK_PREFIX = "iss:";
 export const SCREEN_CALLBACK_PREFIX = "scr:";
+export const DISMISS_BLOCKER_PREFIX = "noblock:";
 export const ISSUE_PICK_PROMPT = "Выберите issue";
 export const SCREEN_MENU_PROMPT = "Выберите экран";
+export const BLOCKER_ASK_HINT = "что мешает?";
+export const NO_BLOCKER_LABEL = "нет блокера";
 
 export const TASK_ACT_CALLBACK_PATTERN =
   /^(menu|plan|pri|can|asg|confirm):/;
@@ -47,6 +50,13 @@ export function screensKeyboard(): InlineKeyboard {
     .text("📋 ПЛАН", `${SCREEN_CALLBACK_PREFIX}plan`)
     .row()
     .text("🐙 GITHUB", `${SCREEN_CALLBACK_PREFIX}github`);
+}
+
+export function noBlockerKeyboard(blockerId: string): InlineKeyboard {
+  return new InlineKeyboard().text(
+    NO_BLOCKER_LABEL,
+    `${DISMISS_BLOCKER_PREFIX}${blockerId}`,
+  );
 }
 
 export function itemIdFromCallback(data: string | undefined): string | undefined {
