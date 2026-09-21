@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** C-1…C-7 из docs/05-constants.md. Единственное место числовых порогов (S-8). */
+/** C-1…C-7 из docs/pda/05-constants.md. Единственное место числовых порогов (S-8). */
 export const constants = {
   staleDays: 2,
   reAskDays: 3,

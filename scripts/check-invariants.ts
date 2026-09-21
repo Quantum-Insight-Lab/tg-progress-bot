@@ -1,5 +1,5 @@
 /**
- * S-7: каждый INV-xx из docs/04-invariants.md имеет тест с этим префиксом в имени.
+ * S-7: каждый INV-xx из docs/pda/04-invariants.md имеет тест с этим префиксом в имени.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -64,7 +64,7 @@ export function checkRepo(repoRoot: string = root): {
   extra: string[];
 } {
   const specIds = specInvariantIds(
-    readFileSync(join(repoRoot, "docs/04-invariants.md"), "utf8"),
+    readFileSync(join(repoRoot, "docs/pda/04-invariants.md"), "utf8"),
   );
   const sources = listTsFiles(join(repoRoot, "tests")).map((file) =>
     readFileSync(file, "utf8"),
@@ -79,7 +79,7 @@ if (isMain) {
   const { specIds, missing, extra } = checkRepo();
   if (specIds.length === 0) {
     process.stderr.write(
-      "S-7: в docs/04-invariants.md нет ID вида | INV-xx |.\n",
+      "S-7: в docs/pda/04-invariants.md нет ID вида | INV-xx |.\n",
     );
     process.exitCode = 1;
   } else if (missing.length > 0 || extra.length > 0) {

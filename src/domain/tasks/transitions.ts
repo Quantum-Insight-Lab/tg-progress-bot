@@ -1,7 +1,7 @@
 import { DomainError } from "../shared/errors.js";
 import type { Task, TaskStatus } from "./types.js";
 
-/** INV-03: таблица переходов из docs/04. */
+/** INV-03: таблица переходов из docs/pda/04. */
 export function isAllowedTransition(
   from: TaskStatus | null,
   to: TaskStatus,
