@@ -1,21 +1,9 @@
-import { randomUUID } from "node:crypto";
-import {
-  recordChecksFailed,
-  recordIssueLinked,
-  recordIssueUpdated,
-  recordMilestoneUpdated,
-  recordPullRequestUpdated,
-} from "../domain/github/index.js";
-import { emit } from "../events/emit.js";
+import { applyGithubFact } from "./apply.js";
 import { getDb } from "../infrastructure/db.js";
+import { clock } from "../infrastructure/clock.js";
 import { logger } from "../infrastructure/logger.js";
-import {
-  idOfIssue,
-  idOfPullRequest,
-  idOfStage,
-  persistGithubFact,
-} from "./mirror.js";
-import { parseGithubFact, type ParsedGithubFact } from "./parse.js";
+import { markGithubTouched } from "../observability/github-sync.js";
+import { parseGithubFact } from "./parse.js";
 import { verifyGithubSignature } from "./signature.js";
 
 export type IngestGithubWebhookInput = {
@@ -79,7 +67,7 @@ export async function ingestGithubWebhook(
 
   let applied = false;
   for (const project of projects) {
-    const published = await publishFact(
+    const published = await applyGithubFact(
       project.id,
       deliveryKey(input.deliveryId, project.id),
       fact,
@@ -88,155 +76,6 @@ export async function ingestGithubWebhook(
       applied = true;
     }
   }
+  markGithubTouched(clock.now("UTC").epochMs);
   return { ok: true, applied };
-}
-
-async function linkedIssueId(
-  projectId: string,
-  issueNumber: number,
-): Promise<string | null> {
-  const row = await getDb()
-    .selectFrom("issues")
-    .select("id")
-    .where("project_id", "=", projectId)
-    .where("issue_number", "=", issueNumber)
-    .executeTakeFirst();
-  return row?.id ?? null;
-}
-
-async function publishFact(
-  projectId: string,
-  deliveryId: string,
-  fact: ParsedGithubFact,
-): Promise<boolean> {
-  if (fact.kind === "issue_updated") {
-    const issueId = await idOfIssue(projectId, fact.issueNumber);
-    const stageId =
-      fact.milestone === null
-        ? undefined
-        : await idOfStage(projectId, fact.milestone.number);
-    const event = recordIssueUpdated({
-      issueId,
-      deliveryId,
-      issueNumber: fact.issueNumber,
-      state: fact.state,
-      title: fact.title,
-      milestoneNumber: fact.milestoneNumber,
-      assigneeLogin: fact.assigneeLogin,
-    });
-    const result = await emit(event.type, {
-      actor: event.actor,
-      subject: event.subject,
-      payload: event.payload,
-      idempotencyKey: event.idempotencyKey,
-    });
-    if (!result.applied) {
-      return false;
-    }
-    await persistGithubFact(projectId, fact, { issueId, stageId });
-    return true;
-  }
-
-  if (fact.kind === "issue_linked") {
-    const issueId = await idOfIssue(projectId, fact.issueNumber);
-    const dependsOnIssueId = await idOfIssue(
-      projectId,
-      fact.dependsOnIssueNumber,
-    );
-    const event = recordIssueLinked({
-      issueId,
-      dependsOnIssueId,
-      deliveryId,
-      linkType: fact.linkType,
-      removed: fact.removed,
-    });
-    const result = await emit(event.type, {
-      actor: event.actor,
-      subject: event.subject,
-      payload: event.payload,
-      idempotencyKey: event.idempotencyKey,
-    });
-    if (!result.applied) {
-      return false;
-    }
-    await persistGithubFact(projectId, fact, { issueId, dependsOnIssueId });
-    return true;
-  }
-
-  if (fact.kind === "pull_request_updated") {
-    const pullRequestId = await idOfPullRequest(
-      projectId,
-      fact.pullRequestNumber,
-    );
-    const issueId = await linkedIssueId(projectId, fact.pullRequestNumber);
-    const event = recordPullRequestUpdated({
-      pullRequestId,
-      deliveryId,
-      pullRequestNumber: fact.pullRequestNumber,
-      issueId,
-      state: fact.state,
-      updatedAt: fact.updatedAt,
-    });
-    const result = await emit(event.type, {
-      actor: event.actor,
-      subject: event.subject,
-      payload: event.payload,
-      idempotencyKey: event.idempotencyKey,
-    });
-    if (!result.applied) {
-      return false;
-    }
-    await persistGithubFact(projectId, fact, {
-      pullRequestId,
-      issueId: issueId ?? undefined,
-    });
-    return true;
-  }
-
-  if (fact.kind === "checks_failed") {
-    const pullRequestId = await idOfPullRequest(
-      projectId,
-      fact.pullRequestNumber,
-    );
-    const checkRunId = randomUUID();
-    const event = recordChecksFailed({
-      checkRunId,
-      deliveryId,
-      pullRequestNumber: fact.pullRequestNumber,
-      conclusion: fact.conclusion,
-      completedAt: fact.completedAt,
-    });
-    const result = await emit(event.type, {
-      actor: event.actor,
-      subject: event.subject,
-      payload: event.payload,
-      idempotencyKey: event.idempotencyKey,
-    });
-    if (!result.applied) {
-      return false;
-    }
-    await persistGithubFact(projectId, fact, { pullRequestId, checkRunId });
-    return true;
-  }
-
-  const stageId = await idOfStage(projectId, fact.milestoneNumber);
-  const event = recordMilestoneUpdated({
-    stageId,
-    deliveryId,
-    milestoneNumber: fact.milestoneNumber,
-    title: fact.title,
-    state: fact.state,
-    dueOn: fact.dueOn,
-  });
-  const result = await emit(event.type, {
-    actor: event.actor,
-    subject: event.subject,
-    payload: event.payload,
-    idempotencyKey: event.idempotencyKey,
-  });
-  if (!result.applied) {
-    return false;
-  }
-  await persistGithubFact(projectId, fact, { stageId });
-  return true;
 }
