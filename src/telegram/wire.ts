@@ -3,9 +3,11 @@ import type { MemberDirectory } from "../domain/projects/index.js";
 import {
   bindGuardedCallbackQuery,
   bindGuardedCommand,
+  bindGuardedPrivateText,
   type IdentityDirectories,
 } from "./bind.js";
 import {
+  DISMISS_BLOCKER_PREFIX,
   ISSUE_CALLBACK_PREFIX,
   SCREEN_CALLBACK_PREFIX,
   TASK_ACT_CALLBACK_PATTERN,
@@ -25,6 +27,10 @@ import {
   onStartMenu,
 } from "./screens.js";
 import { onTaskActCallback } from "./task-actions.js";
+import {
+  onBlockerReasonMessage,
+  onDismissBlockerCallback,
+} from "./stale.js";
 
 /** Идентификаторы хендлеров бота; INV-12 перебирает этот список. */
 export const TELEGRAM_HANDLER_IDS = [
@@ -39,6 +45,8 @@ export const TELEGRAM_HANDLER_IDS = [
   "telegram.done",
   "telegram.plan",
   "telegram.github",
+  "telegram.blocker_dismiss",
+  "telegram.blocker_reason",
 ] as const;
 
 export type { DayListStore };
@@ -59,11 +67,18 @@ export function wireTelegram(bot: Bot, deps: TelegramDeps): void {
     findUserByTelegramId: deps.identity.findUserByTelegramId,
     findProjectIdByCallback: (data) => {
       const itemId = itemIdFromCallback(data);
-      if (itemId === undefined) {
-        return undefined;
+      if (itemId !== undefined) {
+        return deps.dayList.projectIdOfItem(itemId);
       }
-      return deps.dayList.projectIdOfItem(itemId);
+      if (data !== undefined && data.startsWith(DISMISS_BLOCKER_PREFIX)) {
+        return deps.dayList.projectIdOfBlocker(
+          data.slice(DISMISS_BLOCKER_PREFIX.length),
+        );
+      }
+      return undefined;
     },
+    findProjectIdByPrivateUser: (userId) =>
+      deps.dayList.pendingAskOf(userId)?.projectId,
   };
   const screenIdentity = {
     findProjectIdsByUserId: deps.identity.findProjectIdsByUserId,
@@ -162,4 +177,34 @@ export function wireTelegram(bot: Bot, deps: TelegramDeps): void {
       },
     });
   }
+  bindGuardedCallbackQuery({
+    bot,
+    id: "telegram.blocker_dismiss",
+    trigger: new RegExp(`^${DISMISS_BLOCKER_PREFIX}`),
+    directory: deps.directory,
+    identity,
+    onAuthorized: async (ctx, access, member) => {
+      await onDismissBlockerCallback(ctx, access, member, deps.dayList);
+    },
+  });
+  bindGuardedPrivateText({
+    bot,
+    id: "telegram.blocker_reason",
+    directory: deps.directory,
+    identity,
+    shouldHandle: (ctx) => {
+      const telegramUserId = ctx.from?.id;
+      if (telegramUserId === undefined) {
+        return false;
+      }
+      const user = deps.identity.findUserByTelegramId(String(telegramUserId));
+      if (user === undefined) {
+        return false;
+      }
+      return deps.dayList.pendingAskOf(user.id) !== undefined;
+    },
+    onAuthorized: async (ctx, access, member) => {
+      await onBlockerReasonMessage(ctx, access, member, deps.dayList);
+    },
+  });
 }

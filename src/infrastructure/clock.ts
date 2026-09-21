@@ -8,6 +8,7 @@ export type Clock = {
   now: (timeZone: string) => Instant;
   calendarDate: (timeZone: string) => string;
   calendarDateAt: (iso: string, timeZone: string) => string;
+  daysBetween: (fromDate: string, toDate: string) => number;
 };
 
 export type ClockDeps = {
@@ -21,6 +22,11 @@ function calendarDateInZone(at: Date, timeZone: string): string {
     month: "2-digit",
     day: "2-digit",
   }).format(at);
+}
+
+function epochUtcOf(isoDate: string): number {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1);
 }
 
 export function createClock(deps: ClockDeps = {}): Clock {
@@ -39,6 +45,10 @@ export function createClock(deps: ClockDeps = {}): Clock {
     },
     calendarDateAt(iso: string, timeZone: string): string {
       return calendarDateInZone(new Date(iso), timeZone);
+    },
+    daysBetween(fromDate: string, toDate: string): number {
+      const ms = epochUtcOf(toDate) - epochUtcOf(fromDate);
+      return Math.round(ms / 86_400_000);
     },
   };
 }

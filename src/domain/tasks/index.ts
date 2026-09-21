@@ -29,6 +29,13 @@ export {
   type TaskCarriedOverEvent,
 } from "./day-list.js";
 export {
+  applyStaleSignals,
+  isStale,
+  mayReAsk,
+  signalsDue,
+  type GithubIdleFacts,
+} from "./stale.js";
+export {
   closeActiveBlockers,
   declareBlocker,
   detectBlocker,

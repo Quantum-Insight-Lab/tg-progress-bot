@@ -39,6 +39,7 @@ src/config     ничего не импортирует из src
 | Список дня | `openDayList` / `addTaskToTodayList` / `checkDayListItem` / `carryOverOpenItems` в `src/domain/tasks` (INV-06, INV-07, INV-14, C-5) |
 | Выбор issue | `requireIssuesInMirror` / `pickIssueFromMirror` в `src/domain/tasks` (INV-01) |
 | Симметрия BLOCKED | `detectBlocker` / `dismissBlocker` / `resolveBlocker` в `src/domain/tasks` (INV-13) |
+| Застой | `isStale` / `mayReAsk` / `signalsDue` / `applyStaleSignals` в `src/domain/tasks` (C-1, C-2) |
 | Вес задачи | `weightOf` из приоритета в `src/config` (INV-15) |
 | Прогресс | `progressOfProject` / `takeProgressSnapshot` в `src/domain/progress` (INV-10, INV-11) |
 | Экраны | проекции в `src/projections`, хендлеры через factory-guard (S-5, INV-12) |

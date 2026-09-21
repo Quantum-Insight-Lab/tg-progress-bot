@@ -2,6 +2,7 @@ export { bot, resetBotForTests } from "./bot.js";
 export {
   bindGuardedCallbackQuery,
   bindGuardedCommand,
+  bindGuardedPrivateText,
   resolveAccess,
   type IdentityDirectories,
 } from "./bind.js";
@@ -11,3 +12,4 @@ export {
   type DayListStore,
   type TelegramDeps,
 } from "./wire.js";
+export { scanStaleTasks, blockerAskText } from "./stale.js";

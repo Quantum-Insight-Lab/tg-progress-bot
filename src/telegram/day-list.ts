@@ -47,6 +47,12 @@ export type PendingTaskDraft = {
   title: string;
 };
 
+export type PendingBlockerAsk = {
+  projectId: string;
+  taskId: string;
+  blockerId: string;
+};
+
 export type DayListStore = {
   clock: Clock;
   timeZoneOf: (projectId: string) => string | undefined;
@@ -62,6 +68,12 @@ export type DayListStore = {
   leadsOf: (projectId: string) => readonly { userId: string }[];
   telegramIdOf: (userId: string) => string | undefined;
   projectIdOfItem: (itemId: string) => string | undefined;
+  pendingAskOf: (userId: string) => PendingBlockerAsk | undefined;
+  savePendingAsk: (userId: string, ask: PendingBlockerAsk) => void;
+  clearPendingAsk: (userId: string) => void;
+  lastAskedOn: (taskId: string) => string | null;
+  markAsked: (taskId: string, onDate: string) => void;
+  projectIdOfBlocker: (blockerId: string) => string | undefined;
   newId: () => string;
 };
 
