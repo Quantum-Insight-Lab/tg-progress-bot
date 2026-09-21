@@ -163,3 +163,28 @@ export type ReportSentPayload = {
   chat_id: number;
   topic_id: number | null;
 };
+
+export type PayloadByType = {
+  "task.created": TaskCreatedPayload;
+  "task.prioritized": TaskPrioritizedPayload;
+  "task.reassigned": TaskReassignedPayload;
+  "task.postponed": TaskPostponedPayload;
+  "task.checked": TaskCheckedPayload;
+  "task.unchecked": TaskUncheckedPayload;
+  "task.confirmed": TaskConfirmedPayload;
+  "task.cancelled": TaskCancelledPayload;
+  "task.carried_over": TaskCarriedOverPayload;
+  "blocker.detected": BlockerDetectedPayload;
+  "blocker.declared": BlockerDeclaredPayload;
+  "blocker.dismissed": BlockerDismissedPayload;
+  "blocker.resolved": BlockerResolvedPayload;
+  "project.member_added": ProjectMemberAddedPayload;
+  "project.member_removed": ProjectMemberRemovedPayload;
+  "github.issue_updated": GithubIssueUpdatedPayload;
+  "github.issue_linked": GithubIssueLinkedPayload;
+  "github.pull_request_updated": GithubPullRequestUpdatedPayload;
+  "github.checks_failed": GithubChecksFailedPayload;
+  "github.milestone_updated": GithubMilestoneUpdatedPayload;
+  "progress.snapshot_taken": ProgressSnapshotTakenPayload;
+  "report.sent": ReportSentPayload;
+};
