@@ -35,6 +35,8 @@ src/config     ничего не импортирует из src
 | Telegram | единственный экземпляр grammY-бота в `src/telegram/bot.ts` |
 | Регистрация хендлеров | `registerGuardedHandler` в `src/domain/projects` (INV-12) |
 | Переход статуса задачи | `transitionStatus` в `src/domain/tasks` (INV-03) |
+| Галочка и DONE | `checkTask` / `uncheckTask` / `confirmTask` в `src/domain/tasks` (INV-04, INV-05) |
+| Симметрия BLOCKED | `detectBlocker` / `dismissBlocker` / `resolveBlocker` в `src/domain/tasks` (INV-13) |
 | Вес задачи | `weightOf` из приоритета в `src/config` (INV-15) |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |

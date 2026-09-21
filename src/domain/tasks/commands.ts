@@ -2,8 +2,21 @@ import { constants, type Priority } from "../../config/index.js";
 import { EVENT_TYPES } from "../../events/generated/event-types.js";
 import type { PayloadByType } from "../../events/generated/payloads.js";
 import { DomainError } from "../shared/errors.js";
+import { assertAssignee, assertLeadOfProject } from "./access.js";
+import {
+  closeActiveBlockers,
+  hasActiveBlocker,
+  type BlockerResolvedEvent,
+} from "./blockers.js";
 import { transitionStatus } from "./transitions.js";
-import type { ActorRole, IssueRef, MemberRef, Task } from "./types.js";
+import type {
+  ActorRole,
+  Blocker,
+  IssueRef,
+  MemberRef,
+  ProjectActor,
+  Task,
+} from "./types.js";
 
 export type TaskCreatedEvent = {
   type: typeof EVENT_TYPES.TASK_CREATED;
@@ -42,6 +55,30 @@ export type TaskCancelledEvent = {
   actor: { id: string; role: ActorRole };
   subject: { entity: "Task"; id: string };
   payload: PayloadByType["task.cancelled"];
+  idempotencyKey: string;
+};
+
+export type TaskCheckedEvent = {
+  type: typeof EVENT_TYPES.TASK_CHECKED;
+  actor: { id: string; role: ActorRole };
+  subject: { entity: "Task"; id: string };
+  payload: PayloadByType["task.checked"];
+  idempotencyKey: string;
+};
+
+export type TaskUncheckedEvent = {
+  type: typeof EVENT_TYPES.TASK_UNCHECKED;
+  actor: { id: string; role: ActorRole };
+  subject: { entity: "Task"; id: string };
+  payload: PayloadByType["task.unchecked"];
+  idempotencyKey: string;
+};
+
+export type TaskConfirmedEvent = {
+  type: typeof EVENT_TYPES.TASK_CONFIRMED;
+  actor: { id: string; role: ActorRole };
+  subject: { entity: "Task"; id: string };
+  payload: PayloadByType["task.confirmed"];
   idempotencyKey: string;
 };
 
@@ -220,6 +257,78 @@ export function cancelTask(input: {
         reason: input.reason,
       },
       idempotencyKey: `${task.id}:cancelled`,
+    },
+  };
+}
+
+export function checkTask(input: {
+  task: Task;
+  blockers: readonly Blocker[];
+  listItemId: string;
+  actor: ProjectActor;
+  idempotencyKey: string;
+}): {
+  task: Task;
+  blockers: Blocker[];
+  events: Array<TaskCheckedEvent | BlockerResolvedEvent>;
+} {
+  assertAssignee(input.task, input.actor);
+  const closed = closeActiveBlockers(input.task, input.blockers, "checked");
+  const task = transitionStatus(input.task, "REVIEW");
+  return {
+    task,
+    blockers: closed.blockers,
+    events: [
+      ...closed.events,
+      {
+        type: EVENT_TYPES.TASK_CHECKED,
+        actor: { id: input.actor.userId, role: input.actor.role },
+        subject: { entity: "Task", id: task.id },
+        payload: { task_id: task.id, list_item_id: input.listItemId },
+        idempotencyKey: input.idempotencyKey,
+      },
+    ],
+  };
+}
+
+export function uncheckTask(input: {
+  task: Task;
+  listItemId: string;
+  actor: ProjectActor;
+  idempotencyKey: string;
+}): { task: Task; event: TaskUncheckedEvent } {
+  assertAssignee(input.task, input.actor);
+  const task = transitionStatus(input.task, "IN_PROGRESS");
+  return {
+    task,
+    event: {
+      type: EVENT_TYPES.TASK_UNCHECKED,
+      actor: { id: input.actor.userId, role: input.actor.role },
+      subject: { entity: "Task", id: task.id },
+      payload: { task_id: task.id, list_item_id: input.listItemId },
+      idempotencyKey: input.idempotencyKey,
+    },
+  };
+}
+
+export function confirmTask(input: {
+  task: Task;
+  blockers: readonly Blocker[];
+  actor: ProjectActor;
+}): { task: Task; event: TaskConfirmedEvent } {
+  assertLeadOfProject(input.task, input.actor);
+  if (hasActiveBlocker(input.blockers.filter((blocker) => blocker.taskId === input.task.id))) {
+    throw new DomainError("invalid_transition", "Переход статуса запрещён");
+  }
+  const task = transitionStatus(input.task, "DONE");
+  return {
+    task,
+    event: {
+      type: EVENT_TYPES.TASK_CONFIRMED,
+      actor: { id: input.actor.userId, role: input.actor.role },
+      subject: { entity: "Task", id: task.id },
+      payload: { task_id: task.id, confirmed_by: input.actor.userId },
+      idempotencyKey: `${task.id}:confirmed`,
     },
   };
 }

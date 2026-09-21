@@ -49,11 +49,11 @@ it("INV-03: PLANNED → IN_PROGRESS и отложить обратно разр�
   expect(postponed.status).toBe("PLANNED");
 });
 
-it("INV-03: REVIEW/DONE/BLOCKED из текущих статусов запрещены", () => {
+it("INV-03: IN_PROGRESS → REVIEW и BLOCKED разрешены, сразу в DONE — нет", () => {
   const task = create("today");
-  for (const to of ["REVIEW", "DONE", "BLOCKED"] as const) {
-    expect(() => transitionStatus(task, to)).toThrow(DomainError);
-  }
+  expect(transitionStatus(task, "REVIEW").status).toBe("REVIEW");
+  expect(transitionStatus(task, "BLOCKED").status).toBe("BLOCKED");
+  expect(() => transitionStatus(task, "DONE")).toThrow(DomainError);
 });
 
 it("INV-03: любой кроме DONE может быть CANCELLED", () => {
@@ -69,12 +69,18 @@ it("INV-03: любой кроме DONE может быть CANCELLED", () => {
   );
 });
 
-it("INV-03: все пары статусов сходятся с таблицей #8", () => {
+it("INV-03: все пары статусов сходятся с таблицей переходов", () => {
   const allowed = new Set([
     "null>IN_PROGRESS",
     "null>PLANNED",
     "PLANNED>IN_PROGRESS",
     "IN_PROGRESS>PLANNED",
+    "IN_PROGRESS>BLOCKED",
+    "BLOCKED>IN_PROGRESS",
+    "IN_PROGRESS>REVIEW",
+    "BLOCKED>REVIEW",
+    "REVIEW>IN_PROGRESS",
+    "REVIEW>DONE",
     "PLANNED>CANCELLED",
     "IN_PROGRESS>CANCELLED",
     "BLOCKED>CANCELLED",
