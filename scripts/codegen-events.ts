@@ -163,6 +163,10 @@ ${constEntries}
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
 
 export const EVENT_TYPE_VALUES: readonly EventType[] = Object.values(EVENT_TYPES);
+
+export const EVENT_SCHEMA_VERSIONS = {
+${registry.events.map((event) => `  ${JSON.stringify(event.type)}: ${String(event.version)},`).join("\n")}
+} as const satisfies Record<EventType, number>;
 `;
 
   const envelopeFields = Object.entries(registry.envelope)
@@ -182,6 +186,10 @@ ${envelopeFields}
 };
 
 ${payloadTypes}
+
+export type PayloadByType = {
+${registry.events.map((event) => `  ${JSON.stringify(event.type)}: ${toPascal(event.type)}Payload;`).join("\n")}
+};
 `;
 
   const schemaConsts = registry.events

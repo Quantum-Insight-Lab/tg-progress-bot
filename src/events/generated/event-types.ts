@@ -31,3 +31,28 @@ export const EVENT_TYPES = {
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
 
 export const EVENT_TYPE_VALUES: readonly EventType[] = Object.values(EVENT_TYPES);
+
+export const EVENT_SCHEMA_VERSIONS = {
+  "task.created": 1,
+  "task.prioritized": 1,
+  "task.reassigned": 1,
+  "task.postponed": 1,
+  "task.checked": 1,
+  "task.unchecked": 1,
+  "task.confirmed": 1,
+  "task.cancelled": 1,
+  "task.carried_over": 1,
+  "blocker.detected": 1,
+  "blocker.declared": 1,
+  "blocker.dismissed": 1,
+  "blocker.resolved": 1,
+  "project.member_added": 1,
+  "project.member_removed": 1,
+  "github.issue_updated": 1,
+  "github.issue_linked": 1,
+  "github.pull_request_updated": 1,
+  "github.checks_failed": 1,
+  "github.milestone_updated": 1,
+  "progress.snapshot_taken": 1,
+  "report.sent": 1,
+} as const satisfies Record<EventType, number>;
