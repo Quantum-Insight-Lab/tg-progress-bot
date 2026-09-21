@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { beforeAll, expect, it } from "vitest";
+import { DomainError } from "../../src/domain/shared/errors.js";
+import { createTask } from "../../src/domain/tasks/index.js";
 import { getPool } from "../../src/infrastructure/db.js";
 import { applyMigrations } from "../../scripts/migrate.js";
 import { insertTask, seedProject } from "../helpers/domain-seed.js";
@@ -46,4 +48,29 @@ it("INV-01: задача с issue своего проекта вставляет
   const pool = getPool();
   const seed = await seedProject(pool);
   await expect(insertTask(pool, seed)).resolves.toBeTypeOf("string");
+});
+
+it("INV-01: задача без issue своего проекта не создаётся", () => {
+  const draft = {
+    id: "task-1",
+    projectId: "proj-1",
+    issueId: "issue-1",
+    assigneeId: "u-assignee",
+    title: "Шаг",
+    createdByUserId: "u-author",
+    target: "today" as const,
+    assignee: { projectId: "proj-1", userId: "u-assignee" },
+    actor: { userId: "u-author", role: "member" as const },
+    idempotencyKey: "cb-1",
+  };
+  try {
+    createTask({ ...draft, issue: undefined });
+    expect.fail("ожидали отказ");
+  } catch (error) {
+    expect(error).toBeInstanceOf(DomainError);
+    expect((error as DomainError).code).toBe("invalid_transition");
+  }
+  expect(() =>
+    createTask({ ...draft, issue: { id: "issue-1", projectId: "other" } }),
+  ).toThrow(DomainError);
 });

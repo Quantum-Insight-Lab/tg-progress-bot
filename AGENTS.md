@@ -34,6 +34,8 @@ src/config     ничего не импортирует из src
 | Ошибки домена | класс `DomainError` из `src/domain/shared/errors.ts` с кодом причины |
 | Telegram | единственный экземпляр grammY-бота в `src/telegram/bot.ts` |
 | Регистрация хендлеров | `registerGuardedHandler` в `src/domain/projects` (INV-12) |
+| Переход статуса задачи | `transitionStatus` в `src/domain/tasks` (INV-03) |
+| Вес задачи | `weightOf` из приоритета в `src/config` (INV-15) |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |
 | Валидация внешних данных | Zod-схемы, для событий — сгенерированные из реестра |
