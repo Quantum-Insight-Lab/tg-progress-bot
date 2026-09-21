@@ -78,6 +78,14 @@ export default {
       from: { path: "^src/config" },
       to: { path: "^src/", pathNot: "^src/config" },
     },
+    {
+      name: "S-5-projections-not-write-events",
+      comment:
+        "S-5: проекции читают только типы событий, не emit и не журнал",
+      severity: "error",
+      from: { path: "^src/projections" },
+      to: { path: "^src/events", pathNot: "^src/events/generated" },
+    },
   ],
   options: {
     doNotFollow: {

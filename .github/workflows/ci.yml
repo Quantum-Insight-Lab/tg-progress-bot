@@ -34,6 +34,9 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run boundaries
+      - run: npm run circular
+      - run: npm run knip
+        continue-on-error: true
       - run: npm run check:generated
       - run: npm run check:invariants
       - run: npm test
