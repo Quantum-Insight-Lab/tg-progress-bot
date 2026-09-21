@@ -9,7 +9,11 @@
   "scripts": {
     "build": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "boundaries": "depcruise src --config dependency-cruiser.config.mjs",
+    "codegen:events": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/codegen-events.ts",
+    "check:generated": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-generated-events.ts",
+    "ci": "npm run lint && npm run build && npm run boundaries && npm run check:generated && npm test"
   },
   "dependencies": {
     "@octokit/rest": "^21.1.1",

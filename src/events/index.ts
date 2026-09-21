@@ -1,2 +1,2 @@
-/** Журнал и emit. Реализация — issue #4. */
-export {};
+/** Журнал и emit. Реализация — issue #4. Типы событий — S-3. */
+export * from "./generated/index.js";
