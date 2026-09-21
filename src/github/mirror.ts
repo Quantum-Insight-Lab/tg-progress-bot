@@ -259,3 +259,133 @@ async function upsertStubIssue(
     .onConflict((oc) => oc.columns(["project_id", "issue_number"]).doNothing())
     .execute();
 }
+
+function stamp(value: string | Date | null): string | null {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return value.toISOString();
+}
+
+export async function mirrorMatches(
+  projectId: string,
+  fact: ParsedGithubFact,
+): Promise<boolean> {
+  const db = getDb();
+
+  if (fact.kind === "issue_updated") {
+    const row = await db
+      .selectFrom("issues")
+      .select(["title", "state", "assignee_login", "stage_id"])
+      .where("project_id", "=", projectId)
+      .where("issue_number", "=", fact.issueNumber)
+      .executeTakeFirst();
+    if (row === undefined) {
+      return false;
+    }
+    if (
+      row.title !== fact.title ||
+      row.state !== fact.state ||
+      (row.assignee_login ?? null) !== fact.assigneeLogin
+    ) {
+      return false;
+    }
+    if (fact.milestone === null) {
+      return row.stage_id === null;
+    }
+    const stage = await db
+      .selectFrom("stages")
+      .select(["id", "name", "status", "due_on"])
+      .where("project_id", "=", projectId)
+      .where("milestone_number", "=", fact.milestone.number)
+      .executeTakeFirst();
+    if (stage === undefined || row.stage_id !== stage.id) {
+      return false;
+    }
+    return (
+      stage.name === fact.milestone.title &&
+      stage.status === fact.milestone.state &&
+      stamp(stage.due_on) === fact.milestone.dueOn
+    );
+  }
+
+  if (fact.kind === "issue_linked") {
+    const parent = await db
+      .selectFrom("issues")
+      .select("id")
+      .where("project_id", "=", projectId)
+      .where("issue_number", "=", fact.issueNumber)
+      .executeTakeFirst();
+    const child = await db
+      .selectFrom("issues")
+      .select("id")
+      .where("project_id", "=", projectId)
+      .where("issue_number", "=", fact.dependsOnIssueNumber)
+      .executeTakeFirst();
+    if (parent === undefined || child === undefined) {
+      return fact.removed;
+    }
+    const link = await db
+      .selectFrom("issue_dependencies")
+      .select("link_type")
+      .where("issue_id", "=", parent.id)
+      .where("depends_on_issue_id", "=", child.id)
+      .where("link_type", "=", fact.linkType)
+      .executeTakeFirst();
+    if (fact.removed) {
+      return link === undefined;
+    }
+    return link !== undefined;
+  }
+
+  if (fact.kind === "pull_request_updated") {
+    const row = await db
+      .selectFrom("issue_pull_requests")
+      .select("state")
+      .where("project_id", "=", projectId)
+      .where("pull_request_number", "=", fact.pullRequestNumber)
+      .executeTakeFirst();
+    return row?.state === fact.state;
+  }
+
+  if (fact.kind === "checks_failed") {
+    const row = await db
+      .selectFrom("check_runs")
+      .innerJoin(
+        "issue_pull_requests",
+        "issue_pull_requests.id",
+        "check_runs.pull_request_id",
+      )
+      .select([
+        "check_runs.conclusion as conclusion",
+        "check_runs.completed_at as completed_at",
+      ])
+      .where("issue_pull_requests.project_id", "=", projectId)
+      .where(
+        "issue_pull_requests.pull_request_number",
+        "=",
+        fact.pullRequestNumber,
+      )
+      .where("check_runs.conclusion", "=", fact.conclusion)
+      .execute();
+    return row.some((entry) => stamp(entry.completed_at) === fact.completedAt);
+  }
+
+  const stage = await db
+    .selectFrom("stages")
+    .select(["name", "status", "due_on"])
+    .where("project_id", "=", projectId)
+    .where("milestone_number", "=", fact.milestoneNumber)
+    .executeTakeFirst();
+  if (stage === undefined) {
+    return false;
+  }
+  return (
+    stage.name === fact.title &&
+    stage.status === fact.state &&
+    stamp(stage.due_on) === fact.dueOn
+  );
+}

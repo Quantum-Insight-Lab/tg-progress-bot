@@ -11,6 +11,7 @@ export const constants = {
   },
   defaultPriority: "normal",
   dayListMaxItems: 30,
+  /** C-6 GITHUB_RECONCILE_INTERVAL, минуты. */
   githubReconcileIntervalMinutes: 30,
   reportSchedule: {
     daily: { hour: 9, minute: 0 },
