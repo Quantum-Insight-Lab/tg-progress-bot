@@ -1,23 +1,9 @@
 import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 import { env } from "../config/index.js";
+import type { Database } from "./db-schema.js";
 
-export type EventsTable = {
-  event_id: string;
-  event_type: string;
-  occurred_at: string;
-  actor: unknown;
-  subject: unknown;
-  payload: unknown;
-  causation_id: string | null;
-  correlation_id: string | null;
-  idempotency_key: string | null;
-  schema_version: number;
-};
-
-export type Database = {
-  events: EventsTable;
-};
+export type { Database, EventsTable } from "./db-schema.js";
 
 let pool: Pool | undefined;
 let db: Kysely<Database> | undefined;
