@@ -1,5 +1,5 @@
 import { clock, type Clock } from "../../src/infrastructure/clock.js";
-import type { Blocker, IssueRef, Task, TaskList } from "../../src/domain/tasks/index.js";
+import type { Blocker, IssueRef, MemberRef, Task, TaskList } from "../../src/domain/tasks/index.js";
 import type { DayListStore } from "../../src/telegram/index.js";
 
 export function memoryDayListStore(init?: {
@@ -7,12 +7,15 @@ export function memoryDayListStore(init?: {
   timeZone?: string;
   issues?: readonly IssueRef[];
   lists?: TaskList[];
+  roster?: readonly MemberRef[];
+  leads?: readonly { userId: string; telegramUserId: string }[];
 }): DayListStore & {
   lists: TaskList[];
   tasks: Map<string, { task: Task; blockers: Blocker[] }>;
 } {
   const lists: TaskList[] = init?.lists === undefined ? [] : [...init.lists];
   const tasks = new Map<string, { task: Task; blockers: Blocker[] }>();
+  const leads = init?.leads ?? [];
   let nextId = 0;
   return {
     lists,
@@ -44,6 +47,14 @@ export function memoryDayListStore(init?: {
     saveTask: (task, blockers) => {
       tasks.set(task.id, { task, blockers });
     },
+    rosterOf: (projectId) =>
+      (init?.roster ?? []).filter((member) => member.projectId === projectId),
+    leadsOf: () => leads.map((lead) => ({ userId: lead.userId })),
+    telegramIdOf: (userId) =>
+      leads.find((lead) => lead.userId === userId)?.telegramUserId,
+    projectIdOfItem: (itemId) =>
+      lists.find((list) => list.items.some((item) => item.id === itemId))
+        ?.projectId,
     newId: () => {
       nextId += 1;
       return `id-${String(nextId)}`;

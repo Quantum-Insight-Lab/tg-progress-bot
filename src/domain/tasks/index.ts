@@ -19,6 +19,7 @@ export {
   addTaskToTodayList,
   carryOverOpenItems,
   checkDayListItem,
+  closeOpenItem,
   openDayList,
   setListMessageId,
   type TaskCarriedOverEvent,

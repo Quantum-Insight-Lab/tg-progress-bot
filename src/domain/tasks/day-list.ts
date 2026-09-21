@@ -220,3 +220,17 @@ export function checkDayListItem(input: {
     events: checked.events,
   };
 }
+
+/** Закрыть пункт без галочки: отложить / отменить (INV-14). */
+export function closeOpenItem(list: TaskList, itemId: string): TaskList {
+  const item = list.items.find((entry) => entry.id === itemId);
+  if (item === undefined || item.isDone) {
+    throw new DomainError("invalid_transition", "Переход статуса запрещён");
+  }
+  return {
+    ...list,
+    items: list.items.map((entry) =>
+      entry.id === itemId ? { ...entry, isDone: true } : entry,
+    ),
+  };
+}

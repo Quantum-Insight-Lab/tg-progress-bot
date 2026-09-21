@@ -11,30 +11,43 @@ import { DomainError } from "../domain/shared/errors.js";
 export type IdentityDirectories = {
   findProjectByChatId: (chatId: string) => { id: string } | undefined;
   findUserByTelegramId: (telegramUserId: string) => { id: string } | undefined;
+  findProjectIdByCallback?: (data: string | undefined) => string | undefined;
 };
 
 export function resolveAccess(
   ctx: Context,
   identity: IdentityDirectories,
 ): ProjectAccess | undefined {
-  const chatId = ctx.chat?.id;
   const telegramUserId = ctx.from?.id;
-  if (chatId === undefined || telegramUserId === undefined) {
+  if (telegramUserId === undefined) {
     return undefined;
   }
-  const project = identity.findProjectByChatId(String(chatId));
   const user = identity.findUserByTelegramId(String(telegramUserId));
-  if (project === undefined || user === undefined) {
+  if (user === undefined) {
     return undefined;
   }
-  return { projectId: project.id, userId: user.id };
+  const chatId = ctx.chat?.id;
+  if (chatId !== undefined) {
+    const project = identity.findProjectByChatId(String(chatId));
+    if (project !== undefined) {
+      return { projectId: project.id, userId: user.id };
+    }
+  }
+  const projectId = identity.findProjectIdByCallback?.(ctx.callbackQuery?.data);
+  if (projectId === undefined) {
+    return undefined;
+  }
+  return { projectId, userId: user.id };
 }
 
 async function replyDenied(ctx: Context, error: unknown): Promise<boolean> {
-  if (error instanceof DomainError) {
-    await ctx.reply(error.message);
-    return true;
-  }
+    if (error instanceof DomainError) {
+      if (ctx.callbackQuery !== undefined) {
+        await ctx.answerCallbackQuery();
+      }
+      await ctx.reply(error.message);
+      return true;
+    }
   return false;
 }
 

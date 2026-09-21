@@ -16,7 +16,7 @@ isProject: false
 
 # План MVP в GitHub
 
-Источник нарезки: [docs/10-checklists.md](docs/10-checklists.md) (шаги 1–10), объём MVP в [Прогресс-бот.md](Прогресс-бот.md) §12, контракт [AGENTS.md](AGENTS.md) (спека → домен → события → проекции → интерфейс).
+Источник нарезки: [docs/pda/10-checklists.md](../pda/10-checklists.md) (шаги 1–10), объём MVP в [Прогресс-бот.md](Прогресс-бот.md) §12, контракт [AGENTS.md](../../AGENTS.md) (спека → домен → события → проекции → интерфейс).
 
 После утверждения плана создать всё через `gh` в `Quantum-Insight-Lab/tg-progress-bot`. Код в этом шаге не пишется.
 
@@ -99,7 +99,7 @@ INV-xx (тест с этим префиксом в той же задаче)
    - grammY, Octokit, Kysely, Vitest, ESLint — обоснование в сообщении коммита (запрет 7)
 2. **ci: границы слоёв и контекстов, codegen событий, запрет Date в домене**
    - labels: `layer:ci`, `type:chore`
-   - S-1, S-2, S-3, S-10 из [docs/09-structural-invariants.md](docs/09-structural-invariants.md); `npm run codegen:events` сравнивается с git
+   - S-1, S-2, S-3, S-10 из [docs/pda/09-structural-invariants.md](../pda/09-structural-invariants.md); `npm run codegen:events` сравнивается с git
    - blocked by: #1
 3. **feat: единственные механизмы config, clock, logger, db pool, DomainError**
    - labels: `context:infra`, `layer:domain`, `type:feat`
@@ -115,7 +115,7 @@ INV-xx (тест с этим префиксом в той же задаче)
    - blocked by: #2, #3
 5. **feat: миграции таблиц и constraint’ы домена**
    - labels: `context:infra`, `type:feat`
-   - таблицы из [docs/03-domain-graph.md](docs/03-domain-graph.md); UNIQUE/FK под INV-01, INV-02, INV-06, INV-07, INV-08, INV-14
+   - таблицы из [docs/pda/03-domain-graph.md](../pda/03-domain-graph.md); UNIQUE/FK под INV-01, INV-02, INV-06, INV-07, INV-08, INV-14
    - blocked by: #3
 6. **ci: сверка INV-xx в тестах со спекой (S-7) и запрет магических чисел в domain (S-8)**
    - labels: `layer:ci`, `type:chore`
@@ -207,7 +207,7 @@ Issue выбора issue при создании задачи (#11) читает
     - blocked by: #16, #19
 22. **feat: метрики устойчивости и деградация без GitHub**
     - labels: `context:infra`, `type:feat`
-    - [docs/08-observability.md](docs/08-observability.md); `coverage_gap`, `rejected_commands`
+    - [docs/pda/08-observability.md](../pda/08-observability.md); `coverage_gap`, `rejected_commands`
     - blocked by: #21
 
 ## Что не создавать
