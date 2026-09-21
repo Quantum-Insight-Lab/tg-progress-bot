@@ -23,6 +23,7 @@ import {
   type ProjectMember,
 } from "../domain/projects/index.js";
 import { DomainError } from "../domain/shared/errors.js";
+import { dayNumberOf } from "../projections/day-number.js";
 import {
   CHECK_CALLBACK_PREFIX,
   CONFIRM_QUESTION,
@@ -74,29 +75,16 @@ function headingOf(listDate: string): string {
   return `${day}.${month}`;
 }
 
-function dayNumberOf(
-  item: TaskListItem,
-  lists: readonly TaskList[],
-): number {
-  let day = 1;
-  let fromId = item.carriedFromListId;
-  while (fromId !== null) {
-    day += 1;
-    const previous = lists
-      .find((list) => list.id === fromId)
-      ?.items.find((entry) => entry.taskId === item.taskId);
-    fromId = previous?.carriedFromListId ?? null;
-  }
-  return day;
-}
-
 function lineOf(
   item: TaskListItem,
   title: string,
   lists: readonly TaskList[],
 ): string {
   const mark = item.isDone ? "✅" : "☐";
-  const day = dayNumberOf(item, lists);
+  const day = dayNumberOf(
+    item,
+    lists.flatMap((list) => list.items),
+  );
   if (item.carriedFromListId === null || day <= 1) {
     return `${mark} ${title}`;
   }

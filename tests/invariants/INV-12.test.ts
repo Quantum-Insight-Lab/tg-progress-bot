@@ -284,7 +284,7 @@ it("INV-12: участник проходит, ответ без данных п
     dayList: memoryDayListStore(),
   });
   await sendStart(bot, telegramUserId);
-  expect(replies).toEqual(["Доступ есть"]);
+  expect(replies).toEqual(["Выберите экран"]);
   expect(replies.join("\n")).not.toMatch(leak);
 });
 
