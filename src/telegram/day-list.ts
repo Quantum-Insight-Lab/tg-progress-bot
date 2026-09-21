@@ -10,6 +10,7 @@ import {
   setListMessageId,
   type Blocker,
   type IssueRef,
+  type MemberRef,
   type Task,
   type TaskList,
   type TaskListItem,
@@ -19,8 +20,9 @@ import {
   type ProjectAccess,
   type ProjectMember,
 } from "../domain/projects/index.js";
+import { CONFIRM_QUESTION, confirmKeyboard, CHECK_CALLBACK_PREFIX, MENU_CALLBACK_PREFIX } from "./callbacks.js";
 
-export const CHECK_CALLBACK_PREFIX = "check:";
+export { CHECK_CALLBACK_PREFIX, MENU_CALLBACK_PREFIX } from "./callbacks.js";
 
 export type DayListStore = {
   clock: Clock;
@@ -30,6 +32,10 @@ export type DayListStore = {
   saveList: (list: TaskList) => void;
   taskOf: (taskId: string) => { task: Task; blockers: Blocker[] } | undefined;
   saveTask: (task: Task, blockers: Blocker[]) => void;
+  rosterOf: (projectId: string) => readonly MemberRef[];
+  leadsOf: (projectId: string) => readonly { userId: string }[];
+  telegramIdOf: (userId: string) => string | undefined;
+  projectIdOfItem: (itemId: string) => string | undefined;
   newId: () => string;
 };
 
@@ -81,10 +87,16 @@ export function renderDayList(
   const keyboard = new InlineKeyboard();
   for (const item of list.items) {
     const task = tasks.get(item.taskId);
+    if (task?.status === "PLANNED" || task?.status === "CANCELLED") {
+      continue;
+    }
     const title = task?.title ?? item.taskId;
     lines.push(lineOf(item, title, lists));
     if (!item.isDone) {
-      keyboard.text("✓", `${CHECK_CALLBACK_PREFIX}${item.id}`).row();
+      keyboard
+        .text("✓", `${CHECK_CALLBACK_PREFIX}${item.id}`)
+        .text("⋯", `${MENU_CALLBACK_PREFIX}${item.id}`)
+        .row();
     }
   }
   return { text: lines.join("\n"), keyboard };
@@ -157,7 +169,7 @@ function ensureTodayList(
   return carried.targetList;
 }
 
-async function publishList(ctx: Context, store: DayListStore, list: TaskList): Promise<void> {
+export async function publishList(ctx: Context, store: DayListStore, list: TaskList): Promise<void> {
   const rendered = renderDayList(
     list,
     tasksMap(store, list),
@@ -265,5 +277,24 @@ export async function onCheckCallback(
   store.saveTask(checked.task, checked.blockers);
   store.saveList(checked.list);
   await publishList(ctx, store, checked.list);
+  await askLeadToConfirm(ctx, store, access.projectId, item.id);
   await ctx.answerCallbackQuery();
+}
+
+async function askLeadToConfirm(
+  ctx: Context,
+  store: DayListStore,
+  projectId: string,
+  itemId: string,
+): Promise<void> {
+  const keyboard = confirmKeyboard(itemId);
+  for (const lead of store.leadsOf(projectId)) {
+    const telegramId = store.telegramIdOf(lead.userId);
+    if (telegramId === undefined) {
+      continue;
+    }
+    await ctx.api.sendMessage(Number(telegramId), CONFIRM_QUESTION, {
+      reply_markup: keyboard,
+    });
+  }
 }
