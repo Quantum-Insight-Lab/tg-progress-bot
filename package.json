@@ -13,8 +13,9 @@
     "boundaries": "depcruise src --config dependency-cruiser.config.mjs",
     "codegen:events": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/codegen-events.ts",
     "check:generated": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-generated-events.ts",
+    "check:invariants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-invariants.ts",
     "migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/migrate.ts",
-    "ci": "npm run lint && npm run build && npm run boundaries && npm run check:generated && npm test"
+    "ci": "npm run lint && npm run build && npm run boundaries && npm run check:generated && npm run check:invariants && npm test"
   },
   "dependencies": {
     "@octokit/rest": "^21.1.1",

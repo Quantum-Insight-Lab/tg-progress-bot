@@ -56,6 +56,14 @@ export default tseslint.config(
     files: ["src/domain/**/*.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...s3EmitSyntax, ...s10DateSyntax],
+      "no-magic-numbers": [
+        "error",
+        {
+          ignore: [0, 1, -1],
+          ignoreArrayIndexes: true,
+          detectObjects: true,
+        },
+      ],
     },
   },
 );
