@@ -1,5 +1,6 @@
 export { bot, resetBotForTests } from "./bot.js";
 export {
+  bindGuardedCallbackQuery,
   bindGuardedCommand,
   resolveAccess,
   type IdentityDirectories,
@@ -7,5 +8,6 @@ export {
 export {
   TELEGRAM_HANDLER_IDS,
   wireTelegram,
+  type DayListStore,
   type TelegramDeps,
 } from "./wire.js";

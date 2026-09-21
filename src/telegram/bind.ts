@@ -97,3 +97,28 @@ export function bindGuardedCommand(input: {
     onAuthorized: input.onAuthorized,
   });
 }
+
+/** Инлайн-кнопка: тот же factory-guard (INV-12). */
+export function bindGuardedCallbackQuery(input: {
+  bot: Bot;
+  id: string;
+  trigger: RegExp;
+  directory: MemberDirectory;
+  identity: IdentityDirectories;
+  onAuthorized: (
+    ctx: Context,
+    access: ProjectAccess,
+    member: ProjectMember,
+  ) => Promise<void>;
+}): void {
+  bindGuardedListener({
+    bot: input.bot,
+    id: input.id,
+    directory: input.directory,
+    identity: input.identity,
+    attach: (instance, listener) => {
+      instance.callbackQuery(input.trigger, listener);
+    },
+    onAuthorized: input.onAuthorized,
+  });
+}
