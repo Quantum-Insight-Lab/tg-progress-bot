@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { ESLint } from "eslint";
 import { expect, it } from "vitest";
+import { createClock } from "../../src/infrastructure/clock.js";
 import { repoRoot } from "../helpers/repo-root.js";
 
 async function lintDomain(code: string): Promise<ESLint.LintResult> {
@@ -37,3 +38,12 @@ it("S-10: Date.now() в домене ломает lint", async () => {
     ),
   ).toBe(true);
 });
+
+it("S-10: calendarDate считает день в таймзоне проекта, не сервера", () => {
+  const clock = createClock({
+    current: () => new Date("2026-09-20T20:00:00.000Z"),
+  });
+  expect(clock.calendarDate("UTC")).toBe("2026-09-20");
+  expect(clock.calendarDate("Asia/Bangkok")).toBe("2026-09-21");
+});
+

@@ -19,11 +19,13 @@
     "@octokit/rest": "^21.1.1",
     "grammy": "^1.36.3",
     "kysely": "^0.28.2",
+    "pg": "^8.23.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",
     "@types/node": "^22.15.17",
+    "@types/pg": "^8.23.1",
     "dependency-cruiser": "^18.4.0",
     "eslint": "^9.26.0",
     "typescript": "^5.8.3",
