@@ -46,4 +46,7 @@ it("S-4: ровно одна реализация каждого механиз�
     "src/domain/shared/errors.ts",
   ]);
   expect(filesMatching(/\bnew\s+Bot\s*\(/)).toEqual(["src/telegram/bot.ts"]);
+  expect(filesMatching(/\bnew\s+Octokit\s*\(/)).toEqual([
+    "src/github/client.ts",
+  ]);
 });

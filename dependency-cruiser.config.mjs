@@ -58,6 +58,20 @@ export default {
       to: { path: "^src/domain/projects" },
     },
     {
+      name: "S-2-github-not-projects",
+      comment: "S-2: github-контекст не импортирует projects",
+      severity: "error",
+      from: { path: "^src/domain/github" },
+      to: { path: "^src/domain/projects" },
+    },
+    {
+      name: "S-2-github-not-tasks",
+      comment: "S-2: github-контекст не импортирует tasks",
+      severity: "error",
+      from: { path: "^src/domain/github" },
+      to: { path: "^src/domain/tasks" },
+    },
+    {
       name: "config-no-src",
       comment: "src/config ничего не импортирует из src",
       severity: "error",
