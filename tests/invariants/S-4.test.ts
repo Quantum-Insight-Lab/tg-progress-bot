@@ -31,7 +31,7 @@ function filesMatching(pattern: RegExp): string[] {
   return hits.sort();
 }
 
-it("S-4: ровно одна реализация каждого из пяти механизмов", () => {
+it("S-4: ровно одна реализация каждого механизма", () => {
   expect(filesMatching(/\bnew\s+Pool\s*\(/)).toEqual([
     "src/infrastructure/db.ts",
   ]);
@@ -45,4 +45,5 @@ it("S-4: ровно одна реализация каждого из пяти �
   expect(filesMatching(/\bclass\s+DomainError\b/)).toEqual([
     "src/domain/shared/errors.ts",
   ]);
+  expect(filesMatching(/\bnew\s+Bot\s*\(/)).toEqual(["src/telegram/bot.ts"]);
 });
