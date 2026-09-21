@@ -13,3 +13,4 @@ export {
   type TelegramDeps,
 } from "./wire.js";
 export { scanStaleTasks, blockerAskText } from "./stale.js";
+export { composeDailyReport, dispatchDueDailyReports, startDailyReportLoop, dailyReportPollIntervalMs } from "./reports.js";

@@ -3,3 +3,4 @@ export * from "./projects/index.js";
 export * from "./tasks/index.js";
 export * from "./github/index.js";
 export * from "./progress/index.js";
+export * from "./reports/index.js";

@@ -9,6 +9,7 @@ export type Clock = {
   calendarDate: (timeZone: string) => string;
   calendarDateAt: (iso: string, timeZone: string) => string;
   daysBetween: (fromDate: string, toDate: string) => number;
+  hourMinute: (timeZone: string) => { hour: number; minute: number };
 };
 
 export type ClockDeps = {
@@ -22,6 +23,21 @@ function calendarDateInZone(at: Date, timeZone: string): string {
     month: "2-digit",
     day: "2-digit",
   }).format(at);
+}
+
+function hourMinuteInZone(at: Date, timeZone: string): { hour: number; minute: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(at);
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  return {
+    hour: Number.parseInt(hour ?? "0", 10),
+    minute: Number.parseInt(minute ?? "0", 10),
+  };
 }
 
 function epochUtcOf(isoDate: string): number {
@@ -49,6 +65,9 @@ export function createClock(deps: ClockDeps = {}): Clock {
     daysBetween(fromDate: string, toDate: string): number {
       const ms = epochUtcOf(toDate) - epochUtcOf(fromDate);
       return Math.round(ms / 86_400_000);
+    },
+    hourMinute(timeZone: string): { hour: number; minute: number } {
+      return hourMinuteInZone(current(), timeZone);
     },
   };
 }
