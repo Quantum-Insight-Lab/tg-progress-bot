@@ -41,9 +41,9 @@ beforeEach(() => {
 });
 
 it("INV-12: неизвестный пользователь отклонён", () => {
-  expect(() => requireMember(undefined)).toThrow(DomainError);
   try {
     requireMember(undefined);
+    expect.fail("ожидали отказ");
   } catch (error) {
     expect(error).toBeInstanceOf(DomainError);
     const denied = error as DomainError;
