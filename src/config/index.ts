@@ -28,13 +28,18 @@ export function githubReconcileIntervalMs(): number {
   return constants.githubReconcileIntervalMinutes * 60 * 1000;
 }
 
-const envSchema = z.object({
+const envShape = {
   DATABASE_URL: z.string().min(1),
   TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
   GITHUB_APP_ID: z.string().min(1).optional(),
   GITHUB_APP_PRIVATE_KEY: z.string().min(1).optional(),
   GITHUB_WEBHOOK_SECRET: z.string().min(1).optional(),
-});
+};
+
+const envSchema = z.object(envShape);
+
+/** Имена переменных окружения. Пример — `.env.example`, чтение — только здесь. */
+export const ENV_KEYS = Object.keys(envShape);
 
 export type Env = {
   databaseUrl: string;

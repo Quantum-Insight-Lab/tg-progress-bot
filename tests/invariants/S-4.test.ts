@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { expect, it } from "vitest";
+import { ENV_KEYS } from "../../src/config/index.js";
 import { repoRoot } from "../helpers/repo-root.js";
 
 function listSrcTs(dir: string, acc: string[] = []): string[] {
@@ -49,4 +50,26 @@ it("S-4: ровно одна реализация каждого механиз�
   expect(filesMatching(/\bnew\s+Octokit\s*\(/)).toEqual([
     "src/github/client.ts",
   ]);
+});
+
+it("S-4: .env.example совпадает со схемой, секреты пустые, .env не в git", () => {
+  const example = readFileSync(join(repoRoot, ".env.example"), "utf8");
+  const keys = example
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"))
+    .map((line) => line.slice(0, line.indexOf("=")));
+  expect(keys.sort()).toEqual([...ENV_KEYS].sort());
+  for (const key of [
+    "TELEGRAM_BOT_TOKEN",
+    "GITHUB_APP_ID",
+    "GITHUB_APP_PRIVATE_KEY",
+    "GITHUB_WEBHOOK_SECRET",
+  ]) {
+    const line = example.split("\n").find((entry) => entry.startsWith(`${key}=`));
+    expect(line).toBe(`${key}=`);
+  }
+  const ignore = readFileSync(join(repoRoot, ".gitignore"), "utf8");
+  expect(ignore.split("\n")).toContain(".env");
+  expect(ignore.split("\n")).not.toContain(".env.example");
 });
