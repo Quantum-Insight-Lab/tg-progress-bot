@@ -17,7 +17,7 @@
     "check:generated": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-generated-events.ts",
     "check:invariants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-invariants.ts",
     "migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/migrate.ts",
-    "rebuild:projection": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/rebuild-projection.ts",
+    "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/index.ts",
     "ci": "npm run lint && npm run build && npm run boundaries && npm run circular && npm run check:generated && npm run check:invariants && npm test"
   },
   "dependencies": {

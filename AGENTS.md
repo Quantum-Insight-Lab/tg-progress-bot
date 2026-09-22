@@ -47,6 +47,7 @@ src/config     ничего не импортирует из src
 | Наблюдаемость | `stabilitySnapshot` / счётчики `rejected_commands`, `duplicate_deliveries`, `coverage_gap`, `github_sync_lag`; алерты `takeDueImmediateAlerts` (08) |
 | Пересборка проекции | `scripts/rebuild-projection.ts` из журнала, без записи в `events` (S-5) |
 | Лог констант | `logConstantChanges`: базовая линия, дальше только отличия (S-8) |
+| Процесс | `src/index.ts`: webhook Telegram/GitHub, `startGithubReconcileLoop`, `startDailyReportLoop` |
 | Номер дня пункта | `dayNumberOf` в `src/projections/day-number.ts` |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |
