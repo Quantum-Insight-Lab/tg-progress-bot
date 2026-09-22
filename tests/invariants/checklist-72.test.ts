@@ -58,7 +58,7 @@ it("пересборка dynamics_series восстанавливает сним
     .where("id", "=", snapshotId)
     .executeTakeFirst();
   expect(row?.tasks_done).toBe(1);
-  const stamp = row?.snapshot_date;
+  const stamp: unknown = row?.snapshot_date;
   const dateText =
     stamp instanceof Date
       ? `${String(stamp.getFullYear())}-${String(stamp.getMonth() + 1).padStart(2, "0")}-${String(stamp.getDate()).padStart(2, "0")}`
