@@ -1,13 +1,16 @@
 /**
  * Применяет SQL-файлы из migrations/ по порядку.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { closePool, getPool } from "../src/infrastructure/db.js";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const migrationsDir = join(root, "migrations");
+const root = dirname(fileURLToPath(import.meta.url));
+const migrationsDir =
+  [join(root, "..", "migrations"), join(root, "..", "..", "migrations")].find(
+    (dir) => existsSync(dir),
+  ) ?? join(root, "..", "migrations");
 
 export async function applyMigrations(): Promise<void> {
   const pool = getPool();
