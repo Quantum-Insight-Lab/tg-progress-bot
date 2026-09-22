@@ -27,3 +27,10 @@
 | [21](21.md) | M6 Close the loop | feat: ежедневный отчёт в личку и в topic по cron | `context:reports`, `type:feat` | [#16](16.md), [#19](19.md) |
 | [22](22.md) | M6 Close the loop | feat: метрики устойчивости и деградация без GitHub | `context:infra`, `type:feat` | [#21](21.md) |
 | [23](23.md) | M3 Telegram | feat: выбор issue из зеркала в диалоге создания задачи | `context:github`, `layer:telegram`, `type:feat` | [#11](11.md), [#14](14.md) |
+| [47](47.md) | M7 Go-live | chore: пример окружения без секретов | `context:infra`, `type:chore` | — |
+| [48](48.md) | M7 Go-live | feat: процесс бота, webhook и циклы | `context:infra`, `type:feat` | [#47](47.md) |
+| [49](49.md) | M7 Go-live | chore: Docker-образ, миграции отдельным шагом | `context:infra`, `type:chore` | [#48](48.md) |
+| [50](50.md) | M7 Go-live | chore: DNS и TLS для webhook | `context:infra`, `type:chore` | — |
+| [51](51.md) | M7 Go-live | chore: бот Telegram и setWebhook | `layer:telegram`, `type:chore` | [#48](48.md), [#50](50.md) |
+| [52](52.md) | M7 Go-live | chore: GitHub App и webhook на тот же хост | `context:github`, `type:chore` | [#48](48.md), [#50](50.md) |
+| [53](53.md) | M7 Go-live | chore: ручной прогон сценариев | `context:infra`, `type:chore` | [#51](51.md), [#52](52.md) |
