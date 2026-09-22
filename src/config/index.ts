@@ -34,6 +34,7 @@ const envShape = {
   GITHUB_APP_ID: z.string().min(1).optional(),
   GITHUB_APP_PRIVATE_KEY: z.string().min(1).optional(),
   GITHUB_WEBHOOK_SECRET: z.string().min(1).optional(),
+  PORT: z.union([z.string().regex(/^\d+$/), z.literal("")]).optional(),
 };
 
 const envSchema = z.object(envShape);
@@ -47,6 +48,7 @@ export type Env = {
   githubAppId: string | undefined;
   githubAppPrivateKey: string | undefined;
   githubWebhookSecret: string | undefined;
+  port: number;
 };
 
 let cached: Env | undefined;
@@ -62,6 +64,10 @@ export function env(): Env {
     githubAppId: parsed.GITHUB_APP_ID,
     githubAppPrivateKey: parsed.GITHUB_APP_PRIVATE_KEY,
     githubWebhookSecret: parsed.GITHUB_WEBHOOK_SECRET,
+    port:
+      parsed.PORT === undefined || parsed.PORT === ""
+        ? 8080
+        : Number.parseInt(parsed.PORT, 10),
   };
   return cached;
 }
