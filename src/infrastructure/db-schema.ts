@@ -120,6 +120,12 @@ export type ReportTargetsTable = {
   schedule_cron: string;
 };
 
+export type ConstantRevisionsTable = {
+  id: string;
+  recorded_at: string;
+  values: unknown;
+};
+
 export type EventsTable = {
   event_id: string;
   event_type: string;
@@ -148,5 +154,6 @@ export type Database = {
   blockers: BlockersTable;
   progress_snapshots: ProgressSnapshotsTable;
   report_targets: ReportTargetsTable;
+  constant_revisions: ConstantRevisionsTable;
   events: EventsTable;
 };

@@ -24,6 +24,7 @@ import {
 } from "../domain/projects/index.js";
 import { DomainError } from "../domain/shared/errors.js";
 import { dayNumberOf } from "../projections/day-number.js";
+import { callbackQueryId, commitFact } from "./publish.js";
 import {
   CHECK_CALLBACK_PREFIX,
   CONFIRM_QUESTION,
@@ -253,6 +254,11 @@ export async function onPickIssueCallback(
     await ctx.answerCallbackQuery();
     return;
   }
+  const queryId = callbackQueryId(ctx);
+  if (queryId === undefined) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
   const issueId = data.slice(ISSUE_CALLBACK_PREFIX.length);
   const draft = store.pendingOf(member.userId);
   if (draft === undefined || draft.projectId !== access.projectId) {
@@ -279,8 +285,13 @@ export async function onPickIssueCallback(
       userId: member.userId,
       role: member.role,
     },
-    idempotencyKey: store.newId(),
+    idempotencyKey: queryId,
   });
+  const applied = await commitFact(created.event.type, created.event);
+  if (!applied) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
   const added = addTaskToTodayList({
     list,
     task: created.task,
@@ -302,6 +313,11 @@ export async function onCheckCallback(
 ): Promise<void> {
   const data = ctx.callbackQuery?.data;
   if (data === undefined || !data.startsWith(CHECK_CALLBACK_PREFIX)) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const queryId = callbackQueryId(ctx);
+  if (queryId === undefined) {
     await ctx.answerCallbackQuery();
     return;
   }
@@ -330,8 +346,19 @@ export async function onCheckCallback(
       role: member.role,
       projectId: access.projectId,
     },
-    idempotencyKey: `${itemId}:checked`,
+    idempotencyKey: queryId,
   });
+  let applied = false;
+  for (const event of checked.events) {
+    const sent = await commitFact(event.type, event);
+    if (sent) {
+      applied = true;
+    }
+  }
+  if (!applied) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
   store.saveTask(checked.task, checked.blockers);
   store.saveList(checked.list);
   await publishList(ctx, store, checked.list);

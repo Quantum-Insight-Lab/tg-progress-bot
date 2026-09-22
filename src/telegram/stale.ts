@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
 import type { Context } from "grammy";
+import { githubReconcileIntervalMs } from "../config/index.js";
 import { githubSignalsAllowed } from "../domain/github/index.js";
 import {
   applyStaleSignals,
@@ -12,6 +13,7 @@ import {
 } from "../domain/tasks/index.js";
 import type { ProjectAccess, ProjectMember } from "../domain/projects/index.js";
 import { dayNumberOf } from "../projections/day-number.js";
+import { commitFact } from "./publish.js";
 import {
   BLOCKER_ASK_HINT,
   DISMISS_BLOCKER_PREFIX,
@@ -51,7 +53,10 @@ export async function scanStaleTasks(
     return;
   }
   const chain = lists.flatMap((list) => list.items);
-  const githubAvailable = githubSignalsAllowed(input.githubLagMs);
+  const githubAvailable = githubSignalsAllowed(
+    input.githubLagMs,
+    githubReconcileIntervalMs(),
+  );
   const now = store.clock.now(timeZone);
   for (const item of todayList.items) {
     if (item.isDone) {
@@ -140,6 +145,10 @@ export async function onDismissBlockerCallback(
     blockerId,
     actor: actorOf(access, member),
   });
+  if (!(await commitFact(dismissed.event.type, dismissed.event))) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
   store.saveTask(dismissed.task, dismissed.blockers);
   store.clearPendingAsk(member.userId);
   await ctx.answerCallbackQuery();
@@ -167,6 +176,9 @@ export async function onBlockerReasonMessage(
     reason,
     actor: actorOf(access, member),
   });
+  if (!(await commitFact(declared.event.type, declared.event))) {
+    return;
+  }
   store.saveTask(loaded.task, declared.blockers);
   store.clearPendingAsk(member.userId);
 }

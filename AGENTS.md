@@ -44,6 +44,9 @@ src/config     ничего не импортирует из src
 | Прогресс | `progressOfProject` / `takeProgressSnapshot` в `src/domain/progress` (INV-10, INV-11) |
 | Экраны | проекции в `src/projections` (`blockersBoard` — «Блокеры»), хендлеры через factory-guard (S-5, INV-12) |
 | Отчёт | `composeDailyReport` / `recordReportSent` / `isDailyCronDue`; `/report` и `startDailyReportLoop` в topic `report_targets` (A-16, C-7, INV-08) |
+| Наблюдаемость | `stabilitySnapshot` / счётчики `rejected_commands`, `duplicate_deliveries`, `coverage_gap`, `github_sync_lag`; алерты `takeDueImmediateAlerts` (08) |
+| Пересборка проекции | `scripts/rebuild-projection.ts` из журнала, без записи в `events` (S-5) |
+| Лог констант | `logConstantChanges`: базовая линия, дальше только отличия (S-8) |
 | Номер дня пункта | `dayNumberOf` в `src/projections/day-number.ts` |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |

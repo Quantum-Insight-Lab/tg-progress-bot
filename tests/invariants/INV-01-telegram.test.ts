@@ -1,9 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, expect, it } from "vitest";
+import { beforeAll, beforeEach, expect, it } from "vitest";
 import type { Bot, Transformer } from "grammy";
 import { resetHandlerRegistry, type ProjectMember } from "../../src/domain/projects/index.js";
 import { createClock } from "../../src/infrastructure/clock.js";
+import { applyMigrations } from "../../scripts/migrate.js";
 import {
   ISSUE_CALLBACK_PREFIX,
   ISSUE_PICK_PROMPT,
@@ -23,6 +24,10 @@ const lead: ProjectMember = {
   role: "lead",
   topicId: null,
 };
+
+beforeAll(async () => {
+  await applyMigrations();
+});
 
 beforeEach(() => {
   resetHandlerRegistry();

@@ -7,6 +7,7 @@ import {
   type ProjectMember,
 } from "../domain/projects/index.js";
 import { DomainError } from "../domain/shared/errors.js";
+import { recordRejectedCommand } from "../observability/index.js";
 
 export type IdentityDirectories = {
   findProjectByChatId: (chatId: string) => { id: string } | undefined;
@@ -47,6 +48,7 @@ export function resolveAccess(
 
 async function replyDenied(ctx: Context, error: unknown): Promise<boolean> {
     if (error instanceof DomainError) {
+      recordRejectedCommand(error.code);
       if (ctx.callbackQuery !== undefined) {
         await ctx.answerCallbackQuery();
       }

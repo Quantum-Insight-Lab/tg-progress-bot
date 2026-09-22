@@ -3,6 +3,7 @@ export {
   dailyPeriodKey,
   defaultDailyCron,
   isDailyCronDue,
+  isDailyCronMissed,
   reportSentKey,
 } from "./schedule.js";
 export { recordReportSent, REPORT_ACTOR, type ReportSentEvent } from "./sent.js";

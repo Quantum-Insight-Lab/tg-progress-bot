@@ -1,4 +1,4 @@
-import { constants } from "../config/index.js";
+import { githubReconcileIntervalMs } from "../config/index.js";
 import { isReconcileDue } from "../domain/github/index.js";
 import { clock, type Clock } from "../infrastructure/clock.js";
 import { getDb } from "../infrastructure/db.js";
@@ -12,9 +12,7 @@ import { githubClient } from "./client.js";
 import { mirrorMatches } from "./mirror.js";
 import { octokitGithubReader, type GithubReader } from "./reader.js";
 
-export function githubReconcileIntervalMs(): number {
-  return constants.githubReconcileIntervalMinutes * 60 * 1000;
-}
+export { githubReconcileIntervalMs };
 
 export type ReconcileGithubMirrorResult = {
   ran: boolean;

@@ -1,8 +1,9 @@
-import { beforeEach, expect, it } from "vitest";
+import { beforeAll, beforeEach, expect, it } from "vitest";
 import type { Bot, Transformer } from "grammy";
-import { constants } from "../../src/config/index.js";
+import { constants, githubReconcileIntervalMs } from "../../src/config/index.js";
 import { resetHandlerRegistry, type ProjectMember } from "../../src/domain/projects/index.js";
 import { createClock } from "../../src/infrastructure/clock.js";
+import { applyMigrations } from "../../scripts/migrate.js";
 import {
   BLOCKER_ASK_HINT,
   DISMISS_BLOCKER_PREFIX,
@@ -28,6 +29,10 @@ const member: ProjectMember = {
   role: "member",
   topicId: 10,
 };
+
+beforeAll(async () => {
+  await applyMigrations();
+});
 
 beforeEach(() => {
   resetHandlerRegistry();
@@ -239,4 +244,30 @@ it("INV-13: без данных GitHub CI-сигнал не ставится", a
     (blocker) => blocker.signalType,
   );
   expect(signals).toEqual(["no_check"]);
+});
+
+it("INV-13: при лаге ≥ C-6 CI-сигнал не ставится, задачи ведутся", async () => {
+  const bot = resetBotForTests();
+  intercept(bot);
+  const dayList = wire(bot, staleLists("task-1"));
+  await scanStaleTasks(bot, dayList, {
+    projectId,
+    githubLagMs: githubReconcileIntervalMs(),
+    githubFactsByTaskId: new Map([
+      [
+        "task-1",
+        {
+          ciRed: true,
+          prIdleDays: constants.staleDays + 1,
+          issueIdleDays: 0,
+          noBranchDays: 0,
+        },
+      ],
+    ]),
+  });
+  const signals = (dayList.tasks.get("task-1")?.blockers ?? []).map(
+    (blocker) => blocker.signalType,
+  );
+  expect(signals).toEqual(["no_check"]);
+  expect(dayList.tasks.get("task-1")?.task.status).toBe("BLOCKED");
 });

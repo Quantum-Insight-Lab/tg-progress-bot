@@ -1,11 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, expect, it } from "vitest";
+import { beforeAll, beforeEach, expect, it } from "vitest";
 import type { Bot, Transformer } from "grammy";
 import { constants } from "../../src/config/index.js";
 import { resetHandlerRegistry, type ProjectMember } from "../../src/domain/projects/index.js";
 import type { TaskList } from "../../src/domain/tasks/index.js";
 import { createClock } from "../../src/infrastructure/clock.js";
+import { applyMigrations } from "../../scripts/migrate.js";
 import {
   CHECK_CALLBACK_PREFIX,
 } from "../../src/telegram/day-list.js";
@@ -27,6 +29,10 @@ const lead: ProjectMember = {
   role: "lead",
   topicId: null,
 };
+
+beforeAll(async () => {
+  await applyMigrations();
+});
 
 beforeEach(() => {
   resetHandlerRegistry();
@@ -60,12 +66,14 @@ async function sendTask(
   bot: Bot,
   title = "Шаг",
   updateId = 1,
+  callbackId?: string,
 ): Promise<void> {
   await sendTaskUpdate(bot, {
     chatId,
     telegramUserId,
     title,
     updateId,
+    ...(callbackId === undefined ? {} : { callbackId }),
   });
 }
 
@@ -187,7 +195,7 @@ it("INV-06: галочка редактирует то же сообщение",
   await bot.handleUpdate({
     update_id: 2,
     callback_query: {
-      id: "cq-1",
+      id: randomUUID(),
       from: { id: telegramUserId, is_bot: false, first_name: "A" },
       chat_instance: "1",
       data: `${CHECK_CALLBACK_PREFIX}${item?.id ?? ""}`,
@@ -267,4 +275,33 @@ it("INV-06: перенос через границу суток в таймзо�
   expect(captured.texts.some((text) => text.includes("21.09"))).toBe(true);
   expect(captured.texts.some((text) => text.includes("день 2"))).toBe(true);
   expect(captured.texts.some((text) => text.includes("Вчерашняя"))).toBe(true);
+});
+
+it("INV-08: повтор callback_query_id не создаёт вторую задачу", async () => {
+  const bot = resetBotForTests();
+  intercept(bot);
+  const dayList = memoryDayListStore({
+    clock: createClock({
+      current: () => new Date("2026-09-21T05:00:00.000Z"),
+    }),
+    timeZone: "Asia/Bangkok",
+    issues: [sampleIssue(projectId)],
+  });
+  wireTelegram(bot, {
+    directory: {
+      find: (pid, uid) =>
+        pid === projectId && uid === lead.userId ? lead : undefined,
+    },
+    identity: {
+      findProjectByChatId: (id) =>
+        id === String(chatId) ? { id: projectId } : undefined,
+      findUserByTelegramId: (id) =>
+        id === String(telegramUserId) ? { id: lead.userId } : undefined,
+    },
+    dayList,
+  });
+  const replay = randomUUID();
+  await sendTask(bot, "Одна", 41, replay);
+  await sendTask(bot, "Одна", 42, replay);
+  expect(dayList.tasks.size).toBe(1);
 });

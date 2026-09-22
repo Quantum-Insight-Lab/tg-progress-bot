@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
 import { clock } from "../infrastructure/clock.js";
 import { getDb } from "../infrastructure/db.js";
+import { recordDuplicateDelivery } from "../observability/index.js";
 import {
   EVENT_SCHEMA_VERSIONS,
   payloadSchemas,
@@ -34,6 +35,15 @@ function isUniqueViolation(error: unknown): boolean {
 
 function jsonb(value: unknown) {
   return sql`cast(${JSON.stringify(value)} as jsonb)`;
+}
+
+export async function hasIdempotencyKey(idempotencyKey: string): Promise<boolean> {
+  const existing = await getDb()
+    .selectFrom("events")
+    .select("event_id")
+    .where("idempotency_key", "=", idempotencyKey)
+    .executeTakeFirst();
+  return existing !== undefined;
 }
 
 export async function emit<T extends EventType>(
@@ -74,6 +84,7 @@ export async function emit<T extends EventType>(
     if (existing === undefined) {
       throw error;
     }
+    recordDuplicateDelivery();
     return { applied: false, eventId: existing.event_id };
   }
 }
