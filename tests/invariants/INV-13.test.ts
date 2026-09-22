@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { constants } from "../../src/config/index.js";
+import { constants, githubReconcileIntervalMs } from "../../src/config/index.js";
 import {
   applyStaleSignals,
   createTask,
@@ -129,10 +129,27 @@ it("INV-13: переспрос не чаще RE_ASK_DAYS", () => {
 });
 
 it("INV-13: без GitHub сигналы CI/PR не ставятся", () => {
-  expect(githubSignalsAllowed(null)).toBe(false);
+  expect(githubSignalsAllowed(null, githubReconcileIntervalMs())).toBe(false);
   const due = signalsDue({
     daysWithoutCheck: constants.staleDays + 1,
     githubAvailable: false,
+    github: {
+      ciRed: true,
+      prIdleDays: constants.staleDays + 1,
+      issueIdleDays: constants.staleDays + 1,
+      noBranchDays: constants.staleDays + 1,
+    },
+  });
+  expect(due).toEqual(["no_check"]);
+});
+
+it("INV-13: лаг ≥ C-6 — сигналы CI/PR не ставятся", () => {
+  const interval = githubReconcileIntervalMs();
+  expect(githubSignalsAllowed(0, interval)).toBe(true);
+  expect(githubSignalsAllowed(interval, interval)).toBe(false);
+  const due = signalsDue({
+    daysWithoutCheck: constants.staleDays + 1,
+    githubAvailable: githubSignalsAllowed(interval, interval),
     github: {
       ciRed: true,
       prIdleDays: constants.staleDays + 1,

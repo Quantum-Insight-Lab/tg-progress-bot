@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { clock, type Clock } from "../../src/infrastructure/clock.js";
 import type { Blocker, MemberRef, Task, TaskList } from "../../src/domain/tasks/index.js";
 import type { DayListStore, PendingBlockerAsk, PendingTaskDraft, ProjectIssue } from "../../src/telegram/day-list.js";
@@ -26,7 +27,6 @@ export function memoryDayListStore(init?: {
   const pending = new Map<string, PendingTaskDraft>();
   const pendingAsks = new Map<string, PendingBlockerAsk>();
   const askedOn = new Map<string, string>();
-  let nextId = 0;
   return {
     lists,
     tasks,
@@ -86,9 +86,6 @@ export function memoryDayListStore(init?: {
       }
       return undefined;
     },
-    newId: () => {
-      nextId += 1;
-      return `id-${String(nextId)}`;
-    },
+    newId: () => randomUUID(),
   };
 }

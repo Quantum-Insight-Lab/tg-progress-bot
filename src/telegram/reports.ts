@@ -7,7 +7,9 @@ import {
 } from "../domain/progress/index.js";
 import {
   isDailyCronDue,
+  isDailyCronMissed,
   recordReportSent,
+  reportSentKey,
 } from "../domain/reports/index.js";
 import {
   type MemberDirectory,
@@ -19,6 +21,15 @@ import { emit, EVENT_TYPES } from "../events/index.js";
 import { clock as systemClock, type Clock } from "../infrastructure/clock.js";
 import { logger } from "../infrastructure/logger.js";
 import {
+  COVERAGE_GAP_WARNING,
+  coverageGapByProject,
+  coverageGapWarns,
+  recordReportDeliveryFailure,
+  recordSchedulerMissedRun,
+  recordTelegramApiError,
+  reportSentExists,
+} from "../observability/index.js";
+import {
   dailyDigest,
   reportTargets,
   type DailyProjectSlice,
@@ -27,6 +38,7 @@ import {
   projectIdsForScreen,
   type ScreenIdentity,
 } from "./screens.js";
+import { notifyStabilityAlerts } from "./alerts.js";
 
 function escapeMarkdown(value: string): string {
   return value.replace(/[_*[\]`]/g, "\\$&");
@@ -76,22 +88,57 @@ function nextTitleOf(slice: DailyProjectSlice): string | null {
   return ordered.find((item) => !item.blockedByOpenIssue)?.title ?? null;
 }
 
+function progressLine(
+  previous: number | null,
+  current: number | null,
+  gap: number | null,
+): string {
+  const base = `**Прогресс:** ${arrow(previous, current)}`;
+  if (current !== null && coverageGapWarns(gap)) {
+    return `${base} ${COVERAGE_GAP_WARNING}`;
+  }
+  return base;
+}
+
 export function composeDailyReport(
   slices: readonly DailyProjectSlice[],
   includeOverall: boolean,
+  coverageGaps: ReadonlyMap<string, number> = new Map(),
 ): string {
   const lines = ["## DAILY DEVELOPMENT REPORT"];
   if (includeOverall && slices.length > 0) {
     const tasks: ProgressTask[] = slices.flatMap((slice) => slice.tasks);
     const current = progressOfAllProjectsForReport(tasks);
     const previous = slices.length === 1 ? (slices[0]?.previousProgress ?? null) : null;
-    lines.push(`**Все проекты:** ${arrow(previous, current)}`);
+    const overallGap = slices
+      .map((slice) => coverageGaps.get(slice.projectId) ?? null)
+      .reduce<number | null>((worst, gap) => {
+        if (gap === null) {
+          return worst;
+        }
+        if (worst === null || gap > worst) {
+          return gap;
+        }
+        return worst;
+      }, null);
+    const overall = `**Все проекты:** ${arrow(previous, current)}`;
+    lines.push(
+      current !== null && coverageGapWarns(overallGap)
+        ? `${overall} ${COVERAGE_GAP_WARNING}`
+        : overall,
+    );
   }
   for (const slice of slices) {
     const current = progressOfProject(slice.projectId, slice.tasks);
     lines.push("");
     lines.push(`### ${escapeMarkdown(slice.name)}`);
-    lines.push(`**Прогресс:** ${arrow(slice.previousProgress, current)}`);
+    lines.push(
+      progressLine(
+        slice.previousProgress,
+        current,
+        coverageGaps.get(slice.projectId) ?? null,
+      ),
+    );
     if (slice.todayClosed > 0 || slice.todayStarted > 0 || slice.todayBlocked > 0) {
       lines.push(
         `**За день:** ✅ закрыто ${String(slice.todayClosed)} · 🔨 начато ${String(slice.todayStarted)} · ⚠️ заблокировано ${String(slice.todayBlocked)}`,
@@ -129,7 +176,8 @@ export async function onReportCommand(
     ? projectIdsForScreen(access, directory, identity)
     : [access.projectId];
   const slices = await dailyDigest(projectIds);
-  const text = composeDailyReport(slices, privateChat);
+  const gaps = await coverageGapByProject(projectIds);
+  const text = composeDailyReport(slices, privateChat, gaps);
   const chatId = ctx.chat?.id;
   if (chatId === undefined) {
     return;
@@ -150,7 +198,25 @@ export async function onReportCommand(
     payload: event.payload,
     idempotencyKey: event.idempotencyKey,
   });
-  await ctx.reply(text, { parse_mode: "Markdown" });
+  try {
+    await ctx.reply(text, { parse_mode: "Markdown" });
+  } catch (error: unknown) {
+    recordTelegramApiError(telegramErrorCode(error));
+    recordReportDeliveryFailure(privateChat ? "dm" : "group");
+    logger.error("report delivery failed", { error: String(error) });
+  }
+}
+
+function telegramErrorCode(error: unknown): string {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "error_code" in error &&
+    typeof error.error_code === "number"
+  ) {
+    return String(error.error_code);
+  }
+  return "unknown";
 }
 
 export async function dispatchDueDailyReports(
@@ -160,15 +226,28 @@ export async function dispatchDueDailyReports(
   const targets = await reportTargets();
   for (const target of targets) {
     const { hour, minute } = time.hourMinute(target.timezone);
+    const chatId = Number.parseInt(target.chatId, 10);
+    const topicId =
+      target.topicId === null ? null : Number.parseInt(target.topicId, 10);
+    const periodDate = time.calendarDate(target.timezone);
+    const periodKey = reportSentKey({
+      reportType: "daily",
+      destination: "group",
+      chatId,
+      periodKey: periodDate,
+    });
+    if (isDailyCronMissed(target.scheduleCron, hour, minute)) {
+      if (!(await reportSentExists(periodKey))) {
+        recordSchedulerMissedRun(periodKey);
+      }
+      continue;
+    }
     if (!isDailyCronDue(target.scheduleCron, hour, minute)) {
       continue;
     }
     const slices = await dailyDigest([target.projectId]);
-    const text = composeDailyReport(slices, false);
-    const chatId = Number.parseInt(target.chatId, 10);
-    const topicId =
-      target.topicId === null ? null : Number.parseInt(target.topicId, 10);
-    const periodDate = slices[0]?.today ?? time.calendarDate(target.timezone);
+    const gaps = await coverageGapByProject([target.projectId]);
+    const text = composeDailyReport(slices, false, gaps);
     const event = recordReportSent({
       targetId: target.id,
       reportType: "daily",
@@ -176,7 +255,7 @@ export async function dispatchDueDailyReports(
       destination: "group",
       chatId,
       topicId,
-      periodDate,
+      periodDate: slices[0]?.today ?? periodDate,
     });
     const sent = await emit(EVENT_TYPES.REPORT_SENT, {
       actor: event.actor,
@@ -187,11 +266,18 @@ export async function dispatchDueDailyReports(
     if (!sent.applied) {
       continue;
     }
-    await bot.api.sendMessage(chatId, text, {
-      parse_mode: "Markdown",
-      ...(topicId === null ? {} : { message_thread_id: topicId }),
-    });
+    try {
+      await bot.api.sendMessage(chatId, text, {
+        parse_mode: "Markdown",
+        ...(topicId === null ? {} : { message_thread_id: topicId }),
+      });
+    } catch (error: unknown) {
+      recordTelegramApiError(telegramErrorCode(error));
+      recordReportDeliveryFailure("group");
+      logger.error("report delivery failed", { error: String(error) });
+    }
   }
+  await notifyStabilityAlerts(bot);
 }
 
 /** Опрос раз в минуту, чтобы поймать минуту C-7 в таймзоне проекта. */

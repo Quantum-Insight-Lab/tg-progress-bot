@@ -1,7 +1,8 @@
-import { beforeEach, expect, it } from "vitest";
+import { beforeAll, beforeEach, expect, it } from "vitest";
 import type { Bot, Transformer } from "grammy";
 import { resetHandlerRegistry, type ProjectMember } from "../../src/domain/projects/index.js";
 import { createClock } from "../../src/infrastructure/clock.js";
+import { applyMigrations } from "../../scripts/migrate.js";
 import { CHECK_CALLBACK_PREFIX } from "../../src/telegram/day-list.js";
 import { CONFIRM_CALLBACK_PREFIX, CONFIRM_QUESTION } from "../../src/telegram/callbacks.js";
 import { resetBotForTests, wireTelegram } from "../../src/telegram/index.js";
@@ -28,6 +29,10 @@ const member: ProjectMember = {
   role: "member",
   topicId: 10,
 };
+
+beforeAll(async () => {
+  await applyMigrations();
+});
 
 beforeEach(() => {
   resetHandlerRegistry();

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import type { Transformer } from "grammy";
-import { defaultDailyCron, isDailyCronDue, recordReportSent } from "../../src/domain/reports/index.js";
+import { defaultDailyCron, isDailyCronDue, isDailyCronMissed, recordReportSent } from "../../src/domain/reports/index.js";
 import { resetHandlerRegistry, type ProjectMember } from "../../src/domain/projects/index.js";
 import { emit, EVENT_TYPES } from "../../src/events/index.js";
 import { createClock } from "../../src/infrastructure/clock.js";
@@ -9,6 +9,7 @@ import { getDb, getPool } from "../../src/infrastructure/db.js";
 import { applyMigrations } from "../../scripts/migrate.js";
 import { insertTask, seedProject } from "../helpers/domain-seed.js";
 import { memoryDayListStore } from "../helpers/day-list-store.js";
+import { resetObservabilityCountersForTests } from "../../src/observability/index.js";
 import {
   composeDailyReport,
   dailyReportPollIntervalMs,
@@ -26,6 +27,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   resetHandlerRegistry();
+  resetObservabilityCountersForTests();
 });
 
 afterEach(() => {
@@ -43,6 +45,12 @@ it("INV-08: ключ отчёта — report_type + destination + chat_id + peri
     periodDate: "2026-09-21",
   });
   expect(event.idempotencyKey).toBe("daily:dm:42:2026-09-21");
+});
+
+it("C-7: после минуты cron без отправки — missed", () => {
+  expect(isDailyCronMissed(defaultDailyCron(), 9, 0)).toBe(false);
+  expect(isDailyCronMissed(defaultDailyCron(), 9, 1)).toBe(true);
+  expect(isDailyCronMissed(defaultDailyCron(), 8, 59)).toBe(false);
 });
 
 it("INV-08: повтор emit report.sent за тот же период не создаёт второго события", async () => {

@@ -13,6 +13,8 @@ export const constants = {
   dayListMaxItems: 30,
   /** C-6 GITHUB_RECONCILE_INTERVAL, минуты. */
   githubReconcileIntervalMinutes: 30,
+  /** docs/pda/08: coverage_gap выше половины — предупреждение у процента. */
+  coverageGapWarnRatio: 0.5,
   reportSchedule: {
     daily: { hour: 9, minute: 0 },
     weekly: { isoWeekday: 5, hour: 18, minute: 0 },
@@ -20,6 +22,11 @@ export const constants = {
 } as const;
 
 export type Priority = keyof typeof constants.priorityWeights;
+
+/** C-6 в миллисекундах. */
+export function githubReconcileIntervalMs(): number {
+  return constants.githubReconcileIntervalMinutes * 60 * 1000;
+}
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),

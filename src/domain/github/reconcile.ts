@@ -21,7 +21,13 @@ export function githubSyncLagMs(input: {
   return input.nowEpochMs - input.lastTouchEpochMs;
 }
 
-/** Нет свежих данных GitHub — сигналы CI/PR не ставить (#19). */
-export function githubSignalsAllowed(lagMs: number | null): boolean {
-  return lagMs !== null;
+/** Нет свежих данных GitHub или лаг ≥ C-6 — сигналы CI/PR не ставить (#19, #22). */
+export function githubSignalsAllowed(
+  lagMs: number | null,
+  intervalMs: number,
+): boolean {
+  if (lagMs === null) {
+    return false;
+  }
+  return lagMs < intervalMs;
 }

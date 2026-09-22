@@ -22,6 +22,7 @@ import {
   PRIO_CALLBACK_PREFIX,
 } from "./callbacks.js";
 import { publishList, type DayListStore } from "./day-list.js";
+import { callbackQueryId, commitFact } from "./publish.js";
 
 const PRIORITIES = Object.keys(constants.priorityWeights) as Priority[];
 
@@ -101,6 +102,11 @@ export async function onTaskActCallback(
     await ctx.answerCallbackQuery();
     return;
   }
+  const queryId = callbackQueryId(ctx);
+  if (queryId === undefined) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
   const actor = actorOf(access, member);
   if (data.startsWith(CONFIRM_CALLBACK_PREFIX)) {
     const confirmed = confirmTask({
@@ -108,6 +114,10 @@ export async function onTaskActCallback(
       blockers: loaded.blockers,
       actor,
     });
+    if (!(await commitFact(confirmed.event.type, confirmed.event))) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
     store.saveTask(confirmed.task, loaded.blockers);
     await publishList(ctx, store, found.list);
     await ctx.answerCallbackQuery();
@@ -118,8 +128,12 @@ export async function onTaskActCallback(
       task: loaded.task,
       fromListId: found.list.id,
       actor,
-      idempotencyKey: `${loaded.task.id}:${found.list.listDate}:postponed`,
+      idempotencyKey: queryId,
     });
+    if (!(await commitFact(postponed.event.type, postponed.event))) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
     const closed = found.item.isDone
       ? found.list
       : closeOpenItem(found.list, found.item.id);
@@ -139,9 +153,15 @@ export async function onTaskActCallback(
       task: loaded.task,
       priority,
       actor,
-      idempotencyKey: `${loaded.task.id}:${priority}`,
+      idempotencyKey: queryId,
     });
-    store.saveTask(prioritized.task, loaded.blockers);
+    if (prioritized.event !== null && !(await commitFact(prioritized.event.type, prioritized.event))) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    if (prioritized.applied) {
+      store.saveTask(prioritized.task, loaded.blockers);
+    }
     await ctx.answerCallbackQuery();
     return;
   }
@@ -151,6 +171,10 @@ export async function onTaskActCallback(
       reason: null,
       actor,
     });
+    if (!(await commitFact(cancelled.event.type, cancelled.event))) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
     const closed = found.item.isDone
       ? found.list
       : closeOpenItem(found.list, found.item.id);
@@ -172,9 +196,15 @@ export async function onTaskActCallback(
       assigneeId: assignee?.userId ?? "",
       assignee,
       actor,
-      idempotencyKey: `${loaded.task.id}:reassign:${assignee?.userId ?? ""}`,
+      idempotencyKey: queryId,
     });
-    store.saveTask(reassigned.task, loaded.blockers);
+    if (reassigned.event !== null && !(await commitFact(reassigned.event.type, reassigned.event))) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    if (reassigned.applied) {
+      store.saveTask(reassigned.task, loaded.blockers);
+    }
     await ctx.answerCallbackQuery();
   }
 }

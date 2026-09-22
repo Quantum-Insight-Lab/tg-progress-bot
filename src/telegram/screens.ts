@@ -1,4 +1,5 @@
 import type { Context } from "grammy";
+import { githubReconcileIntervalMs } from "../config/index.js";
 import {
   formatProgress,
   progressOfProject,
@@ -11,6 +12,14 @@ import {
   type ProjectMember,
 } from "../domain/projects/index.js";
 import { weightOf } from "../domain/tasks/index.js";
+import { clock } from "../infrastructure/clock.js";
+import {
+  COVERAGE_GAP_WARNING,
+  coverageGapByProject,
+  coverageGapWarns,
+  formatGithubDataAge,
+  githubSyncLag,
+} from "../observability/index.js";
 import type { ScreenKind, ScreenReader } from "../projections/index.js";
 import {
   SCREEN_CALLBACK_PREFIX,
@@ -102,6 +111,7 @@ function byLastChange(
 function renderProgress(
   cards: Awaited<ReturnType<ScreenReader["projectProgress"]>>,
   plans: Awaited<ReturnType<ScreenReader["planQueue"]>>,
+  gaps: ReadonlyMap<string, number>,
 ): string {
   return [...cards]
     .sort(byLastChange)
@@ -114,6 +124,9 @@ function renderProgress(
         card.name,
         percentLabel(progress),
       ];
+      if (progress !== null && coverageGapWarns(gaps.get(card.projectId) ?? null)) {
+        lines.push(COVERAGE_GAP_WARNING);
+      }
       if (card.stageName !== null) {
         lines.push(card.stageName);
       }
@@ -314,6 +327,20 @@ function renderGithub(cards: Awaited<ReturnType<ScreenReader["githubState"]>>): 
     .join("\n\n");
 }
 
+function githubAgeLine(): string {
+  return formatGithubDataAge(
+    githubSyncLag(clock.now("UTC").epochMs),
+    githubReconcileIntervalMs(),
+  );
+}
+
+function withGithubAge(text: string): string {
+  if (text.length === 0) {
+    return githubAgeLine();
+  }
+  return `${text}\n\n${githubAgeLine()}`;
+}
+
 export async function onStartMenu(ctx: Context): Promise<void> {
   await ctx.reply(SCREEN_MENU_PROMPT, { reply_markup: screensKeyboard() });
 }
@@ -361,11 +388,12 @@ async function showScreen(
   const projectIds = projectIdsForScreen(access, directory, identity);
   let text: string;
   if (kind === "progress") {
-    const [cards, plans] = await Promise.all([
+    const [cards, plans, gaps] = await Promise.all([
       screens.projectProgress(projectIds),
       screens.planQueue(projectIds),
+      coverageGapByProject(projectIds),
     ]);
-    text = renderProgress(cards, plans);
+    text = withGithubAge(renderProgress(cards, plans, gaps));
   } else if (kind === "work") {
     text = renderWork(await screens.workBoard(projectIds));
   } else if (kind === "done") {
@@ -373,9 +401,9 @@ async function showScreen(
   } else if (kind === "plan") {
     text = renderPlan(await screens.planQueue(projectIds));
   } else if (kind === "blockers") {
-    text = renderBlockers(await screens.blockersBoard(projectIds));
+    text = withGithubAge(renderBlockers(await screens.blockersBoard(projectIds)));
   } else {
-    text = renderGithub(await screens.githubState(projectIds));
+    text = withGithubAge(renderGithub(await screens.githubState(projectIds)));
   }
   if (text.length === 0) {
     text = formatProgress(null);

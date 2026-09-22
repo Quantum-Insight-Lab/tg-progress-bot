@@ -18,17 +18,44 @@ export function reportSentKey(input: {
   return `${input.reportType}:${input.destination}:${String(input.chatId)}:${input.periodKey}`;
 }
 
+function parseDailyCron(
+  cron: string,
+): { hour: number; minute: number } | null {
+  const match = /^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*$/.exec(cron.trim());
+  if (match === null) {
+    return null;
+  }
+  return {
+    minute: Number.parseInt(match[1] ?? "", 10),
+    hour: Number.parseInt(match[2] ?? "", 10),
+  };
+}
+
 /** C-7: cron `m h * * *` совпадает с часом и минутой в таймзоне проекта. */
 export function isDailyCronDue(
   cron: string,
   hour: number,
   minute: number,
 ): boolean {
-  const match = /^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*$/.exec(cron.trim());
-  if (match === null) {
+  const parsed = parseDailyCron(cron);
+  if (parsed === null) {
     return false;
   }
-  const cronMinute = Number.parseInt(match[1] ?? "", 10);
-  const cronHour = Number.parseInt(match[2] ?? "", 10);
-  return cronHour === hour && cronMinute === minute;
+  return parsed.hour === hour && parsed.minute === minute;
+}
+
+/** Минута cron уже прошла, прогон не состоялся. */
+export function isDailyCronMissed(
+  cron: string,
+  hour: number,
+  minute: number,
+): boolean {
+  const parsed = parseDailyCron(cron);
+  if (parsed === null) {
+    return false;
+  }
+  if (hour > parsed.hour) {
+    return true;
+  }
+  return hour === parsed.hour && minute > parsed.minute;
 }
