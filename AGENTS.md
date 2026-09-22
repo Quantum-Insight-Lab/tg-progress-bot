@@ -48,6 +48,7 @@ src/config     ничего не импортирует из src
 | Пересборка проекции | `scripts/rebuild-projection.ts` из журнала, без записи в `events` (S-5) |
 | Лог констант | `logConstantChanges`: базовая линия, дальше только отличия (S-8) |
 | Процесс | `src/index.ts`: webhook Telegram/GitHub, `startGithubReconcileLoop`, `startDailyReportLoop` |
+| Образ | `Dockerfile`: процесс `node dist/src/index.js`; миграции `node dist/scripts/migrate.js` отдельно |
 | Номер дня пункта | `dayNumberOf` в `src/projections/day-number.ts` |
 | GitHub | единственный клиент Octokit в `src/github/client.ts` |
 | Публикация события | `emit` из `src/events`, тип — только сгенерированная константа |
