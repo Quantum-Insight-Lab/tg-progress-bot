@@ -1,6 +1,7 @@
 import { createSign } from "node:crypto";
 import { Octokit } from "@octokit/rest";
 import { env } from "../config/index.js";
+import { clock } from "../infrastructure/clock.js";
 import { markGithubRateRemaining } from "../observability/index.js";
 
 const TOKEN_SKEW_MS = 60_000;
@@ -38,7 +39,7 @@ export function githubAppPrivateKeyPem(raw: string): string {
 }
 
 function appJwt(appId: string, privateKeyPem: string): string {
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.floor(clock.now("UTC").epochMs / 1000);
   const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString(
     "base64url",
   );
@@ -60,7 +61,10 @@ function githubApiHeaders(jwt: string): Record<string, string> {
 }
 
 async function installationAccessToken(): Promise<string> {
-  if (cachedToken !== undefined && cachedToken.expiresAtMs - TOKEN_SKEW_MS > Date.now()) {
+  if (
+    cachedToken !== undefined &&
+    cachedToken.expiresAtMs - TOKEN_SKEW_MS > clock.now("UTC").epochMs
+  ) {
     return cachedToken.token;
   }
   const { githubAppId, githubAppPrivateKey } = env();
