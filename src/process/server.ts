@@ -60,6 +60,7 @@ async function route(
     send(res, 200, "ok");
     return;
   }
+  logger.info("http.request", { method: req.method, path });
   if (req.method !== "POST") {
     send(res, 405);
     return;

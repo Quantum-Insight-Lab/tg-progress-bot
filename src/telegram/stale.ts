@@ -89,7 +89,7 @@ export async function scanStaleTasks(
       detectedAt: now.iso,
       detectedOnDate: today,
     });
-    store.saveTask(applied.task, applied.blockers);
+    await store.saveTask(applied.task, applied.blockers);
     if (applied.task.status !== "BLOCKED" || !mayReAsk(daysSinceLastAsk)) {
       continue;
     }
@@ -149,7 +149,7 @@ export async function onDismissBlockerCallback(
     await ctx.answerCallbackQuery();
     return;
   }
-  store.saveTask(dismissed.task, dismissed.blockers);
+  await store.saveTask(dismissed.task, dismissed.blockers);
   store.clearPendingAsk(member.userId);
   await ctx.answerCallbackQuery();
 }
@@ -179,6 +179,6 @@ export async function onBlockerReasonMessage(
   if (!(await commitFact(declared.event.type, declared.event))) {
     return;
   }
-  store.saveTask(loaded.task, declared.blockers);
+  await store.saveTask(loaded.task, declared.blockers);
   store.clearPendingAsk(member.userId);
 }

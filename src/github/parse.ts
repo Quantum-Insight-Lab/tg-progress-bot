@@ -127,7 +127,15 @@ export function parseGithubFact(
   const repository = repo.data.full_name;
 
   if (eventName === "issues") {
-    const issue = issueSchema.safeParse(record["issue"]);
+    const rawIssue = record["issue"];
+    if (
+      typeof rawIssue === "object" &&
+      rawIssue !== null &&
+      "pull_request" in rawIssue
+    ) {
+      return undefined;
+    }
+    const issue = issueSchema.safeParse(rawIssue);
     if (!issue.success) {
       return undefined;
     }

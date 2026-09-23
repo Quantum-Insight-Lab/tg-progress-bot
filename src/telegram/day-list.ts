@@ -23,6 +23,7 @@ import {
   type ProjectMember,
 } from "../domain/projects/index.js";
 import { DomainError } from "../domain/shared/errors.js";
+import { logger } from "../infrastructure/logger.js";
 import { dayNumberOf } from "../projections/day-number.js";
 import { callbackQueryId, commitFact } from "./publish.js";
 import {
@@ -62,9 +63,9 @@ export type DayListStore = {
   savePendingTask: (draft: PendingTaskDraft) => void;
   clearPendingTask: (userId: string) => void;
   listsOf: (projectId: string) => TaskList[];
-  saveList: (list: TaskList) => void;
+  saveList: (list: TaskList) => Promise<void>;
   taskOf: (taskId: string) => { task: Task; blockers: Blocker[] } | undefined;
-  saveTask: (task: Task, blockers: Blocker[]) => void;
+  saveTask: (task: Task, blockers: Blocker[]) => Promise<void>;
   rosterOf: (projectId: string) => readonly MemberRef[];
   leadsOf: (projectId: string) => readonly { userId: string }[];
   telegramIdOf: (userId: string) => string | undefined;
@@ -154,11 +155,11 @@ function tasksMap(store: DayListStore, list: TaskList): Map<string, Task> {
   return map;
 }
 
-function ensureTodayList(
+async function ensureTodayList(
   access: ProjectAccess,
   member: ProjectMember,
   store: DayListStore,
-): TaskList {
+): Promise<TaskList> {
   const timeZone = store.timeZoneOf(access.projectId);
   if (timeZone === undefined) {
     requireMember(undefined);
@@ -175,13 +176,14 @@ function ensureTodayList(
   if (!opened.created) {
     return opened.list;
   }
+  await store.saveList(opened.list);
   const carried = carryOverOpenItems({
     lists,
     targetList: opened.list,
     itemIdFor: () => store.newId(),
   });
   for (const list of carried.lists) {
-    store.saveList(list);
+    await store.saveList(list);
   }
   return carried.targetList;
 }
@@ -210,7 +212,7 @@ export async function publishList(ctx: Context, store: DayListStore, list: TaskL
           reply_markup: rendered.keyboard,
           message_thread_id: threadId,
         });
-  store.saveList(setListMessageId(list, sent.message_id));
+  await store.saveList(setListMessageId(list, sent.message_id));
 }
 
 export async function onTaskCommand(
@@ -221,6 +223,10 @@ export async function onTaskCommand(
 ): Promise<void> {
   const parsed = parseTaskCommand(ctx.message?.text);
   if (parsed === undefined) {
+    logger.warn("command.rejected", {
+      code: "missing_title",
+      message: "Нужна формулировка",
+    });
     await ctx.reply("Нужна формулировка");
     return;
   }
@@ -269,7 +275,7 @@ export async function onPickIssueCallback(
     access.projectId,
     issueId,
   );
-  const list = ensureTodayList(access, member, store);
+  const list = await ensureTodayList(access, member, store);
   const lists = store.listsOf(access.projectId);
   const created = createTask({
     id: store.newId(),
@@ -298,8 +304,8 @@ export async function onPickIssueCallback(
     itemId: store.newId(),
     openItemsForTask: openItemsOf(lists),
   });
-  store.saveTask(created.task, []);
-  store.saveList(added.list);
+  await store.saveTask(created.task, []);
+  await store.saveList(added.list);
   store.clearPendingTask(member.userId);
   await publishList(ctx, store, added.list);
   await ctx.answerCallbackQuery();
@@ -359,8 +365,8 @@ export async function onCheckCallback(
     await ctx.answerCallbackQuery();
     return;
   }
-  store.saveTask(checked.task, checked.blockers);
-  store.saveList(checked.list);
+  await store.saveTask(checked.task, checked.blockers);
+  await store.saveList(checked.list);
   await publishList(ctx, store, checked.list);
   await askLeadToConfirm(ctx, store, access.projectId, item.id);
   await ctx.answerCallbackQuery();

@@ -7,14 +7,32 @@ import {
   type ProjectMember,
 } from "../domain/projects/index.js";
 import { DomainError } from "../domain/shared/errors.js";
+import { logger } from "../infrastructure/logger.js";
 import { recordRejectedCommand } from "../observability/index.js";
+import { ISSUE_CALLBACK_PREFIX } from "./callbacks.js";
 
 export type IdentityDirectories = {
   findProjectByChatId: (chatId: string) => { id: string } | undefined;
   findUserByTelegramId: (telegramUserId: string) => { id: string } | undefined;
   findProjectIdByCallback?: (data: string | undefined) => string | undefined;
   findProjectIdByPrivateUser?: (userId: string) => string | undefined;
+  findProjectIdByPendingTask?: (userId: string) => string | undefined;
 };
+
+/** Журнал каждого обновления. Регистрация здесь, чтобы guard оставался единственной точкой входа (INV-12). */
+export function attachTelegramLog(instance: Bot): void {
+  instance.use(async (ctx, next) => {
+    const message = ctx.message;
+    logger.info("telegram.update", {
+      update_id: ctx.update.update_id,
+      chat_id: ctx.chat?.id,
+      user_id: ctx.from?.id,
+      text: message !== undefined && "text" in message ? message.text : undefined,
+      data: ctx.callbackQuery?.data,
+    });
+    await next();
+  });
+}
 
 export function resolveAccess(
   ctx: Context,
@@ -27,6 +45,13 @@ export function resolveAccess(
   const user = identity.findUserByTelegramId(String(telegramUserId));
   if (user === undefined) {
     return undefined;
+  }
+  const data = ctx.callbackQuery?.data;
+  if (data !== undefined && data.startsWith(ISSUE_CALLBACK_PREFIX)) {
+    const draftProject = identity.findProjectIdByPendingTask?.(user.id);
+    if (draftProject !== undefined) {
+      return { projectId: draftProject, userId: user.id };
+    }
   }
   const chatId = ctx.chat?.id;
   if (chatId !== undefined) {
@@ -49,6 +74,7 @@ export function resolveAccess(
 async function replyDenied(ctx: Context, error: unknown): Promise<boolean> {
     if (error instanceof DomainError) {
       recordRejectedCommand(error.code);
+      logger.warn("command.rejected", { code: error.code, message: error.message });
       if (ctx.callbackQuery !== undefined) {
         await ctx.answerCallbackQuery();
       }

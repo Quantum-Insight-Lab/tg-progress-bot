@@ -20,6 +20,21 @@ export async function githubState(
     .where("issues.project_id", "in", [...projectIds])
     .where("issues.state", "=", "open")
     .where("tasks.id", "is", null)
+    .where((eb) =>
+      eb.not(
+        eb.exists(
+          eb
+            .selectFrom("issue_pull_requests")
+            .select("issue_pull_requests.id")
+            .whereRef("issue_pull_requests.project_id", "=", "issues.project_id")
+            .whereRef(
+              "issue_pull_requests.pull_request_number",
+              "=",
+              "issues.issue_number",
+            ),
+        ),
+      ),
+    )
     .execute();
   const pulls = await db
     .selectFrom("issue_pull_requests")

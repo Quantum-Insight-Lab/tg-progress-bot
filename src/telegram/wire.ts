@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import type { MemberDirectory } from "../domain/projects/index.js";
 import {
+  attachTelegramLog,
   bindGuardedCallbackQuery,
   bindGuardedCommand,
   bindGuardedPrivateText,
@@ -64,6 +65,7 @@ export type TelegramDeps = {
 };
 
 export function wireTelegram(bot: Bot, deps: TelegramDeps): void {
+  attachTelegramLog(bot);
   const screens = deps.screens ?? emptyScreenReader();
   const identity: IdentityDirectories = {
     findProjectByChatId: deps.identity.findProjectByChatId,
@@ -80,7 +82,9 @@ export function wireTelegram(bot: Bot, deps: TelegramDeps): void {
       }
       return undefined;
     },
+    findProjectIdByPendingTask: (userId) => deps.dayList.pendingOf(userId)?.projectId,
     findProjectIdByPrivateUser: (userId) =>
+      deps.dayList.pendingOf(userId)?.projectId ??
       deps.dayList.pendingAskOf(userId)?.projectId ??
       deps.identity.findProjectIdsByUserId?.(userId)?.[0],
   };

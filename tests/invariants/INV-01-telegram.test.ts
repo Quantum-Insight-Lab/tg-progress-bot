@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, beforeEach, expect, it } from "vitest";
-import type { Bot, Transformer } from "grammy";
+import type { Bot, Context, Transformer } from "grammy";
 import { resetHandlerRegistry, type ProjectMember } from "../../src/domain/projects/index.js";
 import { createClock } from "../../src/infrastructure/clock.js";
 import { applyMigrations } from "../../scripts/migrate.js";
@@ -9,7 +9,7 @@ import {
   ISSUE_CALLBACK_PREFIX,
   ISSUE_PICK_PROMPT,
 } from "../../src/telegram/callbacks.js";
-import { resetBotForTests, wireTelegram } from "../../src/telegram/index.js";
+import { resetBotForTests, resolveAccess, wireTelegram } from "../../src/telegram/index.js";
 import { memoryDayListStore, sampleIssue } from "../helpers/day-list-store.js";
 import { repoRoot } from "../helpers/repo-root.js";
 import { sendTask } from "../helpers/telegram-task.js";
@@ -189,4 +189,18 @@ it("INV-01: telegram не ходит в живой GitHub API", () => {
   }
   walk(root);
   expect(hits).toEqual([]);
+});
+
+it("INV-01: кнопка issue открывает проект черновика", () => {
+  const ctx = {
+    from: { id: telegramUserId },
+    chat: { id: chatId },
+    callbackQuery: { data: `${ISSUE_CALLBACK_PREFIX}issue-1` },
+  } as Context;
+  const access = resolveAccess(ctx, {
+    findProjectByChatId: () => ({ id: "other-project" }),
+    findUserByTelegramId: () => ({ id: lead.userId }),
+    findProjectIdByPendingTask: () => projectId,
+  });
+  expect(access).toEqual({ projectId, userId: lead.userId });
 });

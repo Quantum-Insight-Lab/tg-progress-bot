@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { beforeAll, beforeEach, expect, it } from "vitest";
 import type { Transformer } from "grammy";
 import { formatProgress } from "../../src/domain/progress/index.js";
+import { parseGithubFact } from "../../src/github/parse.js";
 import { resetHandlerRegistry, type ProjectMember } from "../../src/domain/projects/index.js";
 import { emit } from "../../src/events/emit.js";
 import { EVENT_TYPES } from "../../src/events/generated/index.js";
@@ -63,6 +64,39 @@ it("INV-10: GitHub показывает issues без задач своего п
   await insertTask(pool, home);
   const after = await githubState([home.projectId]);
   expect(after[0]?.issuesWithoutTasks).toEqual([]);
+});
+
+it("INV-10: PR не показывается как issue без задачи", async () => {
+  const pool = getPool();
+  const home = await seedProject(pool);
+  const number = 424242;
+  await pool.query(
+    `INSERT INTO issues (id, project_id, issue_number, title, state)
+     VALUES ($1, $2, $3, $4, 'open')`,
+    [randomUUID(), home.projectId, number, "Это PR"],
+  );
+  await pool.query(
+    `INSERT INTO issue_pull_requests (id, project_id, pull_request_number, state)
+     VALUES ($1, $2, $3, 'open')`,
+    [randomUUID(), home.projectId, number],
+  );
+  const card = await githubState([home.projectId]);
+  const shown = card[0]?.issuesWithoutTasks ?? [];
+  expect(shown.some((issue) => issue.number === number)).toBe(false);
+  expect(shown.some((issue) => issue.title === "Issue")).toBe(true);
+});
+
+it("INV-10: webhook issues для PR не становится issue", () => {
+  const fact = parseGithubFact("issues", {
+    repository: { full_name: "org/repo" },
+    issue: {
+      number: 59,
+      title: "PR title",
+      state: "open",
+      pull_request: { url: "https://example.test/pull/59" },
+    },
+  });
+  expect(fact).toBeUndefined();
 });
 
 it("INV-10: план одного проекта не содержит задачи другого", async () => {

@@ -5,6 +5,7 @@ import { dbScreenReader } from "./projections/index.js";
 import { createRuntimeAccess } from "./process/access.js";
 import { createRuntimeDayList } from "./process/day-list.js";
 import { listenWebhooks } from "./process/server.js";
+import { startStaleScanLoop } from "./process/stale-loop.js";
 import { bot, startDailyReportLoop, wireTelegram } from "./telegram/index.js";
 
 async function main(): Promise<void> {
@@ -20,6 +21,7 @@ async function main(): Promise<void> {
     screens: dbScreenReader(),
   });
   const stopGithub = startGithubReconcileLoop();
+  const stopStale = startStaleScanLoop({ bot: telegram, store: dayList });
   const stopReport = startDailyReportLoop({ bot: telegram });
   const port = env().port;
   const server = listenWebhooks({
@@ -33,6 +35,7 @@ async function main(): Promise<void> {
   logger.info("process.listening", { port });
   const stop = (): void => {
     stopGithub();
+    stopStale();
     stopReport();
     server.close();
   };

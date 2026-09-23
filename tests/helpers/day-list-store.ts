@@ -45,13 +45,15 @@ export function memoryDayListStore(init?: {
       const index = lists.findIndex((entry) => entry.id === list.id);
       if (index === -1) {
         lists.push(list);
-        return;
+      } else {
+        lists[index] = list;
       }
-      lists[index] = list;
+      return Promise.resolve();
     },
     taskOf: (taskId) => tasks.get(taskId),
     saveTask: (task, blockers) => {
       tasks.set(task.id, { task, blockers });
+      return Promise.resolve();
     },
     rosterOf: (projectId) =>
       (init?.roster ?? []).filter((member) => member.projectId === projectId),

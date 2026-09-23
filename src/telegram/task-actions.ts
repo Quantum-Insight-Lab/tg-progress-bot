@@ -118,7 +118,7 @@ export async function onTaskActCallback(
       await ctx.answerCallbackQuery();
       return;
     }
-    store.saveTask(confirmed.task, loaded.blockers);
+    await store.saveTask(confirmed.task, loaded.blockers);
     await publishList(ctx, store, found.list);
     await ctx.answerCallbackQuery();
     return;
@@ -137,8 +137,8 @@ export async function onTaskActCallback(
     const closed = found.item.isDone
       ? found.list
       : closeOpenItem(found.list, found.item.id);
-    store.saveTask(postponed.task, loaded.blockers);
-    store.saveList(closed);
+    await store.saveTask(postponed.task, loaded.blockers);
+    await store.saveList(closed);
     await publishList(ctx, store, closed);
     await ctx.answerCallbackQuery();
     return;
@@ -160,7 +160,7 @@ export async function onTaskActCallback(
       return;
     }
     if (prioritized.applied) {
-      store.saveTask(prioritized.task, loaded.blockers);
+      await store.saveTask(prioritized.task, loaded.blockers);
     }
     await ctx.answerCallbackQuery();
     return;
@@ -178,8 +178,8 @@ export async function onTaskActCallback(
     const closed = found.item.isDone
       ? found.list
       : closeOpenItem(found.list, found.item.id);
-    store.saveTask(cancelled.task, loaded.blockers);
-    store.saveList(closed);
+    await store.saveTask(cancelled.task, loaded.blockers);
+    await store.saveList(closed);
     await publishList(ctx, store, closed);
     await ctx.answerCallbackQuery();
     return;
@@ -203,7 +203,7 @@ export async function onTaskActCallback(
       return;
     }
     if (reassigned.applied) {
-      store.saveTask(reassigned.task, loaded.blockers);
+      await store.saveTask(reassigned.task, loaded.blockers);
     }
     await ctx.answerCallbackQuery();
   }

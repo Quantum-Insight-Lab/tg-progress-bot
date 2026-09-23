@@ -14,6 +14,7 @@ import {
   scanStaleTasks,
   wireTelegram,
 } from "../../src/telegram/index.js";
+import { runStaleScan } from "../../src/process/stale-loop.js";
 import { memoryDayListStore } from "../helpers/day-list-store.js";
 import type { Task, TaskList } from "../../src/domain/tasks/index.js";
 
@@ -270,4 +271,60 @@ it("INV-13: при лаге ≥ C-6 CI-сигнал не ставится, за�
   );
   expect(signals).toEqual(["no_check"]);
   expect(dayList.tasks.get("task-1")?.task.status).toBe("BLOCKED");
+});
+
+it("INV-13: опрос процесса без данных GitHub не ставит CI", async () => {
+  const bot = resetBotForTests();
+  intercept(bot);
+  const dayList = wire(bot, staleLists("task-1"));
+  const facts = new Map([
+    [
+      "task-1",
+      {
+        ciRed: true,
+        prIdleDays: constants.staleDays + 1,
+        issueIdleDays: 0,
+        noBranchDays: 0,
+      },
+    ],
+  ]);
+  await runStaleScan({
+    bot,
+    store: dayList,
+    lagMs: null,
+    projectIds: [projectId],
+    factsFor: () => Promise.resolve(facts),
+  });
+  const signals = (dayList.tasks.get("task-1")?.blockers ?? []).map(
+    (blocker) => blocker.signalType,
+  );
+  expect(signals).toEqual(["no_check"]);
+});
+
+it("INV-13: опрос процесса при свежих данных GitHub ставит CI", async () => {
+  const bot = resetBotForTests();
+  intercept(bot);
+  const dayList = wire(bot, staleLists("task-1"));
+  const facts = new Map([
+    [
+      "task-1",
+      {
+        ciRed: true,
+        prIdleDays: constants.staleDays + 1,
+        issueIdleDays: 0,
+        noBranchDays: 0,
+      },
+    ],
+  ]);
+  await runStaleScan({
+    bot,
+    store: dayList,
+    lagMs: 0,
+    projectIds: [projectId],
+    factsFor: () => Promise.resolve(facts),
+  });
+  const signals = (dayList.tasks.get("task-1")?.blockers ?? []).map(
+    (blocker) => blocker.signalType,
+  );
+  expect(signals).toContain("ci_red");
 });
