@@ -10,6 +10,7 @@ import {
 import { applyGithubFact, reconcileFactKey } from "./apply.js";
 import { githubClient } from "./client.js";
 import { mirrorMatches } from "./mirror.js";
+import type { ParsedGithubFact } from "./parse.js";
 import { octokitGithubReader, type GithubReader } from "./reader.js";
 
 export { githubReconcileIntervalMs };
@@ -58,11 +59,22 @@ export async function reconcileGithubMirror(deps?: {
 
   let applied = 0;
   let readerCalls = 0;
+  let readAny = false;
   for (const [repository, projectIds] of byRepo) {
     readerCalls += 1;
-    const facts = (await reader.factsFor(repository)).filter(
-      (fact) => fact.repository === repository,
-    );
+    let facts: ParsedGithubFact[];
+    try {
+      facts = (await reader.factsFor(repository)).filter(
+        (fact) => fact.repository === repository,
+      );
+      readAny = true;
+    } catch (error: unknown) {
+      logger.error("github reconcile repository failed", {
+        repository,
+        error: String(error),
+      });
+      continue;
+    }
     for (const projectId of projectIds) {
       for (const fact of facts) {
         if (await mirrorMatches(projectId, fact)) {
@@ -80,7 +92,9 @@ export async function reconcileGithubMirror(deps?: {
     }
   }
 
-  markGithubReconciled(nowEpochMs);
+  if (readAny) {
+    markGithubReconciled(nowEpochMs);
+  }
   return { ran: true, applied, readerCalls };
 }
 
