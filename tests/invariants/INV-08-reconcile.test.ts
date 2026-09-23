@@ -182,6 +182,43 @@ it("INV-08: сверка раньше C-6 не опрашивает GitHub", asy
   expect(reader.calls).toBeGreaterThan(0);
 });
 
+it("INV-08: сверка не останавливается на недоступном репозитории", async () => {
+  const missing = await seedProject(getPool());
+  const good = await seedProject(getPool());
+  await getPool().query("UPDATE projects SET repository = $1 WHERE id = $2", [
+    "org/missing",
+    missing.projectId,
+  ]);
+  const goodRepo = await uniqueRepo(good.projectId);
+  const reader: GithubReader = {
+    async factsFor(repository) {
+      if (repository === "org/missing") {
+        throw new Error("Not Found");
+      }
+      if (repository !== goodRepo) {
+        return [];
+      }
+      return [issueFact(goodRepo, "Догон")];
+    },
+  };
+  const result = await reconcileGithubMirror({
+    reader,
+    lastRunEpochMs: null,
+    nowEpochMs: 1,
+    intervalMs: githubReconcileIntervalMs(),
+  });
+  expect(result.ran).toBe(true);
+  expect(result.applied).toBe(1);
+
+  const issue = await getDb()
+    .selectFrom("issues")
+    .select("title")
+    .where("project_id", "=", good.projectId)
+    .where("issue_number", "=", 4242)
+    .executeTakeFirst();
+  expect(issue?.title).toBe("Догон");
+});
+
 it("github_sync_lag: после webhook лаг меньше C-6", async () => {
   const seed = await seedProject(getPool());
   const repository = await uniqueRepo(seed.projectId);
