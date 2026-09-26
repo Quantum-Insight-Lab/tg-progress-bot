@@ -8,9 +8,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "boundaries": "depcruise src --config dependency-cruiser.config.mjs",
     "test": "vitest run",
+    "codegen:events": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/codegen-events.ts",
+    "check:invariants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-invariants.ts",
     "tz:check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts",
-    "ci": "npm run typecheck && npm test && npm run tz:check -- --gate --pda"
+    "ci": "npm run typecheck && npm run lint && npm run boundaries && npm run codegen:events -- --check && npm run check:invariants && npm test && npm run tz:check -- --gate --pda"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

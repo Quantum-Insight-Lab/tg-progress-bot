@@ -16,5 +16,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - name: lint (S-3, S-8, S-10)
+        run: npm run lint
+      - name: boundaries (S-1, S-2, S-5, S-6)
+        run: npm run boundaries
+      - name: generated events (S-3)
+        run: npm run codegen:events -- --check
+      - name: invariants with tests (S-7)
+        run: npm run check:invariants
       - run: npm test
       - run: npm run tz:check -- --gate --pda
