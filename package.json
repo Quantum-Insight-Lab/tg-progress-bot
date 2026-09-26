@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "tz:check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts",
-    "ci": "npm run typecheck && npm test && npm run tz:check"
+    "ci": "npm run typecheck && npm test && npm run tz:check -- --gate"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
