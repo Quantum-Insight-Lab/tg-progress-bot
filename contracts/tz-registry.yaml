@@ -402,24 +402,15 @@ atoms:
   R-337:
     kind: integration
     scope: R-043
-    decision: clarify
-    note: >-
-      Релизы читаются, приходят webhook `release` (R-349) и лежат в зеркале как «последний релиз» (R-373),
-      но ни канвас, ни отчёт их не показывают, и таблицы для них в §9 нет. Читать в MVP или отказаться?
+    decision: withdrawn
+    note: релизы не читаются в MVP — нигде не показывались (решение 26.09) — R-435
   R-338: { kind: integration, scope: R-043 }
   R-339: { kind: integration, scope: R-043 }
   R-340: { kind: view, scope: R-021 }
   R-341: { kind: view, scope: R-021 }
   R-342: { kind: tech, scope: R-043 }
   R-343: { kind: tech, scope: R-043 }
-  R-344:
-    kind: integration
-    scope: R-043
-    decision: clarify
-    defect: D-2
-    note: >-
-      Milestone с датой (§3.1) и связи issues — sub-issues, blocked by (§3.1) — показываются, но среди webhooks
-      нет событий, которые их обновляют, а опрос только догоняет пропущенную доставку (R-350). Откуда обновления?
+  R-344: { kind: integration, scope: R-043 }
   R-345: { kind: integration, scope: R-043 }
   R-346: { kind: integration, scope: R-043 }
   R-347: { kind: integration, scope: R-043 }
@@ -427,8 +418,8 @@ atoms:
   R-349:
     kind: integration
     scope: R-043
-    decision: clarify
-    note: webhook `release` — решается вместе с R-337
+    decision: withdrawn
+    note: отозван вместе с R-337
   R-350: { kind: rule, scope: R-044 }
   R-351: { kind: rule, scope: R-043 }
   R-352: { kind: rule, scope: R-043, decision: same_as, same_as: R-351 }
@@ -457,8 +448,8 @@ atoms:
   R-373:
     kind: entity
     scope: R-043
-    decision: clarify
-    note: «последний релиз» в зеркале — решается вместе с R-337
+    decision: withdrawn
+    note: отозван вместе с R-337
   R-374: { kind: view, scope: R-021, decision: same_as, same_as: R-357 }
   R-375: { kind: view, scope: R-025 }
   R-376: { kind: view, scope: R-026 }
@@ -478,14 +469,7 @@ atoms:
   R-388: { kind: rule, scope: R-002 }
   R-389: { kind: rule, scope: R-025, decision: same_as, same_as: R-272 }
   R-390: { kind: view, scope: R-025 }
-  R-391:
-    kind: rule
-    scope: R-002
-    decision: clarify
-    defect: D-5
-    note: >-
-      «Если логин автора совпал», но для закрытого issue учитывается «кто его закрыл» (R-395), а не автор issue.
-      В §3.3 то же названо «логин действующего лица».
+  R-391: { kind: rule, scope: R-002 }
   R-392: { kind: rule, scope: R-026 }
   R-393: { kind: rule, scope: R-026 }
   R-394: { kind: rule, scope: R-045 }
@@ -524,11 +508,7 @@ atoms:
   R-423: { kind: rule, scope: R-011, decision: same_as, same_as: R-200 }
   R-424: { kind: rule, scope: R-011 }
   R-425: { kind: rule, scope: R-012 }
-  R-426:
-    kind: rule
-    scope: R-015
-    decision: clarify
-    note: одно понятие названо двумя словами — «Прошёл» здесь и «сделал» в строке человека на канвасе (R-112)
+  R-426: { kind: rule, scope: R-015 }
   R-427: { kind: rule, scope: R-015 }
   R-428: { kind: rule, scope: R-015 }
   R-429: { kind: rule, scope: R-015 }
@@ -537,3 +517,9 @@ atoms:
   R-432: { kind: rule, scope: R-015 }
   R-433: { kind: rule, scope: R-012 }
   R-434: { kind: view, scope: R-015 }
+
+  # Ответы на вопросы прохода 4
+  R-435: { kind: scope, release: out }
+  R-436: { kind: integration, scope: R-043 }
+  R-437: { kind: integration, scope: R-043 }
+  R-438: { kind: integration, scope: R-043 }
