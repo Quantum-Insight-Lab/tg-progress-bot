@@ -3,8 +3,8 @@
 source: docs/tz.md
 
 glossary:
-  ветка: топик исполнителя в супергруппе проекта; «ветка исполнителя» и «топик исполнителя» — одно и то же
-  топик: topic Telegram внутри супергруппы — топик исполнителя или командный топик
+  топик: topic Telegram внутри группы — топик исполнителя (канвас и задачи) или командный топик (отчёты); слова «ветка» в этом смысле в ТЗ нет
+  git-ветка: ветка репозитория GitHub; «основная git-ветка» — ветка по умолчанию
   линейка: прогресс проекта — доля completed issues репозитория и остаток открытых; «процент проекта» и «доля бэклога» — то же самое
   задача: шаг, который человек ведёт в боте; issue задачей не является и задачу не порождает
   группа: супергруппа проекта с топиками; «группа» и «супергруппа» — одно и то же
@@ -132,7 +132,11 @@ atoms:
   R-102: { kind: entity, scope: R-042 }
   R-103: { kind: rule, scope: R-001 }
   R-104: { kind: rule, scope: R-004 }
-  R-105: { kind: act, scope: R-027 }
+  R-105:
+    kind: act
+    scope: R-027
+    decision: withdrawn
+    note: новый смысл — задача заводится командой /task, а не обычным сообщением (решение 26.09); заменён на R-326
   R-106: { kind: reaction, scope: R-028 }
   # §1 · макет канваса: поле — атом, значения — иллюстрация (10.5, правило 4)
   R-107: { kind: view, scope: R-001 }
@@ -231,7 +235,7 @@ atoms:
   R-195: { kind: rule, scope: R-012 }
 
   # §2.2 Задача
-  R-196: { kind: act, scope: R-027, decision: same_as, same_as: R-105 }
+  R-196: { kind: act, scope: R-027, decision: same_as, same_as: R-326 }
   R-197: { kind: rule, scope: R-027 }
   R-198: { kind: rule, scope: R-027 }
   R-199: { kind: rule, scope: R-027 }
@@ -240,12 +244,12 @@ atoms:
   R-202: { kind: entity, scope: R-009 }
   R-203:
     kind: entity
-    decision: clarify
-    defect: D-2
-    note: >-
-      Описание задачи: название — текст сообщения (R-226), а чем заполняется описание,
-      нигде не сказано — действия для него нет. Входит ли описание в MVP и откуда берётся?
-  R-204: { kind: rule, scope: R-009 }
+    decision: withdrawn
+    note: описание задачи не входит в MVP (решение 26.09, D-2 закрыт) — R-324
+  R-204:
+    kind: rule
+    decision: withdrawn
+    note: отозван вместе с R-203
   R-205: { kind: entity, scope: R-009 }
   R-206: { kind: entity, scope: R-010 }
   R-207: { kind: entity, scope: R-009 }
@@ -293,11 +297,8 @@ atoms:
   R-249: { kind: rule, scope: R-009 }
   R-250:
     kind: act
-    decision: clarify
-    defect: D-1
-    note: >-
-      Передача задачи другому исполнителю (здесь и в §6) не входит ни в один пункт объёма работ,
-      и не сказано, кто и чем её запускает: на канвасе такой кнопки нет. Входит ли в MVP и в каком виде?
+    decision: withdrawn
+    note: передача задачи не входит в MVP, при удалении участника его задачи снимаются (решение 26.09, D-1 закрыт) — R-323
   R-251: { kind: act, scope: R-005 }
   R-252: { kind: rule, scope: R-005 }
 
@@ -305,52 +306,28 @@ atoms:
   R-253: { kind: reaction, scope: R-023 }
   R-254: { kind: reaction, scope: R-024 }
   R-255: { kind: view, scope: R-024 }
-  R-256:
-    kind: act
-    scope: R-024
-    decision: clarify
-    defect: D-5
-    note: >-
-      Ответ на вопрос о блокере и новая задача — оба обычные сообщения в ветке исполнителя (§6).
-      Как бот отличает ответ-причину от новой задачи?
+  R-256: { kind: act, scope: R-024 }
   R-257: { kind: act, scope: R-024 }
   R-258: { kind: rule, scope: R-024 }
   R-259: { kind: rule, scope: R-023 }
   R-260: { kind: rule, scope: R-023 }
-  R-261:
-    kind: reaction
-    decision: clarify
-    defect: D-1
-    note: >-
-      Напоминания руководителям о задаче в REVIEW нет в объёме работ (MVP п.6 — только блокировка
-      и вопрос исполнителю), и не сказано, куда бот пишет. Входит ли в MVP и куда отправляется?
-  R-262:
-    kind: rule
-    decision: clarify
-    defect: D-1
-    note: частота напоминания руководителям — решается вместе с R-261
+  R-261: { kind: reaction, scope: R-322 }
+  R-262: { kind: rule, scope: R-322 }
   R-263: { kind: entity, scope: R-024 }
   R-264: { kind: view, scope: R-020 }
   R-265:
     kind: entity
-    decision: clarify
-    defect: D-2
-    note: >-
-      «Что требуется»: причина — ответ исполнителя, а кто и как заполняет это поле, нигде не сказано.
-      Оставить в MVP (и откуда оно берётся) или убрать?
-  R-266: { kind: view, scope: R-020 }
+    decision: withdrawn
+    note: поле «что требуется» не входит в MVP, у блокера только причина (решение 26.09, D-2 закрыт) — R-325
+  R-266:
+    kind: view
+    decision: withdrawn
+    note: отозван вместе с R-265
   R-267: { kind: rule, scope: R-020 }
   R-268: { kind: view, scope: R-020 }
   R-269: { kind: rule, scope: R-025 }
   R-270: { kind: rule, scope: R-025 }
-  R-271:
-    kind: reaction
-    scope: R-025
-    decision: clarify
-    defect: D-4
-    note: >-
-      «Основная ветка» здесь — git-ветка по умолчанию, а в глоссарии «ветка» — топик исполнителя.
-      Так же в §3.1, §3.2 и §5. Как называть git-ветку?
+  R-271: { kind: reaction, scope: R-025 }
   R-272: { kind: rule, scope: R-025 }
   R-273: { kind: reaction, scope: R-026 }
   R-274: { kind: rule, scope: R-026 }
@@ -362,11 +339,7 @@ atoms:
   R-280: { kind: rule, scope: R-023 }
   R-281: { kind: rule, scope: R-023 }
   R-282: { kind: rule, scope: R-026 }
-  R-283:
-    kind: rule
-    decision: clarify
-    defect: D-1
-    note: порог для напоминания руководителю — решается вместе с R-261
+  R-283: { kind: rule, scope: R-322 }
 
   # §2.4 Участники и доступ
   R-284: { kind: entity, scope: R-005 }
@@ -404,13 +377,17 @@ atoms:
   R-316: { kind: reaction, scope: R-009 }
   R-317: { kind: view, scope: R-018 }
   R-318: { kind: act, scope: R-009, decision: same_as, same_as: R-298 }
-  R-319:
-    kind: act
-    scope: R-009
-    decision: clarify
-    defect: D-5
-    note: >-
-      Чем руководитель возвращает задачу из REVIEW в работу? Во второй строке REVIEW только
-      «подтвердить» и «отменить» (§1), кнопки возврата нет.
+  R-319: { kind: act, scope: R-009 }
   R-320: { kind: rule, scope: R-009 }
   R-321: { kind: rule, scope: R-009 }
+
+  # Ответы на вопросы прохода 3
+  R-322: { kind: scope, release: mvp }
+  R-323: { kind: scope, release: out }
+  R-324: { kind: scope, release: out }
+  R-325: { kind: scope, release: out }
+  R-326: { kind: act, scope: R-027 }
+  R-327: { kind: view, scope: R-018 }
+  R-328: { kind: view, scope: R-018 }
+  R-329: { kind: rule, scope: R-024 }
+  R-330: { kind: view, scope: R-322 }
