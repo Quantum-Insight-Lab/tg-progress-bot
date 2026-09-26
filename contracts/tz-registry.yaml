@@ -883,14 +883,7 @@ atoms:
   # §7.3 Откуда берутся строки
   R-723: { kind: rule, scope: R-030 }
   R-724: { kind: rule, scope: R-030 }
-  R-725:
-    kind: rule
-    scope: R-030
-    decision: clarify
-    defect: D-5
-    note: >-
-      «Доля и остаток на начало и конец периода», а в макете отчёта остаток один — на конец
-      («42% → 45% · осталось 17 из 31»). Печатать остаток на начало тоже?
+  R-725: { kind: rule, scope: R-030 }
   R-726: { kind: rule, scope: R-030 }
   R-727: { kind: rule, scope: R-030 }
   R-728: { kind: rule, scope: R-030 }
@@ -933,15 +926,12 @@ atoms:
   R-763: { kind: rule, scope: R-039 }
   R-764: { kind: entity, scope: R-039 }
   R-765: { kind: entity, scope: R-033 }
-  R-766:
-    kind: entity
-    scope: R-033
-    decision: clarify
-    defect: D-2
-    note: >-
-      Включение рассылки задаётся на чат, но в настройках (§5.1) есть только время отчёта, а выключение
-      нигде не описано. Отдельный переключатель или «нет времени — рассылка выключена» (R-552)?
+  R-766: { kind: entity, scope: R-033 }
   R-767: { kind: rule, scope: R-033 }
   R-768: { kind: rule, scope: R-030 }
   R-769: { kind: rule, scope: R-032 }
   R-770: { kind: rule, scope: R-055, decision: deferred }
+
+  # Ответы на вопросы прохода 7
+  R-771: { kind: rule, scope: R-033 }
+  R-772: { kind: act, scope: R-033 }
