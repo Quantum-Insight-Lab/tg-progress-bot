@@ -1,0 +1,619 @@
+# Источник правды по событиям (PDA 4.4; патч 1.2 — 9.4; патч 1.3 — realizes).
+# Когда появится код, типы и схемы генерируются из этого файла, ручное объявление типа — ошибка сборки (S-3).
+# Схема существующего события меняется только через version + 1: в журнале уже лежат факты.
+# realizes — атомы ТЗ, которые событие реализует; invariants — INV из docs/pda/04-invariants.md.
+
+meta:
+  schema: pda-event-registry/1
+  project: tg-progress-bot
+  owner: max
+
+envelope:
+  event_id: uuid
+  event_type: string
+  occurred_at: timestamp
+  actor: { id: string, role: string }
+  subject: { entity: string, id: string }
+  payload: object
+  causation_id: uuid | null
+  correlation_id: uuid | null
+  idempotency_key: string
+  schema_version: int
+
+events:
+  # tasks
+  - type: task.created
+    version: 1
+    context: tasks
+    actor: assignee
+    subject: Task
+    payload:
+      task_id: string
+      project_id: string
+      number: int
+      title: string
+      assignee_id: string
+      priority: enum[high, normal, low]
+    idempotency_key: telegram update_id
+    invariants: [INV-04, INV-05, INV-08, INV-22]
+    realizes: [R-326, R-226, R-623, R-106]
+    owner: max
+
+  - type: task.checked
+    version: 1
+    context: tasks
+    actor: assignee
+    subject: Task
+    payload:
+      task_id: string
+    idempotency_key: callback_query_id
+    invariants: [INV-05, INV-11, INV-22]
+    realizes: [R-154, R-314, R-640, R-609]
+    owner: max
+
+  - type: task.unchecked
+    version: 1
+    context: tasks
+    actor: assignee
+    subject: Task
+    payload:
+      task_id: string
+    idempotency_key: callback_query_id
+    invariants: [INV-05, INV-22]
+    realizes: [R-155, R-315, R-316]
+    owner: max
+
+  - type: task.confirmed
+    version: 1
+    context: tasks
+    actor: lead
+    subject: Task
+    payload:
+      task_id: string
+      confirmed_by: string
+    idempotency_key: callback_query_id
+    invariants: [INV-05, INV-06, INV-11, INV-22]
+    realizes: [R-298]
+    owner: max
+
+  - type: task.returned
+    version: 1
+    context: tasks
+    actor: lead
+    subject: Task
+    payload:
+      task_id: string
+      returned_by: string
+    idempotency_key: callback_query_id
+    invariants: [INV-05, INV-22]
+    realizes: [R-319]
+    owner: max
+
+  - type: task.planned
+    version: 1
+    context: tasks
+    actor: assignee
+    subject: Task
+    payload:
+      task_id: string
+    idempotency_key: callback_query_id
+    invariants: [INV-05, INV-07, INV-22]
+    realizes: [R-231]
+    owner: max
+
+  - type: task.resumed
+    version: 1
+    context: tasks
+    actor: assignee
+    subject: Task
+    payload:
+      task_id: string
+    idempotency_key: callback_query_id
+    invariants: [INV-05, INV-07, INV-22]
+    realizes: [R-579]
+    owner: max
+
+  - type: task.prioritized
+    version: 1
+    context: tasks
+    actor: assignee
+    subject: Task
+    payload:
+      task_id: string
+      priority: enum[high, normal, low]
+      previous_priority: enum[high, normal, low]
+    idempotency_key: callback_query_id
+    invariants: [INV-07, INV-08, INV-22]
+    realizes: [R-237]
+    owner: max
+
+  - type: task.cancelled
+    version: 1
+    context: tasks
+    actor: assignee | lead | system
+    subject: Task
+    payload:
+      task_id: string
+      cancelled_by: string
+      reason: enum[button, member_removed]
+    idempotency_key: callback_query_id | member_removed event_id + task_id
+    invariants: [INV-05, INV-18, INV-22]
+    realizes: [R-247, R-248, R-644]
+    owner: max
+
+  - type: blocker.detected
+    version: 1
+    context: tasks
+    actor: system
+    subject: Blocker
+    payload:
+      blocker_id: string
+      task_id: string
+      day: int
+    idempotency_key: task_id + date
+    invariants: [INV-05, INV-10, INV-22]
+    realizes: [R-253, R-254]
+    owner: max
+
+  - type: blocker.declared
+    version: 1
+    context: tasks
+    actor: assignee
+    subject: Blocker
+    payload:
+      blocker_id: string
+      reason: string
+    idempotency_key: telegram update_id
+    invariants: [INV-11, INV-22]
+    realizes: [R-256]
+    owner: max
+
+  - type: blocker.dismissed
+    version: 1
+    context: tasks
+    actor: assignee
+    subject: Blocker
+    payload:
+      blocker_id: string
+      task_id: string
+    idempotency_key: callback_query_id
+    invariants: [INV-05, INV-11, INV-22]
+    realizes: [R-257]
+    owner: max
+
+  - type: review.reminded
+    version: 1
+    context: tasks
+    actor: system
+    subject: Task
+    payload:
+      task_id: string
+      lead_ids: string[]
+    idempotency_key: task_id + date
+    invariants: [INV-10, INV-22]
+    realizes: [R-261]
+    owner: max
+
+  - type: canvas.posted
+    version: 1
+    context: tasks
+    actor: system
+    subject: Canvas
+    payload:
+      canvas_id: string
+      project_id: string
+      assignee_id: string
+      canvas_date: date
+      message_id: int
+    idempotency_key: project_id + assignee_id + canvas_date
+    invariants: [INV-23, INV-24]
+    realizes: [R-627, R-571]
+    owner: max
+
+  - type: canvas.edited
+    version: 1
+    context: tasks
+    actor: system
+    subject: Canvas
+    payload:
+      canvas_id: string
+      shrunk: bool
+    idempotency_key: canvas_id + causation_id
+    invariants: [INV-09, INV-23]
+    realizes: [R-628, R-629, R-630, R-631]
+    owner: max
+
+  - type: canvas.full
+    version: 1
+    context: tasks
+    actor: system
+    subject: Canvas
+    payload:
+      canvas_id: string
+    idempotency_key: telegram update_id
+    invariants: [INV-09, INV-23]
+    realizes: [R-633]
+    owner: max
+
+  - type: canvas.carried_over
+    version: 1
+    context: tasks
+    actor: system
+    subject: Canvas
+    payload:
+      from_canvas_id: string
+      to_canvas_id: string
+      task_ids: string[]
+    idempotency_key: project_id + assignee_id + canvas_date
+    invariants: [INV-09, INV-22, INV-24]
+    realizes: [R-245, R-635, R-637, R-638]
+    owner: max
+
+  - type: divergence.detected
+    version: 1
+    context: tasks
+    actor: system
+    subject: Project
+    payload:
+      project_id: string
+      date: date
+    idempotency_key: project_id + date
+    invariants: [INV-15, INV-22]
+    realizes: [R-407, R-414]
+    owner: max
+
+  # projects
+  - type: user.registered
+    version: 1
+    context: projects
+    actor: user
+    subject: User
+    payload:
+      user_id: string
+      telegram_user_id: int
+      name: string
+      is_root: bool
+    idempotency_key: telegram_user_id
+    invariants: [INV-16, INV-17, INV-22]
+    realizes: [R-555, R-304, R-528, R-529, R-530]
+    owner: max
+
+  - type: user.github_login_set
+    version: 1
+    context: projects
+    actor: user
+    subject: User
+    payload:
+      user_id: string
+      github_login: string | null
+    idempotency_key: telegram update_id
+    invariants: [INV-14, INV-19, INV-20, INV-22]
+    realizes: [R-559, R-521]
+    owner: max
+
+  - type: project.created
+    version: 1
+    context: projects
+    actor: root | lead
+    subject: Project
+    payload:
+      project_id: string
+      name: string
+      description: string
+      timezone: string
+      created_by: string
+    idempotency_key: telegram update_id
+    invariants: [INV-17, INV-19, INV-22]
+    realizes: [R-299, R-531, R-534, R-535, R-536, R-537]
+    owner: max
+
+  - type: project.chat_bound
+    version: 1
+    context: projects
+    actor: lead
+    subject: Project
+    payload:
+      project_id: string
+      chat_id: string
+    idempotency_key: telegram update_id
+    invariants: [INV-20, INV-22, INV-27]
+    realizes: [R-538, R-540]
+    owner: max
+
+  - type: project.repository_connected
+    version: 1
+    context: projects
+    actor: lead
+    subject: Project
+    payload:
+      project_id: string
+      repository_id: string
+    idempotency_key: telegram update_id
+    invariants: [INV-03, INV-19, INV-22]
+    realizes: [R-183, R-544, R-546]
+    owner: max
+
+  - type: project.repository_changed
+    version: 1
+    context: projects
+    actor: root
+    subject: Project
+    payload:
+      project_id: string
+      repository_id: string
+      previous_repository_id: string
+    idempotency_key: telegram update_id
+    invariants: [INV-03, INV-19, INV-22]
+    realizes: [R-586, R-185, R-186]
+    owner: max
+
+  - type: project.settings_changed
+    version: 1
+    context: projects
+    actor: root
+    subject: Project
+    payload:
+      project_id: string
+      field: enum[name, description, timezone, chat, member_role]
+      value: string
+    idempotency_key: telegram update_id
+    invariants: [INV-19, INV-22, INV-24]
+    realizes: [R-513, R-514, R-515, R-516, R-518]
+    owner: max
+
+  - type: project.member_added
+    version: 1
+    context: projects
+    actor: root
+    subject: ProjectMember
+    payload:
+      project_id: string
+      user_id: string
+      role: enum[member, lead]
+    idempotency_key: telegram update_id
+    invariants: [INV-16, INV-18, INV-19, INV-22]
+    realizes: [R-591, R-517]
+    owner: max
+
+  - type: project.member_removed
+    version: 1
+    context: projects
+    actor: root
+    subject: ProjectMember
+    payload:
+      project_id: string
+      user_id: string
+      cancelled_task_ids: string[]
+    idempotency_key: telegram update_id
+    invariants: [INV-18, INV-22]
+    realizes: [R-251]
+    owner: max
+
+  - type: member.topic_set
+    version: 1
+    context: projects
+    actor: root
+    subject: ProjectMember
+    payload:
+      project_id: string
+      user_id: string
+      topic_id: int
+      created: bool
+    idempotency_key: telegram update_id
+    invariants: [INV-22, INV-23]
+    realizes: [R-592, R-519, R-564, R-566, R-567, R-569, R-572, R-573]
+    owner: max
+
+  - type: chat.reports_topic_set
+    version: 1
+    context: projects
+    actor: lead | root
+    subject: Chat
+    payload:
+      chat_id: string
+      topic_id: int
+      created: bool
+    idempotency_key: telegram update_id
+    invariants: [INV-22, INV-27]
+    realizes: [R-548, R-549, R-550, R-520]
+    owner: max
+
+  - type: chat.schedule_set
+    version: 1
+    context: projects
+    actor: lead | root
+    subject: Chat
+    payload:
+      chat_id: string
+      daily_time: time
+      timezone: string
+    idempotency_key: telegram update_id
+    invariants: [INV-22, INV-24, INV-27]
+    realizes: [R-551, R-585, R-523, R-584]
+    owner: max
+
+  - type: chat.schedule_cleared
+    version: 1
+    context: projects
+    actor: root
+    subject: Chat
+    payload:
+      chat_id: string
+    idempotency_key: telegram update_id
+    invariants: [INV-22, INV-27]
+    realizes: [R-772]
+    owner: max
+
+  - type: access.denied
+    version: 1
+    context: projects
+    actor: system
+    subject: User
+    payload:
+      telegram_user_id: int
+      update_kind: string
+    idempotency_key: telegram update_id
+    invariants: [INV-16]
+    realizes: [R-312]
+    owner: max
+
+  # github — пишет только адаптер GitHub
+  - type: github.issue_changed
+    version: 1
+    context: github
+    actor: github
+    subject: Issue
+    payload:
+      repository_id: string
+      issue_number: int
+      title: string
+      state: enum[open, closed]
+      state_reason: enum[completed, not_planned] | null
+      assignees: string[]
+      closed_by_login: string | null
+      updated_at: timestamp
+    idempotency_key: GitHub delivery id
+    invariants: [INV-01, INV-21, INV-22]
+    realizes: [R-344, R-347, R-069, R-094, R-338, R-339]
+    owner: max
+
+  - type: github.pull_request_changed
+    version: 1
+    context: github
+    actor: github
+    subject: PullRequest
+    payload:
+      repository_id: string
+      pull_request_number: int
+      title: string
+      state: enum[open, closed, merged]
+      author_login: string
+      updated_at: timestamp
+      merged_at: timestamp | null
+      merged_by_login: string | null
+    idempotency_key: GitHub delivery id
+    invariants: [INV-12, INV-13, INV-21, INV-22]
+    realizes: [R-346, R-070, R-338, R-339]
+    owner: max
+
+  - type: github.commits_pushed
+    version: 1
+    context: github
+    actor: github
+    subject: Repository
+    payload:
+      repository_id: string
+      commits: "[{ sha, author_login, message, created_at }]"
+    idempotency_key: GitHub delivery id
+    invariants: [INV-13, INV-15, INV-21, INV-22]
+    realizes: [R-345, R-071]
+    owner: max
+
+  - type: github.workflow_completed
+    version: 1
+    context: github
+    actor: github
+    subject: Repository
+    payload:
+      repository_id: string
+      branch: string
+      is_default_branch: bool
+      conclusion: enum[success, failure, cancelled, other]
+      pull_request_numbers: int[]
+    idempotency_key: GitHub delivery id
+    invariants: [INV-12, INV-21, INV-22]
+    realizes: [R-348, R-072, R-271]
+    owner: max
+
+  - type: github.milestone_changed
+    version: 1
+    context: github
+    actor: github
+    subject: Milestone
+    payload:
+      repository_id: string
+      milestone_number: int
+      title: string
+      state: enum[open, closed]
+      due_on: date | null
+    idempotency_key: GitHub delivery id
+    invariants: [INV-21, INV-22]
+    realizes: [R-436, R-073]
+    owner: max
+
+  - type: github.issue_links_changed
+    version: 1
+    context: github
+    actor: github
+    subject: Issue
+    payload:
+      repository_id: string
+      issue_number: int
+      depends_on_issue_number: int
+      link_type: enum[blocked_by, sub_issue]
+      action: enum[added, removed]
+    idempotency_key: GitHub delivery id
+    invariants: [INV-21, INV-22]
+    realizes: [R-437, R-438]
+    owner: max
+
+  - type: github.reconciled
+    version: 1
+    context: github
+    actor: system
+    subject: Repository
+    payload:
+      repository_id: string
+      restored_facts: int
+    idempotency_key: repository_id + run_started_at
+    invariants: [INV-21, INV-22]
+    realizes: [R-350, R-780]
+    owner: max
+
+  - type: repo.pr_stalled
+    version: 1
+    context: github
+    actor: system
+    subject: PullRequest
+    payload:
+      repository_id: string
+      pull_request_number: int
+      author_login: string
+      days: int
+    idempotency_key: repository_id + pull_request_number + date
+    invariants: [INV-12, INV-13, INV-22]
+    realizes: [R-273]
+    owner: max
+
+  # progress
+  - type: progress.snapshot_taken
+    version: 1
+    context: progress
+    actor: system
+    subject: ProgressSnapshot
+    payload:
+      project_id: string
+      progress: number | null
+      date: date
+    idempotency_key: project_id + date
+    invariants: [INV-01, INV-02, INV-22]
+    realizes: [R-465]
+    owner: max
+
+  # reports
+  - type: report.sent
+    version: 1
+    context: reports
+    actor: system | user
+    subject: Chat
+    payload:
+      target: enum[private, group]
+      chat_id: string
+      topic_id: int | null
+      period_start: timestamp
+      period_end: timestamp
+      trigger: enum[schedule, command]
+    idempotency_key: chat_id + date for schedule, telegram update_id for command
+    invariants: [INV-22, INV-25, INV-26, INV-27]
+    realizes: [R-754, R-759, R-758]
+    owner: max
