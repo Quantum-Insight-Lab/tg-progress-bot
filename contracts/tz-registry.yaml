@@ -773,11 +773,8 @@ atoms:
   R-643:
     kind: rule
     scope: R-014
-    decision: clarify
-    defect: D-5
-    note: >-
-      «Пока он не ответил, процент проекта прежний» читается так, будто подтверждение DONE двигает процент,
-      а по §1 и §4 задачи процент не двигают вовсе (R-146, R-147).
+    decision: withdrawn
+    note: фраза убрана — задачи процент не двигают, правило уже в §1 и §4 (решение 26.09)
   R-644: { kind: reaction, scope: R-009 }
   R-645: { kind: act, scope: R-009, decision: same_as, same_as: R-248 }
   R-646: { kind: act, scope: R-009, decision: same_as, same_as: R-247 }
@@ -788,7 +785,15 @@ atoms:
   R-651:
     kind: reaction
     scope: R-323
-    decision: clarify
-    note: передача задачи вне MVP (R-323) — убрать абзац из ТЗ или оставить как описание на будущее?
-  R-652: { kind: reaction, scope: R-323 }
-  R-653: { kind: rule, scope: R-323 }
+    decision: withdrawn
+    note: абзац о передаче исполнителя убран — передача вне MVP (решение 26.09)
+  R-652:
+    kind: reaction
+    scope: R-323
+    decision: withdrawn
+    note: отозван вместе с R-651
+  R-653:
+    kind: rule
+    scope: R-323
+    decision: withdrawn
+    note: отозван вместе с R-651
