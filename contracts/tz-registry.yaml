@@ -797,3 +797,151 @@ atoms:
     scope: R-323
     decision: withdrawn
     note: отозван вместе с R-651
+
+  # §7.1 Ежедневный отчёт
+  R-654: { kind: view, scope: R-030 }
+  R-655: { kind: rule, scope: R-030 }
+  R-656: { kind: rule, scope: R-030 }
+  R-657: { kind: rule, scope: R-030 }
+  R-658: { kind: view, scope: R-030 }
+  R-659: { kind: rule, scope: R-031 }
+  R-660: { kind: view, scope: R-031, decision: same_as, same_as: R-464 }
+  R-661: { kind: view, scope: R-031, decision: same_as, same_as: R-171 }
+  R-662: { kind: rule, scope: R-031 }
+  # §7.1 · макет ежедневного отчёта
+  R-663: { kind: view, scope: R-030 }
+  R-664: { kind: view, scope: R-030 }
+  R-665: { kind: view, scope: R-030 }
+  R-666: { kind: view, scope: R-030 }
+  R-667: { kind: view, scope: R-030 }
+  R-668: { kind: view, scope: R-030 }
+  R-669: { kind: view, scope: R-030 }
+  R-670: { kind: view, scope: R-030 }
+  R-671: { kind: view, scope: R-030 }
+  R-672: { kind: view, scope: R-030 }
+  R-673: { kind: view, scope: R-030 }
+  R-674: { kind: view, scope: R-030 }
+  R-675: { kind: view, scope: R-030 }
+  R-676: { kind: view, scope: R-030 }
+  R-677: { kind: view, scope: R-030 }
+  R-678: { kind: view, scope: R-030 }
+  R-679: { kind: view, scope: R-030 }
+  R-680: { kind: view, scope: R-031 }
+  R-681: { kind: view, scope: R-030 }
+  R-682: { kind: view, scope: R-030 }
+  R-683: { kind: view, scope: R-030 }
+  R-684: { kind: view, scope: R-034 }
+  R-685: { kind: view, scope: R-034, decision: same_as, same_as: R-377 }
+  R-686: { kind: view, scope: R-034, decision: same_as, same_as: R-378 }
+  R-687: { kind: view, scope: R-034, decision: same_as, same_as: R-379 }
+  R-688: { kind: view, scope: R-034, decision: same_as, same_as: R-380 }
+  # §7.1 · после макета
+  R-689: { kind: view, scope: R-045 }
+  R-690: { kind: rule, scope: R-030 }
+  R-691: { kind: rule, scope: R-031 }
+  R-692: { kind: view, scope: R-031, decision: same_as, same_as: R-680 }
+  R-693: { kind: view, scope: R-034 }
+  R-694: { kind: rule, scope: R-034 }
+  R-695: { kind: rule, scope: R-034 }
+
+  # §7.2 Еженедельный отчёт — «Дальше» (R-055)
+  R-696:
+    kind: view
+    scope: R-055
+    decision: clarify
+    defect: D-5
+    note: >-
+      «Тот же состав за семь суток», но в макете нет строк «Сейчас», CI и счётчика «встало в блок»,
+      а «Риск» назван «Что замедлило». Не блокирует MVP — решается вместе с недельным отчётом.
+  R-697: { kind: rule, scope: R-055, decision: deferred }
+  R-698: { kind: view, scope: R-055, decision: deferred }
+  R-699: { kind: view, scope: R-055, decision: deferred }
+  R-700: { kind: view, scope: R-055, decision: deferred }
+  R-701: { kind: view, scope: R-055, decision: deferred }
+  R-702: { kind: view, scope: R-055, decision: deferred }
+  R-703: { kind: view, scope: R-055, decision: deferred }
+  R-704: { kind: view, scope: R-055, decision: deferred }
+  R-705: { kind: view, scope: R-055, decision: deferred }
+  R-706: { kind: view, scope: R-055, decision: deferred }
+  R-707: { kind: view, scope: R-055, decision: deferred }
+  R-708: { kind: view, scope: R-055, decision: deferred }
+  R-709: { kind: view, scope: R-055, decision: deferred }
+  R-710: { kind: view, scope: R-055, decision: deferred }
+  R-711: { kind: view, scope: R-055, decision: deferred }
+  R-712: { kind: view, scope: R-055, decision: deferred }
+  R-713: { kind: view, scope: R-055, decision: deferred }
+  R-714: { kind: view, scope: R-055, decision: deferred }
+  R-715: { kind: view, scope: R-055, decision: deferred }
+  R-716: { kind: view, scope: R-055, decision: deferred }
+  R-717: { kind: view, scope: R-055, decision: deferred }
+  R-718: { kind: view, scope: R-055, decision: deferred }
+  R-719: { kind: rule, scope: R-012 }
+  R-720: { kind: rule, scope: R-012, decision: same_as, same_as: R-148 }
+  R-721: { kind: rule, scope: R-034 }
+  R-722: { kind: view, scope: R-055, decision: deferred }
+
+  # §7.3 Откуда берутся строки
+  R-723: { kind: rule, scope: R-030 }
+  R-724: { kind: rule, scope: R-030 }
+  R-725:
+    kind: rule
+    scope: R-030
+    decision: clarify
+    defect: D-5
+    note: >-
+      «Доля и остаток на начало и конец периода», а в макете отчёта остаток один — на конец
+      («42% → 45% · осталось 17 из 31»). Печатать остаток на начало тоже?
+  R-726: { kind: rule, scope: R-030 }
+  R-727: { kind: rule, scope: R-030 }
+  R-728: { kind: rule, scope: R-030 }
+  R-729: { kind: rule, scope: R-030 }
+  R-730: { kind: rule, scope: R-030 }
+  R-731: { kind: rule, scope: R-030 }
+  R-732: { kind: rule, scope: R-030 }
+  R-733: { kind: rule, scope: R-030 }
+  R-734: { kind: rule, scope: R-030 }
+  R-735: { kind: rule, scope: R-030, decision: same_as, same_as: R-690 }
+  R-736: { kind: rule, scope: R-031, decision: same_as, same_as: R-691 }
+  R-737: { kind: view, scope: R-030 }
+  R-738: { kind: rule, scope: R-030 }
+  R-739: { kind: rule, scope: R-019, decision: same_as, same_as: R-496 }
+  R-740: { kind: rule, scope: R-019, decision: same_as, same_as: R-497 }
+  R-741: { kind: rule, scope: R-030, decision: same_as, same_as: R-690 }
+  R-742: { kind: rule, scope: R-031, decision: same_as, same_as: R-691 }
+  R-743: { kind: rule, scope: R-030 }
+  R-744: { kind: rule, scope: R-055, decision: deferred }
+  R-745: { kind: view, scope: R-034, decision: same_as, same_as: R-377 }
+  R-746: { kind: view, scope: R-034, decision: same_as, same_as: R-378 }
+  R-747: { kind: view, scope: R-034, decision: same_as, same_as: R-379 }
+  R-748: { kind: rule, scope: R-034, decision: same_as, same_as: R-695 }
+  R-749: { kind: view, scope: R-030 }
+  R-750: { kind: rule, scope: R-012, decision: same_as, same_as: R-455 }
+  R-751: { kind: view, scope: R-030 }
+  R-752: { kind: view, scope: R-030 }
+
+  # §7.4 Доставка
+  R-753: { kind: rule, scope: R-030 }
+  R-754: { kind: act, scope: R-030 }
+  R-755: { kind: view, scope: R-030, decision: same_as, same_as: R-658 }
+  R-756: { kind: view, scope: R-030 }
+  R-757: { kind: view, scope: R-030, decision: same_as, same_as: R-463 }
+  R-758: { kind: reaction, scope: R-033 }
+  R-759: { kind: act, scope: R-032 }
+  R-760: { kind: rule, scope: R-031, decision: same_as, same_as: R-659 }
+  R-761: { kind: view, scope: R-031, decision: same_as, same_as: R-464 }
+  R-762: { kind: rule, scope: R-031, decision: same_as, same_as: R-662 }
+  R-763: { kind: rule, scope: R-039 }
+  R-764: { kind: entity, scope: R-039 }
+  R-765: { kind: entity, scope: R-033 }
+  R-766:
+    kind: entity
+    scope: R-033
+    decision: clarify
+    defect: D-2
+    note: >-
+      Включение рассылки задаётся на чат, но в настройках (§5.1) есть только время отчёта, а выключение
+      нигде не описано. Отдельный переключатель или «нет времени — рассылка выключена» (R-552)?
+  R-767: { kind: rule, scope: R-033 }
+  R-768: { kind: rule, scope: R-030 }
+  R-769: { kind: rule, scope: R-032 }
+  R-770: { kind: rule, scope: R-055, decision: deferred }
