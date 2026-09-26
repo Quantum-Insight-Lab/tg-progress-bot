@@ -391,3 +391,149 @@ atoms:
   R-328: { kind: view, scope: R-018 }
   R-329: { kind: rule, scope: R-024 }
   R-330: { kind: view, scope: R-322 }
+
+  # §3 GitHub-интеграция
+  R-331: { kind: integration, scope: R-043, decision: same_as, same_as: R-068 }
+  R-332: { kind: integration, scope: R-043, decision: same_as, same_as: R-069 }
+  R-333: { kind: integration, scope: R-043, decision: same_as, same_as: R-070 }
+  R-334: { kind: integration, scope: R-043, decision: same_as, same_as: R-071 }
+  R-335: { kind: integration, scope: R-043, decision: same_as, same_as: R-072 }
+  R-336: { kind: integration, scope: R-043, decision: same_as, same_as: R-073 }
+  R-337:
+    kind: integration
+    scope: R-043
+    decision: clarify
+    note: >-
+      Релизы читаются, приходят webhook `release` (R-349) и лежат в зеркале как «последний релиз» (R-373),
+      но ни канвас, ни отчёт их не показывают, и таблицы для них в §9 нет. Читать в MVP или отказаться?
+  R-338: { kind: integration, scope: R-043 }
+  R-339: { kind: integration, scope: R-043 }
+  R-340: { kind: view, scope: R-021 }
+  R-341: { kind: view, scope: R-021 }
+  R-342: { kind: tech, scope: R-043 }
+  R-343: { kind: tech, scope: R-043 }
+  R-344:
+    kind: integration
+    scope: R-043
+    decision: clarify
+    defect: D-2
+    note: >-
+      Milestone с датой (§3.1) и связи issues — sub-issues, blocked by (§3.1) — показываются, но среди webhooks
+      нет событий, которые их обновляют, а опрос только догоняет пропущенную доставку (R-350). Откуда обновления?
+  R-345: { kind: integration, scope: R-043 }
+  R-346: { kind: integration, scope: R-043 }
+  R-347: { kind: integration, scope: R-043 }
+  R-348: { kind: integration, scope: R-043 }
+  R-349:
+    kind: integration
+    scope: R-043
+    decision: clarify
+    note: webhook `release` — решается вместе с R-337
+  R-350: { kind: rule, scope: R-044 }
+  R-351: { kind: rule, scope: R-043 }
+  R-352: { kind: rule, scope: R-043, decision: same_as, same_as: R-351 }
+  R-353: { kind: rule, scope: R-002, decision: same_as, same_as: R-172 }
+  R-354: { kind: rule, scope: R-002 }
+  R-355: { kind: rule, scope: R-002, decision: same_as, same_as: R-173 }
+  R-356: { kind: rule, scope: R-002 }
+
+  # §3.1 Что видно из зеркала
+  R-357: { kind: view, scope: R-021 }
+  R-358: { kind: view, scope: R-021 }
+  R-359: { kind: view, scope: R-021, decision: same_as, same_as: R-136 }
+  R-360: { kind: view, scope: R-021 }
+  R-361: { kind: view, scope: R-021, decision: same_as, same_as: R-138 }
+  R-362: { kind: rule, scope: R-021, decision: same_as, same_as: R-193 }
+  R-363: { kind: view, scope: R-021 }
+  R-364: { kind: view, scope: R-021 }
+  R-365: { kind: rule, scope: R-025 }
+  R-366: { kind: view, scope: R-021 }
+  R-367: { kind: entity, scope: R-021 }
+  R-368: { kind: entity, scope: R-021 }
+  R-369: { kind: entity, scope: R-034 }
+  R-370: { kind: entity, scope: R-034 }
+  R-371: { kind: entity, scope: R-012 }
+  R-372: { kind: entity, scope: R-021 }
+  R-373:
+    kind: entity
+    scope: R-043
+    decision: clarify
+    note: «последний релиз» в зеркале — решается вместе с R-337
+  R-374: { kind: view, scope: R-021, decision: same_as, same_as: R-357 }
+  R-375: { kind: view, scope: R-025 }
+  R-376: { kind: view, scope: R-026 }
+  R-377: { kind: view, scope: R-034 }
+  R-378: { kind: view, scope: R-034 }
+  R-379: { kind: view, scope: R-034 }
+  R-380: { kind: view, scope: R-034 }
+  R-381: { kind: view, scope: R-021 }
+  R-382: { kind: view, scope: R-034 }
+  R-383: { kind: view, scope: R-017 }
+  R-384: { kind: entity, scope: R-017 }
+  R-385: { kind: entity, scope: R-017 }
+  R-386: { kind: view, scope: R-017 }
+  R-387: { kind: rule, scope: R-019 }
+
+  # §3.2 Чьи это факты
+  R-388: { kind: rule, scope: R-002 }
+  R-389: { kind: rule, scope: R-025, decision: same_as, same_as: R-272 }
+  R-390: { kind: view, scope: R-025 }
+  R-391:
+    kind: rule
+    scope: R-002
+    decision: clarify
+    defect: D-5
+    note: >-
+      «Если логин автора совпал», но для закрытого issue учитывается «кто его закрыл» (R-395), а не автор issue.
+      В §3.3 то же названо «логин действующего лица».
+  R-392: { kind: rule, scope: R-026 }
+  R-393: { kind: rule, scope: R-026 }
+  R-394: { kind: rule, scope: R-045 }
+  R-395: { kind: rule, scope: R-045 }
+  R-396: { kind: rule, scope: R-002 }
+  R-397: { kind: rule, scope: R-026 }
+  R-398: { kind: rule, scope: R-021 }
+  R-399: { kind: view, scope: R-020 }
+  R-400: { kind: rule, scope: R-026 }
+  R-401: { kind: rule, scope: R-026 }
+  R-402: { kind: rule, scope: R-026 }
+
+  # §3.3 Расхождение учёта
+  R-403: { kind: rule, scope: R-012, decision: same_as, same_as: R-079 }
+  R-404: { kind: rule, scope: R-018 }
+  R-405: { kind: rule, scope: R-045 }
+  R-406: { kind: rule, scope: R-045 }
+  R-407: { kind: rule, scope: R-045 }
+  R-408: { kind: rule, scope: R-045 }
+  R-409: { kind: rule, scope: R-045 }
+  R-410: { kind: rule, scope: R-045 }
+  R-411: { kind: rule, scope: R-045 }
+  R-412: { kind: rule, scope: R-045 }
+  R-413: { kind: rule, scope: R-045 }
+  R-414: { kind: view, scope: R-045 }
+  R-415: { kind: rule, scope: R-045 }
+  R-416: { kind: rule, scope: R-045 }
+  R-417: { kind: rule, scope: R-045, decision: same_as, same_as: R-411 }
+  R-418: { kind: rule, scope: R-045 }
+
+  # §3.4 Где человек стоит в бэклоге
+  R-419: { kind: rule, scope: R-015 }
+  R-420: { kind: rule, scope: R-015 }
+  R-421: { kind: rule, scope: R-015 }
+  R-422: { kind: rule, scope: R-015 }
+  R-423: { kind: rule, scope: R-011, decision: same_as, same_as: R-200 }
+  R-424: { kind: rule, scope: R-011 }
+  R-425: { kind: rule, scope: R-012 }
+  R-426:
+    kind: rule
+    scope: R-015
+    decision: clarify
+    note: одно понятие названо двумя словами — «Прошёл» здесь и «сделал» в строке человека на канвасе (R-112)
+  R-427: { kind: rule, scope: R-015 }
+  R-428: { kind: rule, scope: R-015 }
+  R-429: { kind: rule, scope: R-015 }
+  R-430: { kind: view, scope: R-015 }
+  R-431: { kind: rule, scope: R-008, decision: same_as, same_as: R-286 }
+  R-432: { kind: rule, scope: R-015 }
+  R-433: { kind: rule, scope: R-012 }
+  R-434: { kind: view, scope: R-015 }
