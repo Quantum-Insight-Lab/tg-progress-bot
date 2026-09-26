@@ -71,6 +71,8 @@ export interface PdaElement {
 
 export interface CheckResult {
   gate: boolean;
+  /** Выход из PDA: TR-4 блокирует, а не только отчитывается. */
+  pda: boolean;
   source: string;
   blocks: Block[];
   sections: SectionReport[];
@@ -615,7 +617,7 @@ export function coverage(
 export function check(
   registryText: string,
   readSource: (path: string) => string,
-  options: { gate: boolean },
+  options: { gate: boolean; pda?: boolean },
   pdaDocs: PdaDoc[] = [],
   eventRegistryText?: string,
 ): CheckResult {
@@ -635,7 +637,15 @@ export function check(
     ...checkEventLinks(elements),
   );
   if (options.gate) findings.push(...checkGate(registry));
-  return { gate: options.gate, source: registry.source, blocks, sections: tr1.sections, anchors, registry, elements, findings };
+  const pda = options.pda ?? false;
+  if (pda) {
+    for (const row of coverage(registry, elements, atomTexts(blocks))) {
+      if (row.status === 'covered') continue;
+      const refs = row.refs.length > 0 ? `, есть только ${row.refs.join(', ')}` : '';
+      findings.push({ rule: 'TR-4', message: `${row.id} ${row.status} · ${row.kind}: нужен элемент ${COVERED_BY[row.kind].join(' или ')}${refs}` });
+    }
+  }
+  return { gate: options.gate, pda, source: registry.source, blocks, sections: tr1.sections, anchors, registry, elements, findings };
 }
 
 function countBy<T>(items: Iterable<T>, key: (item: T) => string | undefined): string {
@@ -687,10 +697,10 @@ export function formatReport(result: CheckResult): string {
   ];
   if (result.gate) rules.push(['GATE', 'D-1…D-6 по 10.10']);
 
-  const lines = [`tz:check · ${result.source || '?'} · ${result.gate ? 'gate' : 'шаг 0'}`];
+  const lines = [`tz:check · ${result.source || '?'} · ${result.gate ? 'gate' : 'шаг 0'}${result.pda ? ' · выход из PDA' : ''}`];
   for (const [rule, summary] of rules) {
     const own = findings.filter((f) => f.rule === rule);
-    const status = own.length > 0 ? `✗ ${own.length}` : rule === 'TR-4' ? 'отчёт' : 'ok';
+    const status = own.length > 0 ? `✗ ${own.length}` : rule === 'TR-4' && !result.pda ? 'отчёт' : 'ok';
     lines.push(`${rule.padEnd(5)} ${status}  ${summary}`);
     for (const finding of own) lines.push(`      ${finding.message}`);
   }
@@ -727,7 +737,7 @@ function main(argv: string[]): number {
   const result = check(
     readFileSync(REGISTRY_PATH, 'utf8'),
     (path) => readFileSync(path, 'utf8'),
-    { gate: argv.includes('--gate') },
+    { gate: argv.includes('--gate'), pda: argv.includes('--pda') },
     readPdaDocs(),
     existsSync(EVENT_REGISTRY_PATH) ? readFileSync(EVENT_REGISTRY_PATH, 'utf8') : undefined,
   );

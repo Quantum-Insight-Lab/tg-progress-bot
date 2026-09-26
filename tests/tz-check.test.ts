@@ -348,4 +348,14 @@ describe('TR-4: покрытие по правилу вида', () => {
       ['R-008', 'partial'],
     ]);
   });
+
+  it('на выходе из PDA непокрытый атом MVP блокирует, без флага — только отчёт', () => {
+    expect(messages(check(registry(atoms), () => tz, { gate: false }, [{ file: 'p.md', text: pda }]).findings, 'TR-4')).toEqual([]);
+    const result = check(registry(atoms), () => tz, { gate: false, pda: true }, [{ file: 'p.md', text: pda }]);
+    expect(messages(result.findings, 'TR-4')).toEqual([
+      'R-004 partial · act: нужен элемент A, есть только U-1',
+      'R-005 orphan · act: нужен элемент A',
+      'R-008 partial · rule: нужен элемент INV или E или L, есть только A-1',
+    ]);
+  });
 });
