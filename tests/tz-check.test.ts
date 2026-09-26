@@ -275,6 +275,7 @@ describe('Реестр событий', () => {
     '| ID | Формулировка | Из ТЗ |',
     '| --- | --- | --- |',
     '| INV-01 | закон | derived: пример |',
+    '| P-1 | проекция | derived: пример |',
   ].join('\n');
   const run = (registryText: string): Finding[] =>
     check(registry(atoms), () => tz, { gate: false }, [{ file: 'p.md', text: pda }], registryText).findings;
@@ -285,11 +286,13 @@ describe('Реестр событий', () => {
     expect(coverage(result.registry, result.elements).map((r) => [r.id, r.status, r.refs])).toEqual([['R-002', 'covered', ['EV-task.created']]]);
   });
 
-  it('событие из таблицы актов обязано быть в реестре, инвариант события — в 04', () => {
-    const tr2 = messages(run(event('    invariants: [INV-01, INV-99]\n    realizes: [R-002]')), 'TR-2').join('\n');
+  it('событие из таблицы актов обязано быть в реестре, инварианты и проекции события — в PDA', () => {
+    const tr2 = messages(run(event('    invariants: [INV-01, INV-99]\n    projections: [P-1, P-9]\n    realizes: [R-002]')), 'TR-2').join('\n');
     expect(tr2).toContain('A-1 → событие task.lost: его нет в реестре');
     expect(tr2).toContain('task.created → INV-99: такого инварианта нет');
+    expect(tr2).toContain('task.created → P-9: такой проекции нет');
     expect(tr2).not.toContain('task.created: его нет');
+    expect(tr2).not.toContain('P-1: такой');
   });
 
   it('обязательные поля и realizes', () => {

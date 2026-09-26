@@ -126,24 +126,25 @@ export function parseEventRegistry(text: string, file = EVENT_REGISTRY_PATH): { 
     const missing = EVENT_FIELDS.filter((field) => value[field] === undefined);
     if (missing.length > 0) findings.push({ rule: 'TR-2', message: `${file}: ${value.type} — нет полей ${missing.join(', ')}` });
     const refs = Array.isArray(value.realizes) ? value.realizes.filter((ref): ref is string => typeof ref === 'string') : [];
-    const invariants = Array.isArray(value.invariants) ? value.invariants.filter((inv): inv is string => typeof inv === 'string') : [];
+    const strings = (list: unknown): string[] => (Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string') : []);
     elements.push({
       id: `EV-${value.type}`,
       file,
       line: index + 1,
       refs,
       derived: typeof value.derived === 'string' && value.derived.trim() !== '',
-      cells: { invariants: invariants.join(', ') },
+      cells: { invariants: strings(value.invariants).join(', '), projections: strings(value.projections).join(', ') },
     });
   }
   return { elements, findings };
 }
 
-/** TR-2 между PDA и реестром: события из таблицы актов существуют, инварианты событий определены в 04. */
+/** TR-2 между PDA и реестром: события из таблицы актов существуют, инварианты и проекции событий определены в PDA. */
 export function checkEventLinks(elements: PdaElement[]): Finding[] {
   const findings: Finding[] = [];
   const events = new Set(elements.filter((e) => e.id.startsWith('EV-')).map((e) => e.id.slice(3)));
   const invariants = new Set(elements.filter((e) => e.id.startsWith('INV-')).map((e) => e.id));
+  const projections = new Set(elements.filter((e) => e.id.startsWith('P-')).map((e) => e.id));
   if (events.size === 0) return findings;
   for (const element of elements) {
     if (element.id.startsWith('A-')) {
@@ -154,6 +155,11 @@ export function checkEventLinks(elements: PdaElement[]): Finding[] {
     if (element.id.startsWith('EV-')) {
       for (const inv of (element.cells.invariants ?? '').split(', ').filter(Boolean)) {
         if (!invariants.has(inv)) findings.push({ rule: 'TR-2', message: `${element.file}: ${element.id.slice(3)} → ${inv}: такого инварианта нет` });
+      }
+      for (const projection of (element.cells.projections ?? '').split(', ').filter(Boolean)) {
+        if (!projections.has(projection)) {
+          findings.push({ rule: 'TR-2', message: `${element.file}: ${element.id.slice(3)} → ${projection}: такой проекции нет` });
+        }
       }
     }
   }
