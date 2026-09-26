@@ -14,6 +14,7 @@
     "codegen:events": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/codegen-events.ts",
     "check:invariants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-invariants.ts",
     "tz:check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts",
+    "tz:trace": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts --trace",
     "ci": "npm run typecheck && npm run lint && npm run boundaries && npm run codegen:events -- --check && npm run check:invariants && npm test && npm run tz:check -- --gate --pda"
   },
   "devDependencies": {

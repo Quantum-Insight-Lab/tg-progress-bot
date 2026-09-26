@@ -3,7 +3,10 @@ import {
   atomTexts,
   check,
   coverage,
+  formatTrace,
+  MAX_ATOMS_PER_STEP,
   parseEventRegistry,
+  parseIssue,
   parsePdaElements,
   splitBlocks,
   type Finding,
@@ -368,5 +371,75 @@ describe('TR-4: покрытие по правилу вида', () => {
       'R-005 orphan · act: нужен элемент A',
       'R-008 partial · rule: нужен элемент INV или E или L, есть только A-1',
     ]);
+  });
+});
+
+describe('Backlog: TR-7, TR-8 и ссылки issues', () => {
+  const acts = Array.from({ length: MAX_ATOMS_PER_STEP + 1 }, (_, i) => `R-${String(i + 3).padStart(3, '0')}`);
+  const later = `R-${String(acts.length + 3).padStart(3, '0')}`;
+  const atoms = [
+    '  R-001: { kind: scope, release: mvp }',
+    '  R-002: { kind: scope, release: later }',
+    ...acts.map((id) => `  ${id}: { kind: act, scope: R-001 }`),
+    `  ${later}: { kind: act, scope: R-002 }`,
+    '',
+  ].join('\n');
+  const tz = ['R-001', 'R-002', ...acts, later].map((id) => `{${id}} текст ${id}`).join('\n\n');
+  const pda = ['| ID | Что | Из ТЗ |', '| --- | --- | --- |', `| A-1 | акт | ${acts.join(', ')} |`, '| INV-01 | закон | derived: пример |'].join('\n');
+  const issue = (id: string, items: string[], meta: string[] = [], elements = 'A-1 · INV-01'): { file: string; text: string } => ({
+    file: `docs/backlog/${id}.md`,
+    text: ['---', `id: ${id}`, `title: "${id}"`, ...meta, '---', '', '## PDA', '', elements, '', '## Атомы ТЗ', '', ...items.map((item) => `- [${item.startsWith('x:') ? 'x' : ' '}] ${item.replace('x:', '')} — метка`), ''].join('\n'),
+  });
+  const index = (ids: string[]): string => ids.map((id) => `| [${id}](${id}.md) |`).join('\n');
+  const findings = (issues: { file: string; text: string }[], listed = issues.map((i) => i.file.slice(13, -3))): Finding[] =>
+    check(registry(atoms), () => tz, { gate: false }, [{ file: 'p.md', text: pda }], undefined, { issues, index: index(listed) }).findings;
+
+  it('разбирает front matter, чек-лист атомов и элементы PDA', () => {
+    const { issue: parsed } = parseIssue(issue('I-07', ['x:R-003', 'R-004'], ['state: closed', 'blocked_by: [I-01]'], 'A-1 · INV-01 · события `task.created`'));
+    expect(parsed).toMatchObject({ id: 'I-07', closed: true, blockedBy: ['I-01'], elements: ['A-1', 'INV-01', 'EV-task.created'] });
+    expect(parsed?.atoms.map((a) => [a.id, a.done])).toEqual([
+      ['R-003', true],
+      ['R-004', false],
+    ]);
+    expect(parseIssue({ file: 'x.md', text: '# без front matter' }).findings[0]?.message).toBe('x.md: нет front matter');
+  });
+
+  it('TR-7: покрытый атом MVP назначен issue; атом вне MVP, пункт объёма и отложенное в issue не входят', () => {
+    const tr7 = messages(findings([issue('I-01', acts.slice(0, -1)), issue('I-02', ['R-001', later])]), 'TR-7');
+    expect(tr7).toEqual([
+      'docs/backlog/I-02.md:12: R-001 — пункт объёма работ, в issue не назначается',
+      `docs/backlog/I-02.md:13: ${later} не входит в MVP`,
+      `${acts.at(-1)} act покрыт в PDA, но не назначен ни одной issue`,
+    ]);
+    expect(messages(findings([issue('I-01', acts.slice(0, 5)), issue('I-02', acts.slice(5))]), 'TR-7')).toEqual([]);
+  });
+
+  it('TR-7: у закрытой issue отмечены все атомы', () => {
+    const closed = issue('I-01', ['x:R-003', 'R-004'], ['state: closed']);
+    expect(messages(findings([closed, issue('I-02', acts.slice(2))]), 'TR-7')).toEqual(['docs/backlog/I-01.md:14: I-01 закрыта, а R-004 не отмечен']);
+  });
+
+  it(`TR-8: атомов в issue не больше ${MAX_ATOMS_PER_STEP}`, () => {
+    expect(messages(findings([issue('I-01', acts)]), 'TR-8')).toEqual([
+      `docs/backlog/I-01.md: I-01 — атомов ${acts.length}, лимит ${MAX_ATOMS_PER_STEP}; режется по атомам, а не по слоям`,
+    ]);
+  });
+
+  it('TR-2: элементы PDA, blocked_by без круга, каталог совпадает с файлами', () => {
+    const issues = [issue('I-01', acts.slice(0, 5), ['blocked_by: [I-02]'], 'A-7'), issue('I-02', acts.slice(5), ['blocked_by: [I-01, I-09]'])];
+    expect(messages(findings(issues, ['I-01', 'I-05']), 'TR-2')).toEqual([
+      'docs/backlog/I-01.md: I-01 → A-7: такого элемента PDA нет',
+      'docs/backlog/I-02.md: I-02 blocked_by I-09: такой issue нет',
+      'blocked_by по кругу: I-01 → I-02 → I-01',
+      'docs/backlog/README.md: нет строки I-02',
+      'docs/backlog/README.md: I-05 — файла нет',
+    ]);
+  });
+
+  it('tz:trace: атом → элементы PDA → issues → тесты', () => {
+    const result = check(registry(atoms), () => tz, { gate: false }, [{ file: 'p.md', text: pda }], undefined, {
+      issues: [issue('I-01', ['x:R-003', ...acts.slice(1, 5)]), issue('I-02', ['R-003', ...acts.slice(5)])],
+    });
+    expect(formatTrace(result, ['R-003'], new Map()).split('\n')).toEqual(['R-003  §  covered', '  «текст R-003»', '  → A-1', '  → I-01 ✓, I-02', '  → —']);
   });
 });

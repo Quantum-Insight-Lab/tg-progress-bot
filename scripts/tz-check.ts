@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse as parseYaml } from 'yaml';
+import { TESTS_DIR, testIds } from './check-invariants.ts';
 
 export const KINDS = ['rule', 'act', 'reaction', 'entity', 'view', 'integration', 'tech', 'metric', 'scope'] as const;
 export const RELEASES = ['mvp', 'later', 'out'] as const;
@@ -47,7 +48,7 @@ export interface SectionReport {
   started: boolean;
 }
 
-export type Rule = 'TR-1' | 'TR-2' | 'TR-3' | 'TR-4' | 'TR-5' | 'REG' | 'GATE';
+export type Rule = 'TR-1' | 'TR-2' | 'TR-3' | 'TR-4' | 'TR-5' | 'TR-7' | 'TR-8' | 'REG' | 'GATE';
 
 export interface Finding {
   rule: Rule;
@@ -79,7 +80,20 @@ export interface CheckResult {
   anchors: Map<string, number[]>;
   registry: Registry;
   elements: PdaElement[];
+  /** null — backlog ещё не нарезан, TR-7 и TR-8 не проверяются. */
+  issues: Issue[] | null;
   findings: Finding[];
+}
+
+/** Issue backlog (патч 1.3, 10.8): ссылается на атомы — чек-лист «Атомы ТЗ» — и на элементы PDA. */
+export interface Issue {
+  id: string;
+  file: string;
+  title: string;
+  closed: boolean;
+  blockedBy: string[];
+  atoms: { id: string; done: boolean; line: number }[];
+  elements: string[];
 }
 
 export const REGISTRY_PATH = 'contracts/tz-registry.yaml';
@@ -103,6 +117,14 @@ export const COVERED_BY: Readonly<Record<Kind, readonly string[]>> = {
   metric: ['M'],
   scope: [],
 };
+
+export const BACKLOG_DIR = 'docs/backlog';
+export const BACKLOG_INDEX = 'README.md';
+/** 10.11: без данных ретрофита — 10, допустимо 5–25; калибруется по underdelivery_rate (M-23). Карточка — docs/backlog/README.md. */
+export const MAX_ATOMS_PER_STEP = 10;
+const ISSUE_ID = /^I-\d{2,}$/;
+const ISSUE_ATOM = /^- \[( |x)\] (R-\d{3,})\b/;
+const ISSUE_ELEMENT = /\b(?:U|A|E|L|INV|C|B|P|M|S)-\d+\b/g;
 
 export const EVENT_REGISTRY_PATH = 'contracts/event-registry.yaml';
 const EVENT_FIELDS = ['type', 'version', 'context', 'actor', 'subject', 'payload', 'idempotency_key', 'invariants', 'owner'] as const;
@@ -624,12 +646,119 @@ export function coverage(
   return rows;
 }
 
+function section(lines: string[], title: string): { line: number; text: string }[] {
+  const start = lines.findIndex((line) => line.trim() === `## ${title}`);
+  if (start < 0) return [];
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => line.startsWith('## '));
+  return (end < 0 ? rest : rest.slice(0, end)).map((text, index) => ({ line: start + index + 2, text }));
+}
+
+/** Issue — markdown с front matter (`id`, `title`, `blocked_by`, `state`) и разделами «PDA» и «Атомы ТЗ». */
+export function parseIssue(doc: PdaDoc): { issue?: Issue; findings: Finding[] } {
+  const lines = doc.text.split(/\r?\n/);
+  const end = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
+  if (end < 0) return { findings: [{ rule: 'TR-7', message: `${doc.file}: нет front matter` }] };
+  let meta: unknown;
+  try {
+    meta = parseYaml(lines.slice(1, end).join('\n'));
+  } catch (error) {
+    return { findings: [{ rule: 'TR-7', message: `${doc.file}: front matter не разбирается: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}` }] };
+  }
+  if (!isRecord(meta) || typeof meta.id !== 'string' || !ISSUE_ID.test(meta.id) || typeof meta.title !== 'string') {
+    return { findings: [{ rule: 'TR-7', message: `${doc.file}: в front matter нужны id вида I-01 и title` }] };
+  }
+  const atoms = section(lines, 'Атомы ТЗ').flatMap(({ line, text }) => {
+    const match = ISSUE_ATOM.exec(text.trim());
+    return match ? [{ id: match[2] ?? '', done: match[1] === 'x', line }] : [];
+  });
+  const pda = section(lines, 'PDA')
+    .map(({ text }) => text)
+    .join('\n');
+  const elements = [...new Set([...[...pda.matchAll(ISSUE_ELEMENT)].map((m) => m[0]), ...backticked(pda).map((name) => `EV-${name}`)])];
+  const blockedBy = Array.isArray(meta.blocked_by) ? meta.blocked_by.filter((ref): ref is string => typeof ref === 'string') : [];
+  return { issue: { id: meta.id, file: doc.file, title: meta.title, closed: meta.state === 'closed', blockedBy, atoms, elements }, findings: [] };
+}
+
+function cycleThrough(issues: Map<string, Issue>): string[] | null {
+  const state = new Map<string, 'open' | 'done'>();
+  const walk = (id: string, path: string[]): string[] | null => {
+    if (state.get(id) === 'done') return null;
+    if (state.get(id) === 'open') return [...path.slice(path.indexOf(id)), id];
+    state.set(id, 'open');
+    for (const next of issues.get(id)?.blockedBy ?? []) {
+      const cycle = issues.has(next) ? walk(next, [...path, id]) : null;
+      if (cycle) return cycle;
+    }
+    state.set(id, 'done');
+    return null;
+  };
+  for (const id of issues.keys()) {
+    const cycle = walk(id, []);
+    if (cycle) return cycle;
+  }
+  return null;
+}
+
+/**
+ * TR-7: покрытый атом MVP назначен issue; у закрытой issue отмечены все атомы. TR-8: атомов в issue не больше MAX_ATOMS_PER_STEP.
+ * TR-2: атомы, элементы PDA, blocked_by и каталог backlog указывают на существующее.
+ */
+export function checkBacklog(issues: Issue[], registry: Registry, elements: PdaElement[], rows: CoverageRow[], index?: string): Finding[] {
+  const findings: Finding[] = [];
+  const byId = new Map<string, Issue>();
+  const known = new Set(elements.map((e) => e.id));
+  const assigned = new Set<string>();
+  for (const issue of issues) {
+    const first = byId.get(issue.id);
+    if (first) findings.push({ rule: 'TR-2', message: `${issue.id} определена дважды: ${first.file} и ${issue.file}` });
+    else byId.set(issue.id, issue);
+    if (issue.atoms.length > MAX_ATOMS_PER_STEP) {
+      findings.push({ rule: 'TR-8', message: `${issue.file}: ${issue.id} — атомов ${issue.atoms.length}, лимит ${MAX_ATOMS_PER_STEP}; режется по атомам, а не по слоям` });
+    }
+    const seen = new Set<string>();
+    for (const { id, done, line } of issue.atoms) {
+      const where = `${issue.file}:${line}`;
+      const atom = registry.atoms.get(id);
+      if (seen.has(id)) findings.push({ rule: 'TR-7', message: `${where}: ${id} дважды в ${issue.id}` });
+      seen.add(id);
+      assigned.add(id);
+      if (!atom) findings.push({ rule: 'TR-2', message: `${where}: ${issue.id} → ${id}: такого атома нет` });
+      else if (atom.decision === 'withdrawn') findings.push({ rule: 'TR-2', message: `${where}: ${issue.id} → ${id}: атом отозван` });
+      else if (atom.kind === 'scope') findings.push({ rule: 'TR-7', message: `${where}: ${id} — пункт объёма работ, в issue не назначается` });
+      else if (atom.decision !== undefined) findings.push({ rule: 'TR-7', message: `${where}: ${id} не к реализации — решение ${atom.decision}` });
+      else if (releaseOf(atom, registry) !== 'mvp') findings.push({ rule: 'TR-7', message: `${where}: ${id} не входит в MVP` });
+      if (issue.closed && !done) findings.push({ rule: 'TR-7', message: `${where}: ${issue.id} закрыта, а ${id} не отмечен` });
+    }
+    for (const element of issue.elements) {
+      if (!known.has(element)) findings.push({ rule: 'TR-2', message: `${issue.file}: ${issue.id} → ${element.replace(/^EV-/, 'событие ')}: такого элемента PDA нет` });
+    }
+  }
+  for (const issue of issues) {
+    for (const ref of issue.blockedBy) {
+      if (!byId.has(ref)) findings.push({ rule: 'TR-2', message: `${issue.file}: ${issue.id} blocked_by ${ref}: такой issue нет` });
+    }
+  }
+  const cycle = cycleThrough(byId);
+  if (cycle) findings.push({ rule: 'TR-2', message: `blocked_by по кругу: ${cycle.join(' → ')}` });
+  for (const row of rows) {
+    if (row.status === 'covered' && !assigned.has(row.id)) findings.push({ rule: 'TR-7', message: `${row.id} ${row.kind} покрыт в PDA, но не назначен ни одной issue` });
+  }
+  if (index !== undefined) {
+    const listed = new Set([...index.matchAll(/\]\((I-\d{2,})\.md\)/g)].map((m) => m[1] ?? ''));
+    for (const id of byId.keys()) if (!listed.has(id)) findings.push({ rule: 'TR-2', message: `${BACKLOG_DIR}/${BACKLOG_INDEX}: нет строки ${id}` });
+    for (const id of listed) if (!byId.has(id)) findings.push({ rule: 'TR-2', message: `${BACKLOG_DIR}/${BACKLOG_INDEX}: ${id} — файла нет` });
+  }
+  return findings;
+}
+
 export function check(
   registryText: string,
   readSource: (path: string) => string,
   options: { gate: boolean; pda?: boolean },
   pdaDocs: PdaDoc[] = [],
   eventRegistryText?: string,
+  backlog?: { issues: PdaDoc[]; index?: string },
 ): CheckResult {
   const { registry, findings } = parseRegistry(registryText);
   const markdown = registry.source ? readSource(registry.source) : '';
@@ -648,14 +777,21 @@ export function check(
   );
   if (options.gate) findings.push(...checkGate(registry));
   const pda = options.pda ?? false;
+  const rows = coverage(registry, elements, atomTexts(blocks));
   if (pda) {
-    for (const row of coverage(registry, elements, atomTexts(blocks))) {
+    for (const row of rows) {
       if (row.status === 'covered') continue;
       const refs = row.refs.length > 0 ? `, есть только ${row.refs.join(', ')}` : '';
       findings.push({ rule: 'TR-4', message: `${row.id} ${row.status} · ${row.kind}: нужен элемент ${COVERED_BY[row.kind].join(' или ')}${refs}` });
     }
   }
-  return { gate: options.gate, pda, source: registry.source, blocks, sections: tr1.sections, anchors, registry, elements, findings };
+  let issues: Issue[] | null = null;
+  if (backlog !== undefined) {
+    const parsed = backlog.issues.map(parseIssue);
+    issues = parsed.flatMap((p) => (p.issue ? [p.issue] : []));
+    findings.push(...parsed.flatMap((p) => p.findings), ...checkBacklog(issues, registry, elements, rows, backlog.index));
+  }
+  return { gate: options.gate, pda, source: registry.source, blocks, sections: tr1.sections, anchors, registry, elements, issues, findings };
 }
 
 function countBy<T>(items: Iterable<T>, key: (item: T) => string | undefined): string {
@@ -705,6 +841,16 @@ export function formatReport(result: CheckResult): string {
     ['TR-4', `покрыто атомов MVP по видам: ${coverageSummary(coverage(registry, result.elements, atomTexts(blocks)))}`],
     ['REG', `виды: ${countBy(atoms, (a) => a.kind)}; решения: ${countBy(atoms, (a) => a.decision)}`],
   ];
+  if (result.issues !== null) {
+    const covered = coverage(registry, result.elements, atomTexts(blocks)).filter((row) => row.status === 'covered');
+    const assigned = new Set(result.issues.flatMap((issue) => issue.atoms.map((atom) => atom.id)));
+    const closed = result.issues.filter((issue) => issue.closed).length;
+    const largest = Math.max(0, ...result.issues.map((issue) => issue.atoms.length));
+    rules.push(
+      ['TR-7', `покрытых атомов MVP в issues: ${covered.filter((row) => assigned.has(row.id)).length}/${covered.length}; issues ${result.issues.length}, закрыто ${closed}`],
+      ['TR-8', `атомов в issue: до ${largest} при лимите ${MAX_ATOMS_PER_STEP}`],
+    );
+  }
   if (result.gate) rules.push(['GATE', 'D-1…D-6 по 10.10']);
 
   const lines = [`tz:check · ${result.source || '?'} · ${result.gate ? 'gate' : 'шаг 0'}${result.pda ? ' · выход из PDA' : ''}`];
@@ -732,15 +878,64 @@ export function formatReport(result: CheckResult): string {
   return lines.join('\n');
 }
 
-function readPdaDocs(): PdaDoc[] {
-  if (!existsSync(PDA_DIR)) return [];
-  return readdirSync(PDA_DIR)
-    .filter((name) => name.endsWith('.md'))
+const shown = (id: string): string => (id.startsWith('EV-') ? id.slice(3) : id);
+
+/** tz:trace (10.8): атом → элементы PDA → issues → тесты. Трасса вычисляется, руками не ведётся. */
+export function formatTrace(result: CheckResult, ids: string[], testsByInvariant: Map<string, string[]>): string {
+  const texts = atomTexts(result.blocks);
+  const rows = new Map(coverage(result.registry, result.elements, texts).map((row) => [row.id, row]));
+  const lines: string[] = [];
+  for (const id of ids) {
+    const atom = result.registry.atoms.get(id);
+    if (!atom) {
+      lines.push(`${id}  такого атома нет`);
+      continue;
+    }
+    const entry = texts.get(id);
+    const row = rows.get(id);
+    const refs = row?.refs ?? result.elements.filter((element) => element.refs.includes(id)).map((element) => element.id);
+    const status = row?.status ?? atom.decision ?? (atom.kind === 'scope' ? `scope ${atom.release ?? ''}`.trim() : releaseOf(atom, result.registry) ?? '?');
+    const issues = (result.issues ?? []).flatMap((issue) => {
+      const item = issue.atoms.find((a) => a.id === id);
+      return item ? [`${issue.id}${item.done ? ' ✓' : ''}`] : [];
+    });
+    const tests = [...new Set(refs.filter((ref) => ref.startsWith('INV-')).flatMap((inv) => testsByInvariant.get(inv) ?? []))];
+    lines.push(`${id}  §${entry?.section ?? '?'}  ${status}`, `  «${entry?.text ?? ''}»`);
+    lines.push(`  → ${refs.map(shown).join(', ') || '—'}`, `  → ${issues.join(', ') || '—'}`, `  → ${tests.join(', ') || '—'}`);
+  }
+  return lines.join('\n');
+}
+
+function readDocs(dir: string, pattern: RegExp): PdaDoc[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((name) => pattern.test(name))
     .sort()
     .map((name) => {
-      const file = join(PDA_DIR, name);
+      const file = join(dir, name);
       return { file, text: readFileSync(file, 'utf8') };
     });
+}
+
+function readBacklog(): { issues: PdaDoc[]; index?: string } | undefined {
+  if (!existsSync(BACKLOG_DIR)) return undefined;
+  const index = join(BACKLOG_DIR, BACKLOG_INDEX);
+  const issues = readDocs(BACKLOG_DIR, /^I-\d{2,}.*\.md$/);
+  return existsSync(index) ? { issues, index: readFileSync(index, 'utf8') } : { issues };
+}
+
+function testsByInvariant(): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  const walk = (dir: string): void => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.test.ts')) for (const inv of testIds([readFileSync(path, 'utf8')])) map.set(inv, [...(map.get(inv) ?? []), path]);
+    }
+  };
+  walk(TESTS_DIR);
+  return map;
 }
 
 function main(argv: string[]): number {
@@ -748,9 +943,15 @@ function main(argv: string[]): number {
     readFileSync(REGISTRY_PATH, 'utf8'),
     (path) => readFileSync(path, 'utf8'),
     { gate: argv.includes('--gate'), pda: argv.includes('--pda') },
-    readPdaDocs(),
+    readDocs(PDA_DIR, /\.md$/),
     existsSync(EVENT_REGISTRY_PATH) ? readFileSync(EVENT_REGISTRY_PATH, 'utf8') : undefined,
+    readBacklog(),
   );
+  if (argv.includes('--trace')) {
+    const ids = argv.filter((arg) => /^R-\d{3,}$/.test(arg));
+    console.log(formatTrace(result, ids, testsByInvariant()));
+    return ids.every((id) => result.registry.atoms.has(id)) ? 0 : 1;
+  }
   console.log(formatReport(result));
   const uncovered = argv.indexOf('--uncovered');
   if (uncovered >= 0) console.log(`\n${formatUncovered(result, argv[uncovered + 1] ?? '')}`);
