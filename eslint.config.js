@@ -1,69 +1,36 @@
-import eslint from "@eslint/js";
-import tseslint from "typescript-eslint";
+// Инварианты сборки S-3, S-8, S-10 (docs/pda/09-structural-invariants.md).
+import eslint from '@eslint/js';
+import { defineConfig } from 'eslint/config';
+import tseslint from 'typescript-eslint';
 
-const s3EmitSyntax = [
+const s3 = ['emit', 'on'].flatMap((name) => [
   {
-    selector:
-      "CallExpression[callee.name='emit'][arguments.0.type=/^(Literal|TemplateLiteral)$/]",
-    message:
-      "S-3: тип события — только сгенерированная константа, не строковый литерал",
+    selector: `CallExpression[callee.name='${name}'][arguments.0.type=/^(Literal|TemplateLiteral)$/]`,
+    message: 'S-3: тип события — только сгенерированная константа EVENT_TYPES, не строка',
   },
   {
-    selector:
-      "CallExpression[callee.property.name='emit'][arguments.0.type=/^(Literal|TemplateLiteral)$/]",
-    message:
-      "S-3: тип события — только сгенерированная константа, не строковый литерал",
+    selector: `CallExpression[callee.property.name='${name}'][arguments.0.type=/^(Literal|TemplateLiteral)$/]`,
+    message: 'S-3: тип события — только сгенерированная константа EVENT_TYPES, не строка',
   },
-  {
-    selector:
-      "CallExpression[callee.name='on'][arguments.0.raw=/^['\"`][a-z]+\\./]",
-    message:
-      "S-3: подписка на событие — только сгенерированная константа, не строковый литерал",
-  },
-  {
-    selector:
-      "CallExpression[callee.property.name='on'][arguments.0.raw=/^['\"`][a-z]+\\./]",
-    message:
-      "S-3: подписка на событие — только сгенерированная константа, не строковый литерал",
-  },
+]);
+
+const s10 = [
+  { selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']", message: 'S-10: Date.now() в домене запрещён, время — через Clock' },
+  { selector: "NewExpression[callee.name='Date']", message: 'S-10: new Date() в домене запрещён, время — через Clock' },
 ];
 
-const s10DateSyntax = [
-  {
-    selector:
-      "CallExpression[callee.object.name='Date'][callee.property.name='now']",
-    message: "S-10: Date.now() запрещён в домене; используйте clock",
-  },
-  {
-    selector: "NewExpression[callee.name='Date']",
-    message: "S-10: new Date() запрещён в домене; используйте clock",
-  },
-];
+const s8 = [{ selector: 'Literal[raw=/^(?!(0|1)$)[0-9]/]', message: 'S-8: число в домене — только константа из src/config (разрешены 0, 1, -1)' }];
 
-export default tseslint.config(
+export default defineConfig(
+  { ignores: ['node_modules/**'] },
   eslint.configs.recommended,
-  ...tseslint.configs.recommended,
+  tseslint.configs.recommended,
   {
-    ignores: ["dist/**", "node_modules/**"],
+    files: ['**/*.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...s3] },
   },
   {
-    files: ["**/*.ts"],
-    rules: {
-      "no-restricted-syntax": ["error", ...s3EmitSyntax],
-    },
-  },
-  {
-    files: ["src/domain/**/*.ts"],
-    rules: {
-      "no-restricted-syntax": ["error", ...s3EmitSyntax, ...s10DateSyntax],
-      "no-magic-numbers": [
-        "error",
-        {
-          ignore: [0, 1, -1],
-          ignoreArrayIndexes: true,
-          detectObjects: true,
-        },
-      ],
-    },
+    files: ['src/domain/**/*.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...s3, ...s8, ...s10] },
   },
 );

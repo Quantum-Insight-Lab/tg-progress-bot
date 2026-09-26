@@ -1,0 +1,22 @@
+name: TR-7 issue closed
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  atoms:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      - name: all atoms checked (TR-7)
+        run: node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tr7-issue-closed.ts
+        env:
+          GH_TOKEN: ${{ github.token }}

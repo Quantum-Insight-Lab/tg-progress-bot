@@ -1,0 +1,1180 @@
+# Реестр атомов ТЗ (PDA 1.3, 10.6). Текст атома живёт только в ТЗ, здесь — вид, релиз и решения.
+# Проверяется `npm run tz:check`. Новый атом получает следующий свободный номер; номера не переиспользуются.
+source: docs/tz.md
+
+glossary:
+  топик: topic Telegram внутри группы — топик исполнителя (канвас и задачи) или командный топик (отчёты); слова «ветка» в этом смысле в ТЗ нет
+  git-ветка: ветка репозитория GitHub; «основная git-ветка» — ветка по умолчанию
+  линейка: прогресс проекта — доля completed issues репозитория и остаток открытых; «процент проекта» и «доля бэклога» — то же самое
+  задача: шаг, который человек ведёт в боте; issue задачей не является и задачу не порождает
+  группа: супергруппа проекта с топиками; «группа» и «супергруппа» — одно и то же
+  пользователь: аккаунт Telegram, который боту известен после /start
+  участник: пользователь, добавленный в проект с ролью member или lead
+  руководитель: участник с ролью lead
+  корень: пользователь, первым нажавший /start
+
+atoms:
+  # §12 Объём работ · MVP
+  R-001: { kind: scope, release: mvp }
+  R-002: { kind: scope, release: mvp }
+  R-003: { kind: scope, release: mvp }
+  R-004: { kind: scope, release: mvp }
+  R-005: { kind: scope, release: mvp }
+  R-006: { kind: scope, release: mvp }
+  R-007: { kind: scope, release: mvp }
+  R-008: { kind: scope, release: mvp }
+  R-009: { kind: scope, release: mvp }
+  R-010: { kind: scope, release: mvp }
+  R-011: { kind: scope, release: mvp }
+  R-012: { kind: scope, release: mvp }
+  R-013: { kind: scope, release: mvp }
+  R-014: { kind: scope, release: mvp }
+  R-015: { kind: scope, release: mvp }
+  R-016: { kind: scope, release: mvp }
+  R-017: { kind: scope, release: mvp }
+  R-018: { kind: scope, release: mvp }
+  R-019: { kind: scope, release: mvp }
+  R-020: { kind: scope, release: mvp }
+  R-021: { kind: scope, release: mvp }
+  R-022: { kind: scope, release: mvp }
+  R-023: { kind: scope, release: mvp }
+  R-024: { kind: scope, release: mvp }
+  R-025: { kind: scope, release: mvp }
+  R-026: { kind: scope, release: mvp }
+  R-027: { kind: scope, release: mvp }
+  R-028: { kind: scope, release: mvp }
+  R-029: { kind: scope, release: mvp }
+  R-030: { kind: scope, release: mvp }
+  R-031: { kind: scope, release: mvp }
+  R-032: { kind: scope, release: mvp }
+  R-033: { kind: scope, release: mvp }
+  R-034: { kind: scope, release: mvp }
+  R-035: { kind: scope, release: mvp }
+  R-036: { kind: scope, release: mvp }
+  R-037: { kind: scope, release: mvp }
+  R-038: { kind: scope, release: mvp }
+  R-039: { kind: scope, release: mvp }
+  R-040: { kind: scope, release: mvp }
+  R-041: { kind: scope, release: mvp }
+  R-042: { kind: scope, release: mvp }
+  R-043: { kind: scope, release: mvp }
+  R-044: { kind: scope, release: mvp }
+  R-045: { kind: scope, release: mvp }
+
+  # §12 Объём работ · Не входит в MVP. release: later — если пункт назван и в «Дальше».
+  R-046: { kind: scope, release: out }
+  R-047: { kind: scope, release: out }
+  R-048: { kind: scope, release: out }
+  R-049: { kind: scope, release: out }
+  R-050: { kind: scope, release: later }
+  R-051: { kind: scope, release: out }
+  R-052: { kind: scope, release: out }
+  R-053: { kind: scope, release: out }
+  R-054:
+    kind: scope
+    release: out
+    note: из AI в «Дальше» назван только пересказ блоков отчёта — R-057
+  R-055: { kind: scope, release: later }
+  R-056: { kind: scope, release: later }
+
+  # §12 Объём работ · Дальше
+  R-057: { kind: scope, release: later }
+  R-058: { kind: scope, release: later, decision: same_as, same_as: R-055 }
+  R-059: { kind: scope, release: later }
+  R-060: { kind: scope, release: later, decision: same_as, same_as: R-050 }
+  R-061: { kind: scope, release: later }
+  R-062: { kind: scope, release: later }
+  R-063: { kind: scope, release: later, decision: same_as, same_as: R-056 }
+  R-064: { kind: scope, release: later }
+  R-065: { kind: scope, release: later }
+  R-066: { kind: scope, release: later }
+
+  # Преамбула
+  R-067: { kind: entity, scope: R-009 }
+  R-068: { kind: integration, scope: R-043 }
+  R-069: { kind: integration, scope: R-043 }
+  R-070: { kind: integration, scope: R-043 }
+  R-071: { kind: integration, scope: R-043 }
+  R-072: { kind: integration, scope: R-043 }
+  R-073: { kind: integration, scope: R-043 }
+  R-074: { kind: rule, scope: R-011 }
+  R-075: { kind: entity, scope: R-008 }
+  R-076: { kind: entity, scope: R-038 }
+  R-077: { kind: rule, scope: R-011 }
+  R-078: { kind: rule, scope: R-027 }
+  R-079: { kind: rule, scope: R-012 }
+  R-080: { kind: rule, scope: R-013 }
+  R-081: { kind: rule, scope: R-014 }
+
+  # Цель
+  R-082: { kind: tech, scope: R-001 }
+  R-083: { kind: rule, scope: R-001 }
+  R-084: { kind: integration, scope: R-043 }
+  R-085: { kind: view, scope: R-021 }
+  R-086: { kind: rule, scope: R-009 }
+  R-087: { kind: view, scope: R-017 }
+  R-088: { kind: view, scope: R-018 }
+  R-089: { kind: view, scope: R-020 }
+  R-090: { kind: view, scope: R-019 }
+  R-091: { kind: tech, scope: R-001, decision: same_as, same_as: R-082 }
+  R-092: { kind: tech, scope: R-012 }
+  R-093: { kind: tech, scope: R-015 }
+  R-094: { kind: integration, scope: R-012 }
+  R-095: { kind: integration, scope: R-043, decision: same_as, same_as: R-069 }
+  R-096: { kind: integration, scope: R-043, decision: same_as, same_as: R-070 }
+  R-097: { kind: integration, scope: R-043, decision: same_as, same_as: R-071 }
+  R-098: { kind: integration, scope: R-043, decision: same_as, same_as: R-072 }
+  R-099: { kind: rule, scope: R-012 }
+  R-100: { kind: view, scope: R-016 }
+  R-101: { kind: rule, scope: R-012 }
+
+  # §1 Основной сценарий
+  R-102: { kind: entity, scope: R-042 }
+  R-103: { kind: rule, scope: R-001 }
+  R-104: { kind: rule, scope: R-004 }
+  R-105:
+    kind: act
+    scope: R-027
+    decision: withdrawn
+    note: новый смысл — задача заводится командой /task, а не обычным сообщением (решение 26.09); заменён на R-326
+  R-106: { kind: reaction, scope: R-028 }
+  # §1 · макет канваса: поле — атом, значения — иллюстрация (10.5, правило 4)
+  R-107: { kind: view, scope: R-001 }
+  R-108: { kind: view, scope: R-001 }
+  R-109: { kind: view, scope: R-016 }
+  R-110: { kind: view, scope: R-013 }
+  R-111: { kind: view, scope: R-015 }
+  R-112: { kind: view, scope: R-015 }
+  R-113: { kind: view, scope: R-015 }
+  R-114: { kind: view, scope: R-015 }
+  R-115: { kind: view, scope: R-017 }
+  R-116: { kind: view, scope: R-017 }
+  R-117: { kind: view, scope: R-017 }
+  R-118: { kind: view, scope: R-017 }
+  R-119: { kind: view, scope: R-017 }
+  R-120: { kind: view, scope: R-017 }
+  R-121: { kind: view, scope: R-017 }
+  R-122: { kind: view, scope: R-018 }
+  R-123: { kind: view, scope: R-018 }
+  R-124: { kind: view, scope: R-018 }
+  R-125: { kind: view, scope: R-018 }
+  R-126: { kind: view, scope: R-029 }
+  R-127: { kind: view, scope: R-010 }
+  R-128: { kind: view, scope: R-019 }
+  R-129: { kind: view, scope: R-018 }
+  R-130: { kind: view, scope: R-018 }
+  R-131: { kind: view, scope: R-018 }
+  R-132: { kind: view, scope: R-018 }
+  R-133: { kind: view, scope: R-018 }
+  R-134: { kind: view, scope: R-021 }
+  R-135: { kind: view, scope: R-021 }
+  R-136: { kind: view, scope: R-021 }
+  R-137: { kind: view, scope: R-021 }
+  R-138: { kind: view, scope: R-021 }
+  # §1 · после макета
+  R-139: { kind: rule, scope: R-017 }
+  R-140: { kind: view, scope: R-017 }
+  R-141: { kind: view, scope: R-018 }
+  R-142: { kind: view, scope: R-018, decision: same_as, same_as: R-123 }
+  R-143: { kind: view, scope: R-010 }
+  R-144: { kind: view, scope: R-018 }
+  R-145: { kind: view, scope: R-018 }
+  R-146: { kind: rule, scope: R-014 }
+  R-147: { kind: rule, scope: R-014 }
+  R-148: { kind: rule, scope: R-012 }
+  R-149: { kind: rule, scope: R-012 }
+
+  # §1 · ответы на вопросы прохода 2
+  R-150: { kind: rule, scope: R-001 }
+  R-151: { kind: view, scope: R-017 }
+  R-152: { kind: view, scope: R-017 }
+  R-153: { kind: view, scope: R-017 }
+  R-154: { kind: act, scope: R-018 }
+  R-155: { kind: act, scope: R-018 }
+
+  # §2.1 Проект и репозиторий
+  R-156: { kind: entity, scope: R-036 }
+  R-157: { kind: entity, scope: R-036 }
+  R-158: { kind: entity, scope: R-036 }
+  R-159: { kind: entity, scope: R-036 }
+  R-160: { kind: entity, scope: R-037 }
+  R-161: { kind: rule, scope: R-001 }
+  R-162: { kind: rule, scope: R-029 }
+  R-163: { kind: rule, scope: R-023 }
+  R-164: { kind: rule, scope: R-033 }
+  R-165: { kind: rule, scope: R-038 }
+  R-166: { kind: rule, scope: R-002 }
+  R-167: { kind: rule, scope: R-002 }
+  R-168: { kind: rule, scope: R-002 }
+  R-169: { kind: rule, scope: R-002 }
+  R-170: { kind: rule, scope: R-031 }
+  R-171: { kind: view, scope: R-031 }
+  R-172: { kind: rule, scope: R-002 }
+  R-173: { kind: rule, scope: R-002 }
+  R-174: { kind: rule, scope: R-002 }
+  R-175: { kind: view, scope: R-016 }
+  R-176: { kind: rule, scope: R-003 }
+  R-177: { kind: rule, scope: R-003 }
+  R-178: { kind: rule, scope: R-003 }
+  R-179: { kind: rule, scope: R-003 }
+  R-180: { kind: rule, scope: R-003 }
+  R-181: { kind: view, scope: R-016 }
+  R-182: { kind: view, scope: R-021 }
+  R-183: { kind: act, scope: R-038 }
+  R-184:
+    kind: act
+    scope: R-038
+    decision: withdrawn
+    note: смену репозитория делает только корень (решение 26.09) — R-586
+  R-185: { kind: reaction, scope: R-038 }
+  R-186: { kind: reaction, scope: R-038 }
+  R-187: { kind: rule, scope: R-038 }
+  R-188: { kind: rule, scope: R-022 }
+  R-189: { kind: entity, scope: R-021 }
+  R-190: { kind: rule, scope: R-011 }
+  R-191: { kind: view, scope: R-021, decision: same_as, same_as: R-137 }
+  R-192: { kind: view, scope: R-021, decision: same_as, same_as: R-138 }
+  R-193: { kind: rule, scope: R-021 }
+  R-194: { kind: rule, scope: R-012 }
+  R-195: { kind: rule, scope: R-012 }
+
+  # §2.2 Задача
+  R-196: { kind: act, scope: R-027, decision: same_as, same_as: R-326 }
+  R-197: { kind: rule, scope: R-027 }
+  R-198: { kind: rule, scope: R-027 }
+  R-199: { kind: rule, scope: R-027 }
+  R-200: { kind: rule, scope: R-011 }
+  R-201: { kind: entity, scope: R-009 }
+  R-202: { kind: entity, scope: R-009 }
+  R-203:
+    kind: entity
+    decision: withdrawn
+    note: описание задачи не входит в MVP (решение 26.09, D-2 закрыт) — R-324
+  R-204:
+    kind: rule
+    decision: withdrawn
+    note: отозван вместе с R-203
+  R-205: { kind: entity, scope: R-009 }
+  R-206: { kind: entity, scope: R-010 }
+  R-207: { kind: entity, scope: R-009 }
+  R-208: { kind: entity, scope: R-009 }
+  R-209: { kind: entity, scope: R-009 }
+  R-210: { kind: entity, scope: R-009 }
+  R-211: { kind: entity, scope: R-009 }
+  R-212: { kind: rule, scope: R-019 }
+  R-213: { kind: rule, scope: R-014 }
+  R-214: { kind: rule, scope: R-011 }
+  R-215: { kind: rule, scope: R-014 }
+  R-216: { kind: rule, scope: R-014 }
+  R-217: { kind: entity, scope: R-009 }
+  R-218: { kind: view, scope: R-018 }
+  R-219: { kind: entity, scope: R-009 }
+  R-220: { kind: entity, scope: R-023 }
+  R-221: { kind: rule, scope: R-024 }
+  R-222: { kind: entity, scope: R-009 }
+  R-223: { kind: rule, scope: R-009 }
+  R-224: { kind: entity, scope: R-009 }
+  R-225: { kind: entity, scope: R-009 }
+  R-226: { kind: reaction, scope: R-027 }
+  R-227: { kind: rule, scope: R-027 }
+  R-228: { kind: rule, scope: R-010 }
+  R-229: { kind: reaction, scope: R-028, decision: same_as, same_as: R-106 }
+  R-230: { kind: rule, scope: R-009 }
+  R-231: { kind: act, scope: R-019 }
+  R-232: { kind: rule, scope: R-006 }
+  R-233: { kind: entity, scope: R-010 }
+  R-234: { kind: entity, scope: R-010 }
+  R-235: { kind: entity, scope: R-010 }
+  R-236: { kind: rule, scope: R-010, decision: same_as, same_as: R-228 }
+  R-237: { kind: act, scope: R-010 }
+  R-238: { kind: view, scope: R-010 }
+  R-239: { kind: rule, scope: R-010 }
+  R-240: { kind: view, scope: R-019 }
+  R-241: { kind: rule, scope: R-014, decision: same_as, same_as: R-213 }
+  R-242: { kind: rule, scope: R-011 }
+  R-243: { kind: rule, scope: R-011 }
+  R-244: { kind: rule, scope: R-029 }
+  R-245: { kind: reaction, scope: R-029 }
+  R-246: { kind: view, scope: R-029, decision: same_as, same_as: R-126 }
+  R-247: { kind: act, scope: R-009 }
+  R-248: { kind: act, scope: R-009 }
+  R-249: { kind: rule, scope: R-009 }
+  R-250:
+    kind: act
+    decision: withdrawn
+    note: передача задачи не входит в MVP, при удалении участника его задачи снимаются (решение 26.09, D-1 закрыт) — R-323
+  R-251: { kind: act, scope: R-005 }
+  R-252: { kind: rule, scope: R-005 }
+
+  # §2.3 Блокеры и застой
+  R-253: { kind: reaction, scope: R-023 }
+  R-254: { kind: reaction, scope: R-024 }
+  R-255: { kind: view, scope: R-024 }
+  R-256: { kind: act, scope: R-024 }
+  R-257: { kind: act, scope: R-024 }
+  R-258: { kind: rule, scope: R-024 }
+  R-259: { kind: rule, scope: R-023 }
+  R-260: { kind: rule, scope: R-023 }
+  R-261: { kind: reaction, scope: R-322 }
+  R-262: { kind: rule, scope: R-322 }
+  R-263: { kind: entity, scope: R-024 }
+  R-264: { kind: view, scope: R-020 }
+  R-265:
+    kind: entity
+    decision: withdrawn
+    note: поле «что требуется» не входит в MVP, у блокера только причина (решение 26.09, D-2 закрыт) — R-325
+  R-266:
+    kind: view
+    decision: withdrawn
+    note: отозван вместе с R-265
+  R-267: { kind: rule, scope: R-020 }
+  R-268: { kind: view, scope: R-020 }
+  R-269: { kind: rule, scope: R-025 }
+  R-270: { kind: rule, scope: R-025 }
+  R-271: { kind: reaction, scope: R-025 }
+  R-272: { kind: rule, scope: R-025 }
+  R-273: { kind: reaction, scope: R-026 }
+  R-274:
+    kind: rule
+    scope: R-026
+    decision: withdrawn
+    note: PR относится к участнику только по автору (решение 26.09) — R-936
+  R-275: { kind: rule, scope: R-026 }
+  R-276: { kind: view, scope: R-026 }
+  R-277: { kind: rule, scope: R-020 }
+  R-278: { kind: view, scope: R-020 }
+  R-279: { kind: view, scope: R-030 }
+  R-280: { kind: rule, scope: R-023 }
+  R-281: { kind: rule, scope: R-023 }
+  R-282: { kind: rule, scope: R-026 }
+  R-283: { kind: rule, scope: R-322 }
+
+  # §2.4 Участники и доступ
+  R-284: { kind: entity, scope: R-005 }
+  R-285: { kind: entity, scope: R-008 }
+  R-286: { kind: rule, scope: R-008 }
+  R-287: { kind: rule, scope: R-008 }
+  R-288: { kind: rule, scope: R-008 }
+  R-289: { kind: rule, scope: R-008 }
+  R-290: { kind: entity, scope: R-008 }
+  R-291: { kind: rule, scope: R-008 }
+  R-292: { kind: rule, scope: R-005 }
+  R-293: { kind: rule, scope: R-006 }
+  R-294: { kind: rule, scope: R-006 }
+  R-295: { kind: entity, scope: R-006 }
+  R-296: { kind: entity, scope: R-042, decision: same_as, same_as: R-102 }
+  R-297: { kind: entity, scope: R-006 }
+  R-298: { kind: act, scope: R-009 }
+  R-299: { kind: act, scope: R-036 }
+  R-300: { kind: act, scope: R-038, decision: same_as, same_as: R-183 }
+  R-301:
+    kind: act
+    scope: R-040
+    decision: withdrawn
+    note: участников добавляет только корень (решение 26.09) — R-591
+  R-302: { kind: rule, scope: R-006 }
+  R-303: { kind: rule, scope: R-005 }
+  R-304: { kind: reaction, scope: R-035 }
+  R-305: { kind: rule, scope: R-035 }
+  R-306: { kind: rule, scope: R-035 }
+  R-307: { kind: rule, scope: R-036 }
+  R-308: { kind: rule, scope: R-040 }
+  R-309:
+    kind: rule
+    scope: R-007
+    decision: withdrawn
+    note: добавляет только корень (решение 26.09) — R-589
+  R-310: { kind: rule, scope: R-035 }
+  R-311: { kind: rule, scope: R-007 }
+  R-312: { kind: reaction, scope: R-007 }
+  R-313: { kind: rule, scope: R-007 }
+  R-314: { kind: act, scope: R-009 }
+  R-315: { kind: act, scope: R-009 }
+  R-316: { kind: reaction, scope: R-009 }
+  R-317: { kind: view, scope: R-018 }
+  R-318: { kind: act, scope: R-009, decision: same_as, same_as: R-298 }
+  R-319: { kind: act, scope: R-009 }
+  R-320: { kind: rule, scope: R-009 }
+  R-321: { kind: rule, scope: R-009 }
+
+  # Ответы на вопросы прохода 3
+  R-322: { kind: scope, release: mvp }
+  R-323: { kind: scope, release: out }
+  R-324: { kind: scope, release: out }
+  R-325: { kind: scope, release: out }
+  R-326: { kind: act, scope: R-027 }
+  R-327: { kind: view, scope: R-018 }
+  R-328: { kind: view, scope: R-018 }
+  R-329: { kind: rule, scope: R-024 }
+  R-330: { kind: view, scope: R-322 }
+
+  # §3 GitHub-интеграция
+  R-331: { kind: integration, scope: R-043, decision: same_as, same_as: R-068 }
+  R-332: { kind: integration, scope: R-043, decision: same_as, same_as: R-069 }
+  R-333: { kind: integration, scope: R-043, decision: same_as, same_as: R-070 }
+  R-334: { kind: integration, scope: R-043, decision: same_as, same_as: R-071 }
+  R-335: { kind: integration, scope: R-043, decision: same_as, same_as: R-072 }
+  R-336: { kind: integration, scope: R-043, decision: same_as, same_as: R-073 }
+  R-337:
+    kind: integration
+    scope: R-043
+    decision: withdrawn
+    note: релизы не читаются в MVP — нигде не показывались (решение 26.09) — R-435
+  R-338: { kind: integration, scope: R-043 }
+  R-339: { kind: integration, scope: R-043 }
+  R-340: { kind: view, scope: R-021 }
+  R-341: { kind: view, scope: R-021 }
+  R-342: { kind: tech, scope: R-043 }
+  R-343: { kind: tech, scope: R-043 }
+  R-344: { kind: integration, scope: R-043 }
+  R-345: { kind: integration, scope: R-043 }
+  R-346: { kind: integration, scope: R-043 }
+  R-347: { kind: integration, scope: R-043 }
+  R-348: { kind: integration, scope: R-043 }
+  R-349:
+    kind: integration
+    scope: R-043
+    decision: withdrawn
+    note: отозван вместе с R-337
+  R-350: { kind: rule, scope: R-044 }
+  R-351: { kind: rule, scope: R-043 }
+  R-352: { kind: rule, scope: R-043, decision: same_as, same_as: R-351 }
+  R-353: { kind: rule, scope: R-002, decision: same_as, same_as: R-172 }
+  R-354: { kind: rule, scope: R-002 }
+  R-355: { kind: rule, scope: R-002, decision: same_as, same_as: R-173 }
+  R-356: { kind: rule, scope: R-002 }
+
+  # §3.1 Что видно из зеркала
+  R-357: { kind: view, scope: R-021 }
+  R-358: { kind: view, scope: R-021 }
+  R-359: { kind: view, scope: R-021, decision: same_as, same_as: R-136 }
+  R-360: { kind: view, scope: R-021 }
+  R-361: { kind: view, scope: R-021, decision: same_as, same_as: R-138 }
+  R-362: { kind: rule, scope: R-021, decision: same_as, same_as: R-193 }
+  R-363: { kind: view, scope: R-021 }
+  R-364: { kind: view, scope: R-021 }
+  R-365: { kind: rule, scope: R-025 }
+  R-366: { kind: view, scope: R-021 }
+  R-367: { kind: entity, scope: R-021 }
+  R-368: { kind: entity, scope: R-021 }
+  R-369: { kind: entity, scope: R-034 }
+  R-370: { kind: entity, scope: R-034 }
+  R-371: { kind: entity, scope: R-012 }
+  R-372: { kind: entity, scope: R-021 }
+  R-373:
+    kind: entity
+    scope: R-043
+    decision: withdrawn
+    note: отозван вместе с R-337
+  R-374: { kind: view, scope: R-021, decision: same_as, same_as: R-357 }
+  R-375: { kind: view, scope: R-025 }
+  R-376: { kind: view, scope: R-026 }
+  R-377: { kind: view, scope: R-034 }
+  R-378: { kind: view, scope: R-034 }
+  R-379: { kind: view, scope: R-034 }
+  R-380: { kind: view, scope: R-034 }
+  R-381: { kind: view, scope: R-021 }
+  R-382: { kind: view, scope: R-034 }
+  R-383: { kind: view, scope: R-017 }
+  R-384: { kind: entity, scope: R-017 }
+  R-385: { kind: entity, scope: R-017 }
+  R-386: { kind: view, scope: R-017 }
+  R-387: { kind: rule, scope: R-019 }
+
+  # §3.2 Чьи это факты
+  R-388: { kind: rule, scope: R-002 }
+  R-389: { kind: rule, scope: R-025, decision: same_as, same_as: R-272 }
+  R-390: { kind: view, scope: R-025 }
+  R-391: { kind: rule, scope: R-002 }
+  R-392: { kind: rule, scope: R-026 }
+  R-393:
+    kind: rule
+    scope: R-026
+    decision: withdrawn
+    note: запрошенный ревьюер не учитывается (решение 26.09)
+  R-394: { kind: rule, scope: R-045 }
+  R-395: { kind: rule, scope: R-045 }
+  R-396: { kind: rule, scope: R-002 }
+  R-397: { kind: rule, scope: R-026 }
+  R-398: { kind: rule, scope: R-021 }
+  R-399: { kind: view, scope: R-020 }
+  R-400: { kind: rule, scope: R-026 }
+  R-401:
+    kind: rule
+    scope: R-026
+    decision: withdrawn
+    note: случай «автор и ревьюер в проекте» снят вместе с ревьюером (решение 26.09)
+  R-402: { kind: rule, scope: R-026 }
+
+  # §3.3 Расхождение учёта
+  R-403: { kind: rule, scope: R-012, decision: same_as, same_as: R-079 }
+  R-404: { kind: rule, scope: R-018 }
+  R-405: { kind: rule, scope: R-045 }
+  R-406: { kind: rule, scope: R-045 }
+  R-407: { kind: rule, scope: R-045 }
+  R-408: { kind: rule, scope: R-045 }
+  R-409: { kind: rule, scope: R-045 }
+  R-410: { kind: rule, scope: R-045 }
+  R-411: { kind: rule, scope: R-045 }
+  R-412: { kind: rule, scope: R-045 }
+  R-413: { kind: rule, scope: R-045 }
+  R-414: { kind: view, scope: R-045 }
+  R-415: { kind: rule, scope: R-045 }
+  R-416: { kind: rule, scope: R-045 }
+  R-417: { kind: rule, scope: R-045, decision: same_as, same_as: R-411 }
+  R-418: { kind: rule, scope: R-045 }
+
+  # §3.4 Где человек стоит в бэклоге
+  R-419: { kind: rule, scope: R-015 }
+  R-420: { kind: rule, scope: R-015 }
+  R-421: { kind: rule, scope: R-015 }
+  R-422: { kind: rule, scope: R-015 }
+  R-423: { kind: rule, scope: R-011, decision: same_as, same_as: R-200 }
+  R-424: { kind: rule, scope: R-011 }
+  R-425: { kind: rule, scope: R-012 }
+  R-426: { kind: rule, scope: R-015 }
+  R-427: { kind: rule, scope: R-015 }
+  R-428: { kind: rule, scope: R-015 }
+  R-429: { kind: rule, scope: R-015 }
+  R-430: { kind: view, scope: R-015 }
+  R-431: { kind: rule, scope: R-008, decision: same_as, same_as: R-286 }
+  R-432: { kind: rule, scope: R-015 }
+  R-433: { kind: rule, scope: R-012 }
+  R-434: { kind: view, scope: R-015 }
+
+  # Ответы на вопросы прохода 4
+  R-435: { kind: scope, release: out }
+  R-436: { kind: integration, scope: R-043 }
+  R-437: { kind: integration, scope: R-043 }
+  R-438: { kind: integration, scope: R-043 }
+
+  # Решение 26.09: личка — админка
+  R-439: { kind: scope, release: mvp }
+
+  # §4 Расчёт прогресса
+  R-440: { kind: rule, scope: R-012, decision: same_as, same_as: R-079 }
+  R-441: { kind: rule, scope: R-014 }
+  R-442: { kind: rule, scope: R-012 }
+  R-443: { kind: rule, scope: R-012 }
+  R-444: { kind: rule, scope: R-012 }
+  R-445: { kind: view, scope: R-013 }
+  R-446: { kind: rule, scope: R-012 }
+  R-447: { kind: rule, scope: R-012 }
+  R-448: { kind: rule, scope: R-012 }
+  R-449: { kind: rule, scope: R-012 }
+  R-450: { kind: rule, scope: R-012, decision: same_as, same_as: R-148 }
+  R-451: { kind: rule, scope: R-014, decision: same_as, same_as: R-146 }
+  R-452: { kind: rule, scope: R-003, decision: same_as, same_as: R-180 }
+  R-453: { kind: rule, scope: R-012 }
+  R-454: { kind: view, scope: R-016, decision: same_as, same_as: R-181 }
+  R-455: { kind: rule, scope: R-012 }
+  R-456: { kind: rule, scope: R-002, decision: same_as, same_as: R-174 }
+  R-457: { kind: rule, scope: R-012 }
+  R-458: { kind: rule, scope: R-031 }
+  R-459: { kind: rule, scope: R-031 }
+  R-460: { kind: rule, scope: R-031 }
+  R-461: { kind: rule, scope: R-031, decision: same_as, same_as: R-458 }
+  R-462: { kind: rule, scope: R-031 }
+  R-463: { kind: view, scope: R-030 }
+  R-464: { kind: view, scope: R-031 }
+  R-465: { kind: reaction, scope: R-022 }
+  R-466: { kind: entity, scope: R-022 }
+  R-467: { kind: rule, scope: R-022 }
+  R-468: { kind: rule, scope: R-022 }
+  R-469: { kind: rule, scope: R-022, decision: same_as, same_as: R-188 }
+
+  # §5 Канвас
+  R-470: { kind: rule, scope: R-001 }
+  R-471: { kind: rule, scope: R-004 }
+  R-472: { kind: rule, scope: R-004, decision: same_as, same_as: R-104 }
+  R-473: { kind: rule, scope: R-001 }
+  R-474: { kind: rule, scope: R-001, decision: same_as, same_as: R-103 }
+  R-475: { kind: view, scope: R-001 }
+  R-476: { kind: view, scope: R-001, decision: same_as, same_as: R-108 }
+  R-477: { kind: view, scope: R-001, decision: same_as, same_as: R-107 }
+  R-478: { kind: view, scope: R-016, decision: same_as, same_as: R-109 }
+  R-479: { kind: view, scope: R-013, decision: same_as, same_as: R-110 }
+  R-480: { kind: view, scope: R-015, decision: same_as, same_as: R-111 }
+  R-481: { kind: view, scope: R-017, decision: same_as, same_as: R-115 }
+  R-482: { kind: view, scope: R-017 }
+  R-483: { kind: view, scope: R-017, decision: same_as, same_as: R-117 }
+  R-484: { kind: view, scope: R-017 }
+  R-485: { kind: view, scope: R-017, decision: same_as, same_as: R-120 }
+  R-486: { kind: view, scope: R-017 }
+  R-487: { kind: view, scope: R-018, decision: same_as, same_as: R-122 }
+  R-488: { kind: view, scope: R-018 }
+  R-489: { kind: view, scope: R-018 }
+  R-490: { kind: view, scope: R-018 }
+  R-491: { kind: view, scope: R-018 }
+  R-492: { kind: view, scope: R-018 }
+  R-493: { kind: view, scope: R-018 }
+  R-494: { kind: view, scope: R-019 }
+  R-495: { kind: view, scope: R-019 }
+  R-496: { kind: rule, scope: R-019 }
+  R-497: { kind: rule, scope: R-019 }
+  R-498: { kind: view, scope: R-019 }
+  R-499: { kind: view, scope: R-020 }
+  R-500: { kind: view, scope: R-020 }
+  R-501: { kind: view, scope: R-020 }
+  R-502: { kind: rule, scope: R-026, decision: same_as, same_as: R-397 }
+  R-503: { kind: view, scope: R-025 }
+  R-504: { kind: view, scope: R-021, decision: same_as, same_as: R-357 }
+  R-505: { kind: view, scope: R-021, decision: same_as, same_as: R-182 }
+  R-506: { kind: view, scope: R-022 }
+  R-507: { kind: view, scope: R-022 }
+  R-508: { kind: view, scope: R-045 }
+  R-509: { kind: view, scope: R-018 }
+  R-510: { kind: view, scope: R-018, decision: same_as, same_as: R-509 }
+  R-511: { kind: view, scope: R-030 }
+
+  # §5.1 Настройки
+  R-512: { kind: rule, scope: R-439 }
+  R-513: { kind: act, scope: R-439 }
+  R-514: { kind: act, scope: R-439 }
+  R-515: { kind: act, scope: R-439 }
+  R-516: { kind: act, scope: R-439 }
+  R-517: { kind: act, scope: R-439 }
+  R-518: { kind: act, scope: R-439 }
+  R-519: { kind: act, scope: R-439 }
+  R-520: { kind: act, scope: R-439 }
+  R-521: { kind: act, scope: R-439 }
+  R-522: { kind: act, scope: R-038, decision: same_as, same_as: R-586 }
+  R-523: { kind: act, scope: R-439 }
+  R-524: { kind: rule, scope: R-439 }
+  R-525: { kind: rule, scope: R-439 }
+  R-526: { kind: rule, scope: R-439 }
+
+  # §5.2 Онбординг
+  R-527: { kind: reaction, scope: R-035, decision: same_as, same_as: R-304 }
+  R-528: { kind: reaction, scope: R-035 }
+  R-529: { kind: reaction, scope: R-040 }
+  R-530: { kind: reaction, scope: R-040 }
+  R-531: { kind: act, scope: R-036 }
+  R-532: { kind: act, scope: R-036, decision: same_as, same_as: R-299 }
+  R-533: { kind: rule, scope: R-439 }
+  R-534: { kind: act, scope: R-036 }
+  R-535: { kind: act, scope: R-036 }
+  R-536: { kind: act, scope: R-036 }
+  R-537: { kind: act, scope: R-036 }
+  R-538: { kind: reaction, scope: R-037 }
+  R-539: { kind: tech, scope: R-037 }
+  R-540: { kind: act, scope: R-037 }
+  R-541: { kind: rule, scope: R-037 }
+  R-542: { kind: rule, scope: R-039 }
+  R-543: { kind: rule, scope: R-037 }
+  R-544: { kind: act, scope: R-038 }
+  R-545: { kind: rule, scope: R-038 }
+  R-546: { kind: reaction, scope: R-038 }
+  R-547:
+    kind: rule
+    scope: R-038
+    decision: withdrawn
+    note: подключает руководитель, меняет только корень (решение 26.09) — R-587, R-588
+  R-548: { kind: reaction, scope: R-039 }
+  R-549: { kind: act, scope: R-039 }
+  R-550: { kind: reaction, scope: R-039 }
+  R-551: { kind: reaction, scope: R-033 }
+  R-552: { kind: rule, scope: R-033 }
+  R-553: { kind: rule, scope: R-032 }
+  R-554: { kind: act, scope: R-040 }
+  R-555: { kind: act, scope: R-040 }
+  R-556: { kind: reaction, scope: R-040, decision: same_as, same_as: R-529 }
+  R-557:
+    kind: view
+    scope: R-040
+    decision: withdrawn
+    note: людей без проекта видит только корень (решение 26.09) — R-590
+  R-558:
+    kind: act
+    scope: R-040
+    decision: withdrawn
+    note: участников добавляет только корень (решение 26.09) — R-591
+  R-559: { kind: reaction, scope: R-041 }
+  R-560: { kind: rule, scope: R-041 }
+  R-561: { kind: act, scope: R-041, decision: same_as, same_as: R-521 }
+  R-562: { kind: rule, scope: R-008 }
+  R-563: { kind: rule, scope: R-008 }
+  R-564: { kind: reaction, scope: R-042 }
+  R-565:
+    kind: act
+    scope: R-042
+    decision: withdrawn
+    note: топик участника указывает корень (решение 26.09) — R-592
+  R-566: { kind: reaction, scope: R-042 }
+  R-567: { kind: reaction, scope: R-042 }
+  R-568: { kind: reaction, scope: R-042, decision: same_as, same_as: R-566 }
+  R-569: { kind: reaction, scope: R-042 }
+  R-570: { kind: rule, scope: R-037 }
+  R-571: { kind: reaction, scope: R-042 }
+  R-572: { kind: reaction, scope: R-040 }
+  R-573: { kind: reaction, scope: R-040 }
+  R-574: { kind: view, scope: R-040 }
+  R-575: { kind: view, scope: R-040 }
+  R-576: { kind: view, scope: R-040 }
+  R-577: { kind: view, scope: R-040 }
+  R-578: { kind: view, scope: R-040 }
+
+  # Ответы на вопросы прохода 5
+  R-579: { kind: act, scope: R-019 }
+  R-580: { kind: view, scope: R-019 }
+  R-581: { kind: view, scope: R-018, decision: same_as, same_as: R-131 }
+  R-582: { kind: view, scope: R-022 }
+  R-583: { kind: rule, scope: R-439 }
+  R-584: { kind: act, scope: R-439 }
+  R-585: { kind: reaction, scope: R-033 }
+  # уточнение: настройки меняет только корень, кроме своего логина GitHub
+  R-586: { kind: act, scope: R-038 }
+  R-587: { kind: rule, scope: R-038 }
+  R-588: { kind: rule, scope: R-038 }
+  R-589: { kind: rule, scope: R-007 }
+  R-590: { kind: view, scope: R-040 }
+  R-591: { kind: act, scope: R-040 }
+  R-592: { kind: act, scope: R-042 }
+  R-593: { kind: rule, scope: R-439 }
+
+  # §6 Как задача попадает на канвас
+  R-594: { kind: tech, scope: R-001 }
+  R-595: { kind: rule, scope: R-001, decision: same_as, same_as: R-473 }
+  R-596: { kind: tech, scope: R-018 }
+  R-597: { kind: view, scope: R-018 }
+  R-598: { kind: view, scope: R-018 }
+  R-599: { kind: view, scope: R-018 }
+  R-600: { kind: view, scope: R-018, decision: same_as, same_as: R-123 }
+  R-601: { kind: view, scope: R-018, decision: same_as, same_as: R-124 }
+  R-602: { kind: view, scope: R-018, decision: same_as, same_as: R-125 }
+  R-603: { kind: view, scope: R-029, decision: same_as, same_as: R-126 }
+  R-604: { kind: view, scope: R-010, decision: same_as, same_as: R-143 }
+  R-605: { kind: view, scope: R-018, decision: same_as, same_as: R-144 }
+  R-606: { kind: view, scope: R-018, decision: same_as, same_as: R-328 }
+  R-607: { kind: view, scope: R-018, decision: same_as, same_as: R-145 }
+  R-608: { kind: tech, scope: R-018 }
+  R-609: { kind: reaction, scope: R-018 }
+  R-610: { kind: tech, scope: R-001 }
+  R-611: { kind: rule, scope: R-043 }
+  R-612: { kind: rule, scope: R-043 }
+  R-613: { kind: rule, scope: R-043 }
+  R-614: { kind: tech, scope: R-001 }
+  R-615: { kind: tech, scope: R-001 }
+  R-616: { kind: tech, scope: R-001 }
+  R-617: { kind: rule, scope: R-001 }
+  R-618: { kind: rule, scope: R-001 }
+  R-619: { kind: rule, scope: R-001, decision: same_as, same_as: R-161 }
+  R-620: { kind: entity, scope: R-042, decision: same_as, same_as: R-102 }
+  R-621: { kind: entity, scope: R-042 }
+  R-622: { kind: act, scope: R-027, decision: same_as, same_as: R-326 }
+  R-623: { kind: reaction, scope: R-027 }
+  R-624: { kind: reaction, scope: R-028, decision: same_as, same_as: R-106 }
+  R-625: { kind: rule, scope: R-027 }
+  R-626: { kind: rule, scope: R-011 }
+  R-627: { kind: reaction, scope: R-001 }
+  R-628: { kind: reaction, scope: R-001 }
+  R-629: { kind: reaction, scope: R-001 }
+  R-630: { kind: reaction, scope: R-001 }
+  R-631: { kind: reaction, scope: R-001 }
+  R-632: { kind: rule, scope: R-018 }
+  R-633: { kind: reaction, scope: R-018 }
+  R-634: { kind: rule, scope: R-001, decision: same_as, same_as: R-103 }
+  R-635: { kind: reaction, scope: R-029 }
+  R-636: { kind: view, scope: R-029, decision: same_as, same_as: R-126 }
+  R-637: { kind: reaction, scope: R-029 }
+  R-638: { kind: reaction, scope: R-019 }
+  R-639: { kind: view, scope: R-019 }
+  R-640: { kind: reaction, scope: R-009 }
+  R-641: { kind: act, scope: R-009, decision: same_as, same_as: R-298 }
+  R-642: { kind: view, scope: R-018, decision: same_as, same_as: R-132 }
+  R-643:
+    kind: rule
+    scope: R-014
+    decision: withdrawn
+    note: фраза убрана — задачи процент не двигают, правило уже в §1 и §4 (решение 26.09)
+  R-644: { kind: reaction, scope: R-009 }
+  R-645: { kind: act, scope: R-009, decision: same_as, same_as: R-248 }
+  R-646: { kind: act, scope: R-009, decision: same_as, same_as: R-247 }
+  R-647: { kind: rule, scope: R-009, decision: same_as, same_as: R-249 }
+  R-648: { kind: view, scope: R-018 }
+  R-649: { kind: rule, scope: R-029 }
+  R-650: { kind: rule, scope: R-014 }
+  R-651:
+    kind: reaction
+    scope: R-323
+    decision: withdrawn
+    note: абзац о передаче исполнителя убран — передача вне MVP (решение 26.09)
+  R-652:
+    kind: reaction
+    scope: R-323
+    decision: withdrawn
+    note: отозван вместе с R-651
+  R-653:
+    kind: rule
+    scope: R-323
+    decision: withdrawn
+    note: отозван вместе с R-651
+
+  # §7.1 Ежедневный отчёт
+  R-654: { kind: view, scope: R-030 }
+  R-655: { kind: rule, scope: R-030 }
+  R-656: { kind: rule, scope: R-030 }
+  R-657: { kind: rule, scope: R-030 }
+  R-658: { kind: view, scope: R-030 }
+  R-659: { kind: rule, scope: R-031 }
+  R-660: { kind: view, scope: R-031, decision: same_as, same_as: R-464 }
+  R-661: { kind: view, scope: R-031, decision: same_as, same_as: R-171 }
+  R-662: { kind: rule, scope: R-031 }
+  # §7.1 · макет ежедневного отчёта
+  R-663: { kind: view, scope: R-030 }
+  R-664: { kind: view, scope: R-030 }
+  R-665: { kind: view, scope: R-030 }
+  R-666: { kind: view, scope: R-030 }
+  R-667: { kind: view, scope: R-030 }
+  R-668: { kind: view, scope: R-030 }
+  R-669: { kind: view, scope: R-030 }
+  R-670: { kind: view, scope: R-030 }
+  R-671: { kind: view, scope: R-030 }
+  R-672: { kind: view, scope: R-030 }
+  R-673: { kind: view, scope: R-030 }
+  R-674: { kind: view, scope: R-030 }
+  R-675: { kind: view, scope: R-030 }
+  R-676: { kind: view, scope: R-030 }
+  R-677: { kind: view, scope: R-030 }
+  R-678: { kind: view, scope: R-030 }
+  R-679: { kind: view, scope: R-030 }
+  R-680: { kind: view, scope: R-031 }
+  R-681: { kind: view, scope: R-030 }
+  R-682: { kind: view, scope: R-030 }
+  R-683: { kind: view, scope: R-030 }
+  R-684: { kind: view, scope: R-034 }
+  R-685: { kind: view, scope: R-034, decision: same_as, same_as: R-377 }
+  R-686: { kind: view, scope: R-034, decision: same_as, same_as: R-378 }
+  R-687: { kind: view, scope: R-034, decision: same_as, same_as: R-379 }
+  R-688: { kind: view, scope: R-034, decision: same_as, same_as: R-380 }
+  # §7.1 · после макета
+  R-689: { kind: view, scope: R-045 }
+  R-690: { kind: rule, scope: R-030 }
+  R-691: { kind: rule, scope: R-031 }
+  R-692: { kind: view, scope: R-031, decision: same_as, same_as: R-680 }
+  R-693: { kind: view, scope: R-034 }
+  R-694: { kind: rule, scope: R-034 }
+  R-695: { kind: rule, scope: R-034 }
+
+  # §7.2 Еженедельный отчёт — «Дальше» (R-055)
+  R-696:
+    kind: view
+    scope: R-055
+    decision: clarify
+    defect: D-5
+    note: >-
+      «Тот же состав за семь суток», но в макете нет строк «Сейчас», CI и счётчика «встало в блок»,
+      а «Риск» назван «Что замедлило». Не блокирует MVP — решается вместе с недельным отчётом.
+  R-697: { kind: rule, scope: R-055, decision: deferred }
+  R-698: { kind: view, scope: R-055, decision: deferred }
+  R-699: { kind: view, scope: R-055, decision: deferred }
+  R-700: { kind: view, scope: R-055, decision: deferred }
+  R-701: { kind: view, scope: R-055, decision: deferred }
+  R-702: { kind: view, scope: R-055, decision: deferred }
+  R-703: { kind: view, scope: R-055, decision: deferred }
+  R-704: { kind: view, scope: R-055, decision: deferred }
+  R-705: { kind: view, scope: R-055, decision: deferred }
+  R-706: { kind: view, scope: R-055, decision: deferred }
+  R-707: { kind: view, scope: R-055, decision: deferred }
+  R-708: { kind: view, scope: R-055, decision: deferred }
+  R-709: { kind: view, scope: R-055, decision: deferred }
+  R-710: { kind: view, scope: R-055, decision: deferred }
+  R-711: { kind: view, scope: R-055, decision: deferred }
+  R-712: { kind: view, scope: R-055, decision: deferred }
+  R-713: { kind: view, scope: R-055, decision: deferred }
+  R-714: { kind: view, scope: R-055, decision: deferred }
+  R-715: { kind: view, scope: R-055, decision: deferred }
+  R-716: { kind: view, scope: R-055, decision: deferred }
+  R-717: { kind: view, scope: R-055, decision: deferred }
+  R-718: { kind: view, scope: R-055, decision: deferred }
+  R-719: { kind: rule, scope: R-012 }
+  R-720: { kind: rule, scope: R-012, decision: same_as, same_as: R-148 }
+  R-721: { kind: rule, scope: R-034 }
+  R-722: { kind: view, scope: R-055, decision: deferred }
+
+  # §7.3 Откуда берутся строки
+  R-723: { kind: rule, scope: R-030 }
+  R-724: { kind: rule, scope: R-030 }
+  R-725: { kind: rule, scope: R-030 }
+  R-726: { kind: rule, scope: R-030 }
+  R-727: { kind: rule, scope: R-030 }
+  R-728: { kind: rule, scope: R-030 }
+  R-729: { kind: rule, scope: R-030 }
+  R-730: { kind: rule, scope: R-030 }
+  R-731: { kind: rule, scope: R-030 }
+  R-732: { kind: rule, scope: R-030 }
+  R-733: { kind: rule, scope: R-030 }
+  R-734: { kind: rule, scope: R-030 }
+  R-735: { kind: rule, scope: R-030, decision: same_as, same_as: R-690 }
+  R-736: { kind: rule, scope: R-031, decision: same_as, same_as: R-691 }
+  R-737: { kind: view, scope: R-030 }
+  R-738: { kind: rule, scope: R-030 }
+  R-739: { kind: rule, scope: R-019, decision: same_as, same_as: R-496 }
+  R-740: { kind: rule, scope: R-019, decision: same_as, same_as: R-497 }
+  R-741: { kind: rule, scope: R-030, decision: same_as, same_as: R-690 }
+  R-742: { kind: rule, scope: R-031, decision: same_as, same_as: R-691 }
+  R-743: { kind: rule, scope: R-030 }
+  R-744: { kind: rule, scope: R-055, decision: deferred }
+  R-745: { kind: view, scope: R-034, decision: same_as, same_as: R-377 }
+  R-746: { kind: view, scope: R-034, decision: same_as, same_as: R-378 }
+  R-747: { kind: view, scope: R-034, decision: same_as, same_as: R-379 }
+  R-748: { kind: rule, scope: R-034, decision: same_as, same_as: R-695 }
+  R-749: { kind: view, scope: R-030 }
+  R-750: { kind: rule, scope: R-012, decision: same_as, same_as: R-455 }
+  R-751: { kind: view, scope: R-030 }
+  R-752: { kind: view, scope: R-030 }
+
+  # §7.4 Доставка
+  R-753: { kind: rule, scope: R-030 }
+  R-754: { kind: act, scope: R-030 }
+  R-755: { kind: view, scope: R-030, decision: same_as, same_as: R-658 }
+  R-756: { kind: view, scope: R-030 }
+  R-757: { kind: view, scope: R-030, decision: same_as, same_as: R-463 }
+  R-758: { kind: reaction, scope: R-033 }
+  R-759: { kind: act, scope: R-032 }
+  R-760: { kind: rule, scope: R-031, decision: same_as, same_as: R-659 }
+  R-761: { kind: view, scope: R-031, decision: same_as, same_as: R-464 }
+  R-762: { kind: rule, scope: R-031, decision: same_as, same_as: R-662 }
+  R-763: { kind: rule, scope: R-039 }
+  R-764: { kind: entity, scope: R-039 }
+  R-765: { kind: entity, scope: R-033 }
+  R-766: { kind: entity, scope: R-033 }
+  R-767: { kind: rule, scope: R-033 }
+  R-768: { kind: rule, scope: R-030 }
+  R-769: { kind: rule, scope: R-032 }
+  R-770: { kind: rule, scope: R-055, decision: deferred }
+
+  # Ответы на вопросы прохода 7
+  R-771: { kind: rule, scope: R-033 }
+  R-772: { kind: act, scope: R-033 }
+
+  # §8 Архитектура
+  R-773: { kind: tech, scope: R-001 }
+  R-774: { kind: tech, scope: R-001 }
+  R-775: { kind: tech, scope: R-001 }
+  R-776: { kind: tech, scope: R-009 }
+  R-777: { kind: tech, scope: R-043 }
+  R-778: { kind: tech, scope: R-043 }
+  R-779: { kind: tech, scope: R-030 }
+  R-780: { kind: tech, scope: R-043 }
+  R-781: { kind: rule, scope: R-011 }
+  R-782: { kind: rule, scope: R-015, decision: same_as, same_as: R-422 }
+
+  # §9 Структура данных
+  R-783: { kind: rule, scope: R-011, decision: same_as, same_as: R-214 }
+  # users
+  R-784: { kind: entity, scope: R-005 }
+  R-785: { kind: entity, scope: R-005 }
+  R-786: { kind: entity, scope: R-008 }
+  R-787: { kind: rule, scope: R-008 }
+  R-788: { kind: entity, scope: R-005 }
+  R-789: { kind: entity, scope: R-035 }
+  R-790: { kind: rule, scope: R-005 }
+  R-791: { kind: rule, scope: R-008 }
+  R-792: { kind: rule, scope: R-008, decision: same_as, same_as: R-289 }
+  R-793: { kind: rule, scope: R-035 }
+  R-794: { kind: rule, scope: R-035 }
+  # chats
+  R-795: { kind: entity, scope: R-037 }
+  R-796: { kind: entity, scope: R-037 }
+  R-797: { kind: rule, scope: R-037 }
+  R-798: { kind: entity, scope: R-039 }
+  R-799: { kind: rule, scope: R-039 }
+  R-800: { kind: entity, scope: R-033 }
+  R-801: { kind: entity, scope: R-033 }
+  R-802: { kind: entity, scope: R-055, decision: deferred }
+  R-803:
+    kind: entity
+    scope: R-033
+    decision: withdrawn
+    note: рассылка включена, пока задано время, — отдельный флаг не нужен (решение 26.09)
+  R-804:
+    kind: entity
+    scope: R-055
+    decision: withdrawn
+    note: weekly_enabled убран вместе с daily_enabled (решение 26.09)
+  R-805: { kind: rule, scope: R-042 }
+  R-806: { kind: rule, scope: R-042 }
+  R-807: { kind: rule, scope: R-033, decision: same_as, same_as: R-767 }
+  R-808: { kind: rule, scope: R-031, decision: same_as, same_as: R-170 }
+  # projects
+  R-809: { kind: entity, scope: R-036 }
+  R-810: { kind: entity, scope: R-037, decision: same_as, same_as: R-160 }
+  R-811: { kind: entity, scope: R-036, decision: same_as, same_as: R-157 }
+  R-812: { kind: entity, scope: R-036, decision: same_as, same_as: R-158 }
+  R-813: { kind: entity, scope: R-038 }
+  R-814: { kind: rule, scope: R-003 }
+  R-815: { kind: entity, scope: R-036, decision: same_as, same_as: R-159 }
+  R-816: { kind: entity, scope: R-036 }
+  R-817: { kind: rule, scope: R-037, decision: same_as, same_as: R-541 }
+  R-818: { kind: rule, scope: R-002, decision: same_as, same_as: R-166 }
+  R-819: { kind: rule, scope: R-029, decision: same_as, same_as: R-162 }
+  R-820: { kind: rule, scope: R-023, decision: same_as, same_as: R-163 }
+  R-821: { kind: rule, scope: R-033, decision: same_as, same_as: R-164 }
+  # project_members
+  R-822: { kind: entity, scope: R-005 }
+  R-823: { kind: entity, scope: R-005 }
+  R-824: { kind: entity, scope: R-005 }
+  R-825: { kind: entity, scope: R-006 }
+  R-826: { kind: entity, scope: R-042 }
+  R-827: { kind: rule, scope: R-037, decision: same_as, same_as: R-570 }
+  R-828: { kind: rule, scope: R-005 }
+  R-829: { kind: rule, scope: R-001, decision: same_as, same_as: R-470 }
+  R-830: { kind: rule, scope: R-039 }
+  # tasks — поля повторяют §2.2
+  R-831: { kind: entity, scope: R-009 }
+  R-832: { kind: entity, scope: R-009, decision: same_as, same_as: R-205 }
+  R-833: { kind: entity, scope: R-009, decision: same_as, same_as: R-201 }
+  R-834: { kind: entity, scope: R-009, decision: same_as, same_as: R-202 }
+  R-835: { kind: entity, scope: R-009, decision: same_as, same_as: R-208 }
+  R-836: { kind: entity, scope: R-010, decision: same_as, same_as: R-206 }
+  R-837: { kind: entity, scope: R-009, decision: same_as, same_as: R-207 }
+  R-838: { kind: entity, scope: R-009, decision: same_as, same_as: R-209 }
+  R-839: { kind: entity, scope: R-009, decision: same_as, same_as: R-210 }
+  R-840: { kind: entity, scope: R-009, decision: same_as, same_as: R-211 }
+  R-841: { kind: rule, scope: R-009 }
+  R-842: { kind: rule, scope: R-011, decision: same_as, same_as: R-214 }
+  R-843: { kind: rule, scope: R-014, decision: same_as, same_as: R-216 }
+  R-844: { kind: rule, scope: R-014, decision: same_as, same_as: R-215 }
+  # blockers
+  R-845: { kind: entity, scope: R-024 }
+  R-846: { kind: entity, scope: R-024 }
+  R-847: { kind: entity, scope: R-024, decision: same_as, same_as: R-263 }
+  R-848: { kind: entity, scope: R-024 }
+  R-849: { kind: entity, scope: R-024 }
+  R-850: { kind: rule, scope: R-024 }
+  R-851: { kind: rule, scope: R-025 }
+  R-852: { kind: rule, scope: R-025 }
+  # canvases
+  R-853: { kind: entity, scope: R-001 }
+  R-854: { kind: entity, scope: R-001 }
+  R-855: { kind: entity, scope: R-001 }
+  R-856: { kind: entity, scope: R-001 }
+  R-857: { kind: entity, scope: R-001 }
+  R-858: { kind: entity, scope: R-001 }
+  R-859: { kind: entity, scope: R-001 }
+  R-860: { kind: rule, scope: R-001, decision: same_as, same_as: R-618 }
+  # canvas_items
+  R-861: { kind: entity, scope: R-018 }
+  R-862: { kind: entity, scope: R-018 }
+  R-863: { kind: entity, scope: R-018 }
+  R-864: { kind: entity, scope: R-018 }
+  R-865: { kind: entity, scope: R-029 }
+  R-866: { kind: entity, scope: R-018 }
+  R-867: { kind: rule, scope: R-018 }
+  R-868: { kind: rule, scope: R-018 }
+  # repositories
+  R-869: { kind: entity, scope: R-038 }
+  R-870: { kind: entity, scope: R-038 }
+  R-871: { kind: entity, scope: R-038 }
+  R-872: { kind: entity, scope: R-025 }
+  # issues
+  R-873: { kind: entity, scope: R-012 }
+  R-874: { kind: entity, scope: R-012 }
+  R-875: { kind: entity, scope: R-012 }
+  R-876: { kind: entity, scope: R-017 }
+  R-877: { kind: entity, scope: R-012 }
+  R-878: { kind: entity, scope: R-012 }
+  R-879: { kind: rule, scope: R-012 }
+  R-880: { kind: entity, scope: R-045 }
+  R-881: { kind: entity, scope: R-012 }
+  R-882: { kind: entity, scope: R-017 }
+  R-883: { kind: rule, scope: R-012 }
+  R-884: { kind: rule, scope: R-002 }
+  R-885: { kind: rule, scope: R-012 }
+  # issue_assignees
+  R-886: { kind: entity, scope: R-015 }
+  R-887: { kind: entity, scope: R-015 }
+  R-888: { kind: entity, scope: R-015 }
+  R-889: { kind: rule, scope: R-015 }
+  R-890: { kind: rule, scope: R-015 }
+  # issue_dependencies
+  R-891: { kind: entity, scope: R-017 }
+  R-892: { kind: entity, scope: R-017 }
+  R-893: { kind: entity, scope: R-017 }
+  R-894: { kind: view, scope: R-017, decision: same_as, same_as: R-386 }
+  # milestones
+  R-895: { kind: entity, scope: R-021 }
+  R-896: { kind: entity, scope: R-021 }
+  R-897: { kind: entity, scope: R-021 }
+  R-898: { kind: entity, scope: R-021 }
+  R-899: { kind: entity, scope: R-021 }
+  R-900: { kind: entity, scope: R-021 }
+  R-901: { kind: entity, scope: R-021, decision: same_as, same_as: R-189 }
+  R-902: { kind: rule, scope: R-011, decision: same_as, same_as: R-190 }
+  R-903: { kind: rule, scope: R-021, decision: same_as, same_as: R-193 }
+  # pull_requests
+  R-904: { kind: entity, scope: R-021 }
+  R-905: { kind: entity, scope: R-021 }
+  R-906: { kind: entity, scope: R-021 }
+  R-907: { kind: entity, scope: R-021 }
+  R-908: { kind: entity, scope: R-026 }
+  R-909: { kind: entity, scope: R-021 }
+  R-910: { kind: entity, scope: R-026 }
+  R-911: { kind: entity, scope: R-026 }
+  R-912: { kind: entity, scope: R-034 }
+  R-913: { kind: entity, scope: R-034 }
+  # commits
+  R-914: { kind: entity, scope: R-034 }
+  R-915: { kind: entity, scope: R-034 }
+  R-916: { kind: entity, scope: R-034 }
+  R-917: { kind: entity, scope: R-034 }
+  R-918: { kind: entity, scope: R-045 }
+  R-919: { kind: entity, scope: R-034 }
+  R-920: { kind: rule, scope: R-034 }
+  R-921: { kind: rule, scope: R-034 }
+  # progress_snapshots
+  R-922: { kind: entity, scope: R-022 }
+  R-923: { kind: entity, scope: R-022 }
+  R-924: { kind: entity, scope: R-022 }
+  R-925: { kind: entity, scope: R-022 }
+  R-926: { kind: entity, scope: R-022, decision: same_as, same_as: R-466 }
+  R-927: { kind: rule, scope: R-002, decision: same_as, same_as: R-174 }
+  R-928: { kind: rule, scope: R-022, decision: same_as, same_as: R-188 }
+  # events
+  R-929: { kind: entity, scope: R-043 }
+  R-930: { kind: entity, scope: R-043 }
+  R-931: { kind: entity, scope: R-043 }
+  R-932: { kind: entity, scope: R-043 }
+  R-933: { kind: entity, scope: R-043 }
+  R-934: { kind: rule, scope: R-043 }
+
+  # Ответы на вопросы прохода 8
+  R-935: { kind: rule, scope: R-024 }
+  R-936: { kind: rule, scope: R-026 }
+  R-937: { kind: view, scope: R-021, decision: same_as, same_as: R-938 }
+  R-938: { kind: view, scope: R-021 }
+
+  # §10 AI-слой — вне MVP: пересказ в «Дальше» (R-057), AI целиком не входит (R-054)
+  R-939: { kind: reaction, scope: R-057, decision: deferred }
+  R-940: { kind: reaction, scope: R-961, decision: deferred }
+  R-941: { kind: rule, scope: R-057, decision: deferred }
+  R-942: { kind: rule, scope: R-057, decision: deferred }
+  R-943: { kind: rule, scope: R-057, decision: deferred }
+  R-944: { kind: rule, scope: R-057, decision: deferred }
+  R-945: { kind: rule, scope: R-057, decision: deferred }
+
+  # §11 Definition of Done
+  R-946: { kind: rule, scope: R-009 }
+  R-947: { kind: rule, scope: R-009 }
+  R-948: { kind: rule, scope: R-009 }
+  R-949: { kind: rule, scope: R-009 }
+  R-950: { kind: rule, scope: R-009 }
+
+  # §13 Критерий успеха
+  R-951: { kind: metric, scope: R-001 }
+  R-952: { kind: metric, scope: R-001 }
+  R-953: { kind: metric, scope: R-016 }
+  R-954: { kind: metric, scope: R-013 }
+  R-955: { kind: metric, scope: R-015 }
+  R-956: { kind: metric, scope: R-018 }
+  R-957: { kind: metric, scope: R-020 }
+  R-958: { kind: view, scope: R-021, decision: same_as, same_as: R-357 }
+  R-959: { kind: rule, scope: R-009 }
+  R-960: { kind: rule, scope: R-014, decision: same_as, same_as: R-081 }
+
+  # Ответ на вопрос прохода 9
+  R-961: { kind: scope, release: later }
+
+  # Решение 26.09 при шаге 2 PDA
+  R-962: { kind: rule, scope: R-018 }
