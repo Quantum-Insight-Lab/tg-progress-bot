@@ -334,7 +334,11 @@ atoms:
   R-271: { kind: reaction, scope: R-025 }
   R-272: { kind: rule, scope: R-025 }
   R-273: { kind: reaction, scope: R-026 }
-  R-274: { kind: rule, scope: R-026 }
+  R-274:
+    kind: rule
+    scope: R-026
+    decision: withdrawn
+    note: PR относится к участнику только по автору (решение 26.09) — R-936
   R-275: { kind: rule, scope: R-026 }
   R-276: { kind: view, scope: R-026 }
   R-277: { kind: rule, scope: R-020 }
@@ -483,7 +487,11 @@ atoms:
   R-390: { kind: view, scope: R-025 }
   R-391: { kind: rule, scope: R-002 }
   R-392: { kind: rule, scope: R-026 }
-  R-393: { kind: rule, scope: R-026 }
+  R-393:
+    kind: rule
+    scope: R-026
+    decision: withdrawn
+    note: запрошенный ревьюер не учитывается (решение 26.09)
   R-394: { kind: rule, scope: R-045 }
   R-395: { kind: rule, scope: R-045 }
   R-396: { kind: rule, scope: R-002 }
@@ -491,7 +499,11 @@ atoms:
   R-398: { kind: rule, scope: R-021 }
   R-399: { kind: view, scope: R-020 }
   R-400: { kind: rule, scope: R-026 }
-  R-401: { kind: rule, scope: R-026 }
+  R-401:
+    kind: rule
+    scope: R-026
+    decision: withdrawn
+    note: случай «автор и ревьюер в проекте» снят вместе с ревьюером (решение 26.09)
   R-402: { kind: rule, scope: R-026 }
 
   # §3.3 Расхождение учёта
@@ -974,12 +986,13 @@ atoms:
   R-803:
     kind: entity
     scope: R-033
-    decision: clarify
-    defect: D-5
-    note: >-
-      `daily_enabled` — отдельный флаг включения, а по решению прохода 7 рассылка включена, пока задано время
-      (R-771), отдельного переключателя нет. Убрать `daily_enabled` и по аналогии `weekly_enabled`?
-  R-804: { kind: entity, scope: R-055, decision: deferred }
+    decision: withdrawn
+    note: рассылка включена, пока задано время, — отдельный флаг не нужен (решение 26.09)
+  R-804:
+    kind: entity
+    scope: R-055
+    decision: withdrawn
+    note: weekly_enabled убран вместе с daily_enabled (решение 26.09)
   R-805: { kind: rule, scope: R-042 }
   R-806: { kind: rule, scope: R-042 }
   R-807: { kind: rule, scope: R-033, decision: same_as, same_as: R-767 }
@@ -1028,14 +1041,7 @@ atoms:
   R-846: { kind: entity, scope: R-024 }
   R-847: { kind: entity, scope: R-024, decision: same_as, same_as: R-263 }
   R-848: { kind: entity, scope: R-024 }
-  R-849:
-    kind: entity
-    scope: R-024
-    decision: clarify
-    defect: D-2
-    note: >-
-      Когда блокер закрывается (`resolved_at`)? Про «нет блокера» сказано (R-257), а если задачу отметили
-      галочкой, отправили в план или отменили — не сказано.
+  R-849: { kind: entity, scope: R-024 }
   R-850: { kind: rule, scope: R-024 }
   R-851: { kind: rule, scope: R-025 }
   R-852: { kind: rule, scope: R-025 }
@@ -1055,14 +1061,7 @@ atoms:
   R-864: { kind: entity, scope: R-018 }
   R-865: { kind: entity, scope: R-029 }
   R-866: { kind: entity, scope: R-018 }
-  R-867:
-    kind: rule
-    scope: R-018
-    decision: clarify
-    defect: D-5
-    note: >-
-      Перечень кнопок устарел: после решений прохода 2 и 5 есть ещё «вернуть» (R-327) и «в работу» (R-579).
-      Написать общо — «кнопки задачи в таблицу не складываются»?
+  R-867: { kind: rule, scope: R-018 }
   R-868: { kind: rule, scope: R-018 }
   # repositories
   R-869: { kind: entity, scope: R-038 }
@@ -1109,14 +1108,7 @@ atoms:
   R-905: { kind: entity, scope: R-021 }
   R-906: { kind: entity, scope: R-021 }
   R-907: { kind: entity, scope: R-021 }
-  R-908:
-    kind: entity
-    scope: R-026
-    decision: clarify
-    defect: D-2
-    note: >-
-      PR относится к участнику по автору и запрошенному ревьюеру (R-392, R-393), но запрошенных ревьюеров
-      в `pull_requests` нет. Добавить таблицу ревьюеров?
+  R-908: { kind: entity, scope: R-026 }
   R-909: { kind: entity, scope: R-021 }
   R-910: { kind: entity, scope: R-026 }
   R-911: { kind: entity, scope: R-026 }
@@ -1129,14 +1121,7 @@ atoms:
   R-917: { kind: entity, scope: R-034 }
   R-918: { kind: entity, scope: R-045 }
   R-919: { kind: entity, scope: R-034 }
-  R-920:
-    kind: rule
-    scope: R-034
-    decision: clarify
-    defect: D-5
-    note: >-
-      «Хвост для строки GitHub на канвасе», но строка GitHub на канвасе коммитов не показывает (§3.1, R-357);
-      коммиты нужны блоку отчёта (R-379) и сигналу расхождения (R-408).
+  R-920: { kind: rule, scope: R-034 }
   R-921: { kind: rule, scope: R-034 }
   # progress_snapshots
   R-922: { kind: entity, scope: R-022 }
@@ -1153,3 +1138,9 @@ atoms:
   R-932: { kind: entity, scope: R-043 }
   R-933: { kind: entity, scope: R-043 }
   R-934: { kind: rule, scope: R-043 }
+
+  # Ответы на вопросы прохода 8
+  R-935: { kind: rule, scope: R-024 }
+  R-936: { kind: rule, scope: R-026 }
+  R-937: { kind: view, scope: R-021, decision: same_as, same_as: R-938 }
+  R-938: { kind: view, scope: R-021 }
