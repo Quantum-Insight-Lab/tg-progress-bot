@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { check, splitBlocks, type Finding, type Rule } from '../scripts/tz-check.ts';
+import { check, parsePdaElements, splitBlocks, type Finding, type Rule } from '../scripts/tz-check.ts';
 
 const registry = (atoms: string, glossary = ''): string => `source: tz.md\n${glossary}atoms:\n${atoms}`;
 
@@ -193,5 +193,51 @@ describe('GATE: готовность ТЗ к шагу 1', () => {
 
   it('на шаге 0 gate не проверяется', () => {
     expect(messages(run(markdown, registry(atoms)), 'GATE')).toEqual([]);
+  });
+});
+
+describe('PDA: колонка «Из ТЗ»', () => {
+  const atoms = [
+    '  R-001: { kind: scope, release: mvp }',
+    '  R-002: { kind: rule, scope: R-001 }',
+    '  R-003: { kind: rule, scope: R-001, decision: withdrawn, note: снят }',
+    '',
+  ].join('\n');
+  const tz = '{R-001} a\n\n{R-002} b';
+  const table = (rows: string[]): string => ['| ID | Неопределённость | Из ТЗ |', '| --- | --- | --- |', ...rows].join('\n');
+  const runPda = (text: string): Finding[] =>
+    check(registry(atoms), () => tz, { gate: false }, [{ file: 'docs/pda/01.md', text }]).findings;
+
+  it('читает ID и ссылки только из таблиц с колонкой «Из ТЗ»', () => {
+    const text = [
+      table(['| U-1 | что сделано? | R-002, R-001 |', '| U-2 | кто? | derived: повтор доставки |']),
+      '',
+      '| ID | Без ссылок |',
+      '| --- | --- |',
+      '| X-1 | мимо |',
+    ].join('\n');
+    const elements = parsePdaElements({ file: 'f.md', text });
+    expect(elements.map((e) => [e.id, e.line, e.refs, e.derived])).toEqual([
+      ['U-1', 3, ['R-002', 'R-001'], false],
+      ['U-2', 4, [], true],
+    ]);
+  });
+
+  it('TR-5: элемент без ссылок и без derived', () => {
+    expect(messages(runPda(table(['| U-1 | что? | — |'])), 'TR-5')).toEqual([
+      'docs/pda/01.md:3: U-1 не ссылается на атомы ТЗ; решение архитектуры помечается «derived: причина»',
+    ]);
+  });
+
+  it('TR-2: ссылка на несуществующий и отозванный атом, дубль ID', () => {
+    const tr2 = messages(runPda(table(['| U-1 | a | R-009 |', '| U-1 | b | R-003 |'])), 'TR-2').join('\n');
+    expect(tr2).toContain('U-1 → R-009: такого атома нет');
+    expect(tr2).toContain('U-1 → R-003: атом отозван');
+    expect(tr2).toContain('U-1 определён дважды');
+  });
+
+  it('корректная таблица проходит', () => {
+    const findings = runPda(table(['| U-1 | a | R-002 |']));
+    expect(findings.filter((f) => f.rule === 'TR-2' || f.rule === 'TR-5')).toEqual([]);
   });
 });

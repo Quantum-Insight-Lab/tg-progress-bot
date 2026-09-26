@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 
@@ -46,11 +47,25 @@ export interface SectionReport {
   started: boolean;
 }
 
-export type Rule = 'TR-1' | 'TR-2' | 'TR-3' | 'REG' | 'GATE';
+export type Rule = 'TR-1' | 'TR-2' | 'TR-3' | 'TR-5' | 'REG' | 'GATE';
 
 export interface Finding {
   rule: Rule;
   message: string;
+}
+
+export interface PdaDoc {
+  file: string;
+  text: string;
+}
+
+/** Строка таблицы PDA с колонкой «Из ТЗ»: элемент (U-1, A-3, INV-02…) и атомы, из которых он выведен. */
+export interface PdaElement {
+  id: string;
+  file: string;
+  line: number;
+  refs: string[];
+  derived: boolean;
 }
 
 export interface CheckResult {
@@ -60,10 +75,14 @@ export interface CheckResult {
   sections: SectionReport[];
   anchors: Map<string, number[]>;
   registry: Registry;
+  elements: PdaElement[];
   findings: Finding[];
 }
 
 export const REGISTRY_PATH = 'contracts/tz-registry.yaml';
+export const PDA_DIR = 'docs/pda';
+const FROM_TZ_COLUMN = 'Из ТЗ';
+const ELEMENT_ID = /^[A-Z]+-\d+$/;
 
 const ANCHOR_AT_START = /^\{(?:R-\d{3,}|ctx)\}/;
 const ANY_ANCHOR = /\{(?:R-\d{3,}|ctx)\}/;
@@ -387,15 +406,76 @@ export function checkGate(registry: Registry): Finding[] {
   return findings;
 }
 
-export function check(registryText: string, readSource: (path: string) => string, options: { gate: boolean }): CheckResult {
+function tableCells(row: string): string[] {
+  return row.replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+}
+
+/** Элементы PDA — строки таблиц, где есть колонка «Из ТЗ», а первая ячейка — ID вида U-1. */
+export function parsePdaElements(doc: PdaDoc): PdaElement[] {
+  const elements: PdaElement[] = [];
+  let header: string[] | null = null;
+  for (const [index, raw] of doc.text.split(/\r?\n/).entries()) {
+    const text = raw.trim();
+    if (!text.startsWith('|')) {
+      header = null;
+      continue;
+    }
+    if (header === null) {
+      header = tableCells(text);
+      continue;
+    }
+    const refColumn = header.indexOf(FROM_TZ_COLUMN);
+    const cells = tableCells(text);
+    const id = cells[0] ?? '';
+    if (refColumn < 0 || !ELEMENT_ID.test(id)) continue;
+    const refs = cells[refColumn] ?? '';
+    elements.push({
+      id,
+      file: doc.file,
+      line: index + 1,
+      refs: [...refs.matchAll(/R-\d{3,}/g)].map((match) => match[0]),
+      derived: refs.includes('derived:'),
+    });
+  }
+  return elements;
+}
+
+/** TR-2 для ссылок из PDA и TR-5: элемент ссылается на атомы или помечен «derived: причина». */
+export function checkPda(elements: PdaElement[], registry: Registry): Finding[] {
+  const findings: Finding[] = [];
+  const seen = new Map<string, PdaElement>();
+  for (const element of elements) {
+    const where = `${element.file}:${element.line}`;
+    const first = seen.get(element.id);
+    if (first) findings.push({ rule: 'TR-2', message: `${element.id} определён дважды: ${first.file}:${first.line} и ${where}` });
+    else seen.set(element.id, element);
+    if (element.refs.length === 0 && !element.derived) {
+      findings.push({ rule: 'TR-5', message: `${where}: ${element.id} не ссылается на атомы ТЗ; решение архитектуры помечается «derived: причина»` });
+    }
+    for (const ref of element.refs) {
+      const atom = registry.atoms.get(ref);
+      if (!atom) findings.push({ rule: 'TR-2', message: `${where}: ${element.id} → ${ref}: такого атома нет` });
+      else if (atom.decision === 'withdrawn') findings.push({ rule: 'TR-2', message: `${where}: ${element.id} → ${ref}: атом отозван` });
+    }
+  }
+  return findings;
+}
+
+export function check(
+  registryText: string,
+  readSource: (path: string) => string,
+  options: { gate: boolean },
+  pdaDocs: PdaDoc[] = [],
+): CheckResult {
   const { registry, findings } = parseRegistry(registryText);
   const markdown = registry.source ? readSource(registry.source) : '';
   const blocks = splitBlocks(markdown);
   const anchors = collectAnchors(markdown);
+  const elements = pdaDocs.flatMap(parsePdaElements);
   const tr1 = checkBlocks(blocks, options.gate);
-  findings.push(...tr1.findings, ...checkIds(anchors, registry), ...checkScope(registry));
+  findings.push(...tr1.findings, ...checkIds(anchors, registry), ...checkScope(registry), ...checkPda(elements, registry));
   if (options.gate) findings.push(...checkGate(registry));
-  return { gate: options.gate, source: registry.source, blocks, sections: tr1.sections, anchors, registry, findings };
+  return { gate: options.gate, source: registry.source, blocks, sections: tr1.sections, anchors, registry, elements, findings };
 }
 
 function countBy<T>(items: Iterable<T>, key: (item: T) => string | undefined): string {
@@ -418,6 +498,7 @@ export function formatReport(result: CheckResult): string {
     ['TR-1', `блоков ${blocks.length}, с якорем ${anchored}; размечено разделов ${started.length} из ${sections.length}`],
     ['TR-2', `атомов ${atoms.length}, следующий номер ${formatId(Math.max(0, ...numbers) + 1)}`],
     ['TR-3', `релизы scope: ${countBy(atoms, (a) => (a.kind === 'scope' ? a.release : undefined))}`],
+    ['TR-5', `элементов PDA: ${countBy(result.elements, (e) => e.id.split('-')[0])}; ссылок на атомы: ${result.elements.reduce((n, e) => n + e.refs.length, 0)}`],
     ['REG', `виды: ${countBy(atoms, (a) => a.kind)}; решения: ${countBy(atoms, (a) => a.decision)}`],
   ];
   if (result.gate) rules.push(['GATE', 'D-1…D-6 по 10.10']);
@@ -446,10 +527,24 @@ export function formatReport(result: CheckResult): string {
   return lines.join('\n');
 }
 
+function readPdaDocs(): PdaDoc[] {
+  if (!existsSync(PDA_DIR)) return [];
+  return readdirSync(PDA_DIR)
+    .filter((name) => name.endsWith('.md'))
+    .sort()
+    .map((name) => {
+      const file = join(PDA_DIR, name);
+      return { file, text: readFileSync(file, 'utf8') };
+    });
+}
+
 function main(argv: string[]): number {
-  const result = check(readFileSync(REGISTRY_PATH, 'utf8'), (path) => readFileSync(path, 'utf8'), {
-    gate: argv.includes('--gate'),
-  });
+  const result = check(
+    readFileSync(REGISTRY_PATH, 'utf8'),
+    (path) => readFileSync(path, 'utf8'),
+    { gate: argv.includes('--gate') },
+    readPdaDocs(),
+  );
   console.log(formatReport(result));
   return result.findings.length === 0 ? 0 : 1;
 }
