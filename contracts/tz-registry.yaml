@@ -29,14 +29,7 @@ atoms:
   R-019: { kind: scope, release: mvp }
   R-020: { kind: scope, release: mvp }
   R-021: { kind: scope, release: mvp }
-  R-022:
-    kind: scope
-    release: mvp
-    decision: clarify
-    defect: D-5
-    note: >-
-      MVP п.5 включает «короткую динамику» (и §5 рисует строку последних снимков доли),
-      а «Дальше» откладывает «динамику по снимкам» (R-059). Что из динамики входит в MVP?
+  R-022: { kind: scope, release: mvp }
   R-023: { kind: scope, release: mvp }
   R-024: { kind: scope, release: mvp }
   R-025: { kind: scope, release: mvp }
