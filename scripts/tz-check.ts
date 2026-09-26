@@ -92,15 +92,73 @@ const ELEMENT_ID = /^[A-Z]+-\d+$/;
  */
 export const COVERED_BY: Readonly<Record<Kind, readonly string[]>> = {
   act: ['A'],
-  reaction: ['A'],
+  reaction: ['A', 'EV'],
   rule: ['INV', 'E', 'L'],
   entity: ['E', 'L'],
   view: ['P'],
-  integration: ['B'],
+  integration: ['B', 'EV'],
   tech: ['B'],
   metric: ['M'],
   scope: [],
 };
+
+export const EVENT_REGISTRY_PATH = 'contracts/event-registry.yaml';
+const EVENT_FIELDS = ['type', 'version', 'context', 'actor', 'subject', 'payload', 'idempotency_key', 'invariants', 'owner'] as const;
+const ACT_EVENT_COLUMN = 'Порождает событие';
+
+/** События реестра — элементы PDA с префиксом EV: `realizes` — их ссылки на атомы (патч 1.3, 10.8). */
+export function parseEventRegistry(text: string, file = EVENT_REGISTRY_PATH): { elements: PdaElement[]; findings: Finding[] } {
+  const elements: PdaElement[] = [];
+  const findings: Finding[] = [];
+  let root: unknown;
+  try {
+    root = parseYaml(text);
+  } catch (error) {
+    findings.push({ rule: 'TR-2', message: `${file}: YAML не разбирается: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}` });
+    return { elements, findings };
+  }
+  const events = isRecord(root) && Array.isArray(root.events) ? root.events : [];
+  for (const [index, value] of events.entries()) {
+    if (!isRecord(value) || typeof value.type !== 'string') {
+      findings.push({ rule: 'TR-2', message: `${file}: событие №${index + 1} без type` });
+      continue;
+    }
+    const missing = EVENT_FIELDS.filter((field) => value[field] === undefined);
+    if (missing.length > 0) findings.push({ rule: 'TR-2', message: `${file}: ${value.type} — нет полей ${missing.join(', ')}` });
+    const refs = Array.isArray(value.realizes) ? value.realizes.filter((ref): ref is string => typeof ref === 'string') : [];
+    const invariants = Array.isArray(value.invariants) ? value.invariants.filter((inv): inv is string => typeof inv === 'string') : [];
+    elements.push({
+      id: `EV-${value.type}`,
+      file,
+      line: index + 1,
+      refs,
+      derived: typeof value.derived === 'string' && value.derived.trim() !== '',
+      cells: { invariants: invariants.join(', ') },
+    });
+  }
+  return { elements, findings };
+}
+
+/** TR-2 между PDA и реестром: события из таблицы актов существуют, инварианты событий определены в 04. */
+export function checkEventLinks(elements: PdaElement[]): Finding[] {
+  const findings: Finding[] = [];
+  const events = new Set(elements.filter((e) => e.id.startsWith('EV-')).map((e) => e.id.slice(3)));
+  const invariants = new Set(elements.filter((e) => e.id.startsWith('INV-')).map((e) => e.id));
+  if (events.size === 0) return findings;
+  for (const element of elements) {
+    if (element.id.startsWith('A-')) {
+      for (const name of backticked(element.cells[ACT_EVENT_COLUMN])) {
+        if (!events.has(name)) findings.push({ rule: 'TR-2', message: `${element.file}:${element.line}: ${element.id} → событие ${name}: его нет в реестре` });
+      }
+    }
+    if (element.id.startsWith('EV-')) {
+      for (const inv of (element.cells.invariants ?? '').split(', ').filter(Boolean)) {
+        if (!invariants.has(inv)) findings.push({ rule: 'TR-2', message: `${element.file}: ${element.id.slice(3)} → ${inv}: такого инварианта нет` });
+      }
+    }
+  }
+  return findings;
+}
 
 export type Coverage = 'covered' | 'partial' | 'orphan';
 
@@ -553,14 +611,23 @@ export function check(
   readSource: (path: string) => string,
   options: { gate: boolean },
   pdaDocs: PdaDoc[] = [],
+  eventRegistryText?: string,
 ): CheckResult {
   const { registry, findings } = parseRegistry(registryText);
   const markdown = registry.source ? readSource(registry.source) : '';
   const blocks = splitBlocks(markdown);
   const anchors = collectAnchors(markdown);
-  const elements = pdaDocs.flatMap(parsePdaElements);
+  const events = eventRegistryText === undefined ? { elements: [], findings: [] } : parseEventRegistry(eventRegistryText);
+  const elements = [...pdaDocs.flatMap(parsePdaElements), ...events.elements];
   const tr1 = checkBlocks(blocks, options.gate);
-  findings.push(...tr1.findings, ...checkIds(anchors, registry), ...checkScope(registry), ...checkPda(elements, registry));
+  findings.push(
+    ...tr1.findings,
+    ...checkIds(anchors, registry),
+    ...checkScope(registry),
+    ...events.findings,
+    ...checkPda(elements, registry),
+    ...checkEventLinks(elements),
+  );
   if (options.gate) findings.push(...checkGate(registry));
   return { gate: options.gate, source: registry.source, blocks, sections: tr1.sections, anchors, registry, elements, findings };
 }
@@ -656,6 +723,7 @@ function main(argv: string[]): number {
     (path) => readFileSync(path, 'utf8'),
     { gate: argv.includes('--gate') },
     readPdaDocs(),
+    existsSync(EVENT_REGISTRY_PATH) ? readFileSync(EVENT_REGISTRY_PATH, 'utf8') : undefined,
   );
   console.log(formatReport(result));
   const uncovered = argv.indexOf('--uncovered');

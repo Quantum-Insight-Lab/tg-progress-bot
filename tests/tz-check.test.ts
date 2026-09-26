@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { atomTexts, check, coverage, parsePdaElements, splitBlocks, type Finding, type Rule } from '../scripts/tz-check.ts';
+import {
+  atomTexts,
+  check,
+  coverage,
+  parseEventRegistry,
+  parsePdaElements,
+  splitBlocks,
+  type Finding,
+  type Rule,
+} from '../scripts/tz-check.ts';
 
 const registry = (atoms: string, glossary = ''): string => `source: tz.md\n${glossary}atoms:\n${atoms}`;
 
@@ -239,6 +248,55 @@ describe('PDA: колонка «Из ТЗ»', () => {
   it('корректная таблица проходит', () => {
     const findings = runPda(table(['| U-1 | a | R-002 |']));
     expect(findings.filter((f) => f.rule === 'TR-2' || f.rule === 'TR-5')).toEqual([]);
+  });
+});
+
+describe('Реестр событий', () => {
+  const atoms = ['  R-001: { kind: scope, release: mvp }', '  R-002: { kind: reaction, scope: R-001 }', ''].join('\n');
+  const tz = '{R-001} a\n\n{R-002} b';
+  const event = (extra: string): string =>
+    [
+      'events:',
+      '  - type: task.created',
+      '    version: 1',
+      '    context: tasks',
+      '    actor: assignee',
+      '    subject: Task',
+      '    payload: { task_id: string }',
+      '    idempotency_key: update_id',
+      '    owner: max',
+      extra,
+    ].join('\n');
+  const pda = [
+    '| ID | Акт | Порождает событие | Из ТЗ |',
+    '| --- | --- | --- | --- |',
+    '| A-1 | завести | `task.created`, `task.lost` | R-002 |',
+    '',
+    '| ID | Формулировка | Из ТЗ |',
+    '| --- | --- | --- |',
+    '| INV-01 | закон | derived: пример |',
+  ].join('\n');
+  const run = (registryText: string): Finding[] =>
+    check(registry(atoms), () => tz, { gate: false }, [{ file: 'p.md', text: pda }], registryText).findings;
+
+  it('событие с realizes покрывает reaction', () => {
+    const text = event('    invariants: [INV-01]\n    realizes: [R-002]');
+    const result = check(registry(atoms), () => tz, { gate: false }, [], text);
+    expect(coverage(result.registry, result.elements).map((r) => [r.id, r.status, r.refs])).toEqual([['R-002', 'covered', ['EV-task.created']]]);
+  });
+
+  it('событие из таблицы актов обязано быть в реестре, инвариант события — в 04', () => {
+    const tr2 = messages(run(event('    invariants: [INV-01, INV-99]\n    realizes: [R-002]')), 'TR-2').join('\n');
+    expect(tr2).toContain('A-1 → событие task.lost: его нет в реестре');
+    expect(tr2).toContain('task.created → INV-99: такого инварианта нет');
+    expect(tr2).not.toContain('task.created: его нет');
+  });
+
+  it('обязательные поля и realizes', () => {
+    const { elements, findings } = parseEventRegistry('events:\n  - type: task.checked\n    version: 1\n');
+    expect(findings.map((f) => f.message).join('\n')).toContain('task.checked — нет полей context, actor, subject, payload, idempotency_key, invariants, owner');
+    expect(messages(check(registry(atoms), () => tz, { gate: false }, [], 'events:\n  - type: x.y\n').findings, 'TR-5')[0]).toContain('EV-x.y не ссылается на атомы ТЗ');
+    expect(elements.map((e) => e.id)).toEqual(['EV-task.checked']);
   });
 });
 
