@@ -5,6 +5,8 @@ source: docs/tz.md
 glossary:
   ветка: топик исполнителя в супергруппе проекта; «ветка исполнителя» и «топик исполнителя» — одно и то же
   топик: topic Telegram внутри супергруппы — топик исполнителя или командный топик
+  линейка: прогресс проекта — доля completed issues репозитория и остаток открытых; «процент проекта» и «доля бэклога» — то же самое
+  задача: шаг, который человек ведёт в боте; issue задачей не является и задачу не порождает
 
 atoms:
   # §12 Объём работ · MVP
@@ -81,3 +83,122 @@ atoms:
   R-064: { kind: scope, release: later }
   R-065: { kind: scope, release: later }
   R-066: { kind: scope, release: later }
+
+  # Преамбула
+  R-067: { kind: entity, scope: R-009 }
+  R-068: { kind: integration, scope: R-043 }
+  R-069: { kind: integration, scope: R-043 }
+  R-070: { kind: integration, scope: R-043 }
+  R-071: { kind: integration, scope: R-043 }
+  R-072: { kind: integration, scope: R-043 }
+  R-073: { kind: integration, scope: R-043 }
+  R-074: { kind: rule, scope: R-011 }
+  R-075: { kind: entity, scope: R-008 }
+  R-076: { kind: entity, scope: R-038 }
+  R-077: { kind: rule, scope: R-011 }
+  R-078: { kind: rule, scope: R-027 }
+  R-079: { kind: rule, scope: R-012 }
+  R-080: { kind: rule, scope: R-013 }
+  R-081: { kind: rule, scope: R-014 }
+
+  # Цель
+  R-082: { kind: tech, scope: R-001 }
+  R-083: { kind: rule, scope: R-001 }
+  R-084: { kind: integration, scope: R-043 }
+  R-085: { kind: view, scope: R-021 }
+  R-086: { kind: rule, scope: R-009 }
+  R-087: { kind: view, scope: R-017 }
+  R-088: { kind: view, scope: R-018 }
+  R-089: { kind: view, scope: R-020 }
+  R-090: { kind: view, scope: R-019 }
+  R-091: { kind: tech, scope: R-001, decision: same_as, same_as: R-082 }
+  R-092: { kind: tech, scope: R-012 }
+  R-093: { kind: tech, scope: R-015 }
+  R-094: { kind: integration, scope: R-012 }
+  R-095: { kind: integration, scope: R-043, decision: same_as, same_as: R-069 }
+  R-096: { kind: integration, scope: R-043, decision: same_as, same_as: R-070 }
+  R-097: { kind: integration, scope: R-043, decision: same_as, same_as: R-071 }
+  R-098: { kind: integration, scope: R-043, decision: same_as, same_as: R-072 }
+  R-099: { kind: rule, scope: R-012 }
+  R-100: { kind: view, scope: R-016 }
+  R-101: { kind: rule, scope: R-012 }
+
+  # §1 Основной сценарий
+  R-102: { kind: entity, scope: R-042 }
+  R-103:
+    kind: rule
+    scope: R-001
+    decision: clarify
+    defect: D-5
+    note: >-
+      «Там одно сообщение бота — канвас», но в ту же ветку бот пишет вопрос о блокере (§2.3)
+      и первое сообщение сотруднику (§5.2), а канвас каждый день новый (§6). «Одно» — это канвас на дату?
+  R-104: { kind: rule, scope: R-004 }
+  R-105: { kind: act, scope: R-027 }
+  R-106: { kind: reaction, scope: R-028 }
+  # §1 · макет канваса: поле — атом, значения — иллюстрация (10.5, правило 4)
+  R-107: { kind: view, scope: R-001 }
+  R-108: { kind: view, scope: R-001 }
+  R-109: { kind: view, scope: R-016 }
+  R-110: { kind: view, scope: R-013 }
+  R-111: { kind: view, scope: R-015 }
+  R-112:
+    kind: view
+    scope: R-015
+    decision: clarify
+    defect: D-5
+    note: >-
+      «закрыл 4»: по §3.4 это issues completed, где человек assignee («Прошёл»),
+      а «кто закрыл» в §3.2 — это closed_by. Что считает строка?
+  R-113: { kind: view, scope: R-015 }
+  R-114: { kind: view, scope: R-015 }
+  R-115: { kind: view, scope: R-017 }
+  R-116: { kind: view, scope: R-017 }
+  R-117: { kind: view, scope: R-017 }
+  R-118: { kind: view, scope: R-017 }
+  R-119:
+    kind: view
+    scope: R-017
+    decision: clarify
+    defect: D-2
+    note: >-
+      Имя у issue в «В работе» — пользователь бота по github_login assignee. Что печатать,
+      если логин ни на кого не записан, и как печатать несколько assignees?
+  R-120: { kind: view, scope: R-017 }
+  R-121: { kind: view, scope: R-017 }
+  R-122: { kind: view, scope: R-018 }
+  R-123:
+    kind: view
+    scope: R-018
+    decision: clarify
+    defect: D-5
+    note: >-
+      Чем исполнитель ставит и снимает галочку? Во второй строке IN_PROGRESS такой кнопки нет,
+      а `- [ ]` по §6 — рисунок без callback. Кружок у названия — это кнопка (RichTextButton)?
+  R-124: { kind: view, scope: R-018 }
+  R-125: { kind: view, scope: R-018 }
+  R-126: { kind: view, scope: R-029 }
+  R-127: { kind: view, scope: R-010 }
+  R-128: { kind: view, scope: R-019 }
+  R-129: { kind: view, scope: R-018 }
+  R-130: { kind: view, scope: R-018 }
+  R-131: { kind: view, scope: R-018 }
+  R-132: { kind: view, scope: R-018 }
+  R-133: { kind: view, scope: R-018 }
+  R-134: { kind: view, scope: R-021 }
+  R-135: { kind: view, scope: R-021 }
+  R-136: { kind: view, scope: R-021 }
+  R-137: { kind: view, scope: R-021 }
+  R-138: { kind: view, scope: R-021 }
+  # §1 · после макета
+  R-139: { kind: rule, scope: R-017 }
+  R-140: { kind: view, scope: R-017 }
+  R-141: { kind: view, scope: R-018 }
+  R-142: { kind: view, scope: R-018, decision: same_as, same_as: R-123 }
+  R-143: { kind: view, scope: R-010 }
+  R-144: { kind: view, scope: R-018 }
+  R-145: { kind: view, scope: R-018 }
+  R-146: { kind: rule, scope: R-014 }
+  R-147: { kind: rule, scope: R-014 }
+  R-148: { kind: rule, scope: R-012 }
+  R-149: { kind: rule, scope: R-012 }
