@@ -7,6 +7,11 @@ glossary:
   топик: topic Telegram внутри супергруппы — топик исполнителя или командный топик
   линейка: прогресс проекта — доля completed issues репозитория и остаток открытых; «процент проекта» и «доля бэклога» — то же самое
   задача: шаг, который человек ведёт в боте; issue задачей не является и задачу не порождает
+  группа: супергруппа проекта с топиками; «группа» и «супергруппа» — одно и то же
+  пользователь: аккаунт Telegram, который боту известен после /start
+  участник: пользователь, добавленный в проект с ролью member или lead
+  руководитель: участник с ролью lead
+  корень: пользователь, первым нажавший /start
 
 atoms:
   # §12 Объём работ · MVP
@@ -182,3 +187,230 @@ atoms:
   R-153: { kind: view, scope: R-017 }
   R-154: { kind: act, scope: R-018 }
   R-155: { kind: act, scope: R-018 }
+
+  # §2.1 Проект и репозиторий
+  R-156: { kind: entity, scope: R-036 }
+  R-157: { kind: entity, scope: R-036 }
+  R-158: { kind: entity, scope: R-036 }
+  R-159: { kind: entity, scope: R-036 }
+  R-160: { kind: entity, scope: R-037 }
+  R-161: { kind: rule, scope: R-001 }
+  R-162: { kind: rule, scope: R-029 }
+  R-163: { kind: rule, scope: R-023 }
+  R-164: { kind: rule, scope: R-033 }
+  R-165: { kind: rule, scope: R-038 }
+  R-166: { kind: rule, scope: R-002 }
+  R-167: { kind: rule, scope: R-002 }
+  R-168: { kind: rule, scope: R-002 }
+  R-169: { kind: rule, scope: R-002 }
+  R-170: { kind: rule, scope: R-031 }
+  R-171: { kind: view, scope: R-031 }
+  R-172: { kind: rule, scope: R-002 }
+  R-173: { kind: rule, scope: R-002 }
+  R-174: { kind: rule, scope: R-002 }
+  R-175: { kind: view, scope: R-016 }
+  R-176: { kind: rule, scope: R-003 }
+  R-177: { kind: rule, scope: R-003 }
+  R-178: { kind: rule, scope: R-003 }
+  R-179: { kind: rule, scope: R-003 }
+  R-180: { kind: rule, scope: R-003 }
+  R-181: { kind: view, scope: R-016 }
+  R-182: { kind: view, scope: R-021 }
+  R-183: { kind: act, scope: R-038 }
+  R-184: { kind: act, scope: R-038 }
+  R-185: { kind: reaction, scope: R-038 }
+  R-186: { kind: reaction, scope: R-038 }
+  R-187: { kind: rule, scope: R-038 }
+  R-188: { kind: rule, scope: R-022 }
+  R-189: { kind: entity, scope: R-021 }
+  R-190: { kind: rule, scope: R-011 }
+  R-191: { kind: view, scope: R-021, decision: same_as, same_as: R-137 }
+  R-192: { kind: view, scope: R-021, decision: same_as, same_as: R-138 }
+  R-193: { kind: rule, scope: R-021 }
+  R-194: { kind: rule, scope: R-012 }
+  R-195: { kind: rule, scope: R-012 }
+
+  # §2.2 Задача
+  R-196: { kind: act, scope: R-027, decision: same_as, same_as: R-105 }
+  R-197: { kind: rule, scope: R-027 }
+  R-198: { kind: rule, scope: R-027 }
+  R-199: { kind: rule, scope: R-027 }
+  R-200: { kind: rule, scope: R-011 }
+  R-201: { kind: entity, scope: R-009 }
+  R-202: { kind: entity, scope: R-009 }
+  R-203:
+    kind: entity
+    decision: clarify
+    defect: D-2
+    note: >-
+      Описание задачи: название — текст сообщения (R-226), а чем заполняется описание,
+      нигде не сказано — действия для него нет. Входит ли описание в MVP и откуда берётся?
+  R-204: { kind: rule, scope: R-009 }
+  R-205: { kind: entity, scope: R-009 }
+  R-206: { kind: entity, scope: R-010 }
+  R-207: { kind: entity, scope: R-009 }
+  R-208: { kind: entity, scope: R-009 }
+  R-209: { kind: entity, scope: R-009 }
+  R-210: { kind: entity, scope: R-009 }
+  R-211: { kind: entity, scope: R-009 }
+  R-212: { kind: rule, scope: R-019 }
+  R-213: { kind: rule, scope: R-014 }
+  R-214: { kind: rule, scope: R-011 }
+  R-215: { kind: rule, scope: R-014 }
+  R-216: { kind: rule, scope: R-014 }
+  R-217: { kind: entity, scope: R-009 }
+  R-218: { kind: view, scope: R-018 }
+  R-219: { kind: entity, scope: R-009 }
+  R-220: { kind: entity, scope: R-023 }
+  R-221: { kind: rule, scope: R-024 }
+  R-222: { kind: entity, scope: R-009 }
+  R-223: { kind: rule, scope: R-009 }
+  R-224: { kind: entity, scope: R-009 }
+  R-225: { kind: entity, scope: R-009 }
+  R-226: { kind: reaction, scope: R-027 }
+  R-227: { kind: rule, scope: R-027 }
+  R-228: { kind: rule, scope: R-010 }
+  R-229: { kind: reaction, scope: R-028, decision: same_as, same_as: R-106 }
+  R-230: { kind: rule, scope: R-009 }
+  R-231: { kind: act, scope: R-019 }
+  R-232: { kind: rule, scope: R-006 }
+  R-233: { kind: entity, scope: R-010 }
+  R-234: { kind: entity, scope: R-010 }
+  R-235: { kind: entity, scope: R-010 }
+  R-236: { kind: rule, scope: R-010, decision: same_as, same_as: R-228 }
+  R-237: { kind: act, scope: R-010 }
+  R-238: { kind: view, scope: R-010 }
+  R-239: { kind: rule, scope: R-010 }
+  R-240: { kind: view, scope: R-019 }
+  R-241: { kind: rule, scope: R-014, decision: same_as, same_as: R-213 }
+  R-242: { kind: rule, scope: R-011 }
+  R-243: { kind: rule, scope: R-011 }
+  R-244: { kind: rule, scope: R-029 }
+  R-245: { kind: reaction, scope: R-029 }
+  R-246: { kind: view, scope: R-029, decision: same_as, same_as: R-126 }
+  R-247: { kind: act, scope: R-009 }
+  R-248: { kind: act, scope: R-009 }
+  R-249: { kind: rule, scope: R-009 }
+  R-250:
+    kind: act
+    decision: clarify
+    defect: D-1
+    note: >-
+      Передача задачи другому исполнителю (здесь и в §6) не входит ни в один пункт объёма работ,
+      и не сказано, кто и чем её запускает: на канвасе такой кнопки нет. Входит ли в MVP и в каком виде?
+  R-251: { kind: act, scope: R-005 }
+  R-252: { kind: rule, scope: R-005 }
+
+  # §2.3 Блокеры и застой
+  R-253: { kind: reaction, scope: R-023 }
+  R-254: { kind: reaction, scope: R-024 }
+  R-255: { kind: view, scope: R-024 }
+  R-256:
+    kind: act
+    scope: R-024
+    decision: clarify
+    defect: D-5
+    note: >-
+      Ответ на вопрос о блокере и новая задача — оба обычные сообщения в ветке исполнителя (§6).
+      Как бот отличает ответ-причину от новой задачи?
+  R-257: { kind: act, scope: R-024 }
+  R-258: { kind: rule, scope: R-024 }
+  R-259: { kind: rule, scope: R-023 }
+  R-260: { kind: rule, scope: R-023 }
+  R-261:
+    kind: reaction
+    decision: clarify
+    defect: D-1
+    note: >-
+      Напоминания руководителям о задаче в REVIEW нет в объёме работ (MVP п.6 — только блокировка
+      и вопрос исполнителю), и не сказано, куда бот пишет. Входит ли в MVP и куда отправляется?
+  R-262:
+    kind: rule
+    decision: clarify
+    defect: D-1
+    note: частота напоминания руководителям — решается вместе с R-261
+  R-263: { kind: entity, scope: R-024 }
+  R-264: { kind: view, scope: R-020 }
+  R-265:
+    kind: entity
+    decision: clarify
+    defect: D-2
+    note: >-
+      «Что требуется»: причина — ответ исполнителя, а кто и как заполняет это поле, нигде не сказано.
+      Оставить в MVP (и откуда оно берётся) или убрать?
+  R-266: { kind: view, scope: R-020 }
+  R-267: { kind: rule, scope: R-020 }
+  R-268: { kind: view, scope: R-020 }
+  R-269: { kind: rule, scope: R-025 }
+  R-270: { kind: rule, scope: R-025 }
+  R-271:
+    kind: reaction
+    scope: R-025
+    decision: clarify
+    defect: D-4
+    note: >-
+      «Основная ветка» здесь — git-ветка по умолчанию, а в глоссарии «ветка» — топик исполнителя.
+      Так же в §3.1, §3.2 и §5. Как называть git-ветку?
+  R-272: { kind: rule, scope: R-025 }
+  R-273: { kind: reaction, scope: R-026 }
+  R-274: { kind: rule, scope: R-026 }
+  R-275: { kind: rule, scope: R-026 }
+  R-276: { kind: view, scope: R-026 }
+  R-277: { kind: rule, scope: R-020 }
+  R-278: { kind: view, scope: R-020 }
+  R-279: { kind: view, scope: R-030 }
+  R-280: { kind: rule, scope: R-023 }
+  R-281: { kind: rule, scope: R-023 }
+  R-282: { kind: rule, scope: R-026 }
+  R-283:
+    kind: rule
+    decision: clarify
+    defect: D-1
+    note: порог для напоминания руководителю — решается вместе с R-261
+
+  # §2.4 Участники и доступ
+  R-284: { kind: entity, scope: R-005 }
+  R-285: { kind: entity, scope: R-008 }
+  R-286: { kind: rule, scope: R-008 }
+  R-287: { kind: rule, scope: R-008 }
+  R-288: { kind: rule, scope: R-008 }
+  R-289: { kind: rule, scope: R-008 }
+  R-290: { kind: entity, scope: R-008 }
+  R-291: { kind: rule, scope: R-008 }
+  R-292: { kind: rule, scope: R-005 }
+  R-293: { kind: rule, scope: R-006 }
+  R-294: { kind: rule, scope: R-006 }
+  R-295: { kind: entity, scope: R-006 }
+  R-296: { kind: entity, scope: R-042, decision: same_as, same_as: R-102 }
+  R-297: { kind: entity, scope: R-006 }
+  R-298: { kind: act, scope: R-009 }
+  R-299: { kind: act, scope: R-036 }
+  R-300: { kind: act, scope: R-038, decision: same_as, same_as: R-183 }
+  R-301: { kind: act, scope: R-040 }
+  R-302: { kind: rule, scope: R-006 }
+  R-303: { kind: rule, scope: R-005 }
+  R-304: { kind: reaction, scope: R-035 }
+  R-305: { kind: rule, scope: R-035 }
+  R-306: { kind: rule, scope: R-035 }
+  R-307: { kind: rule, scope: R-036 }
+  R-308: { kind: rule, scope: R-040 }
+  R-309: { kind: rule, scope: R-007 }
+  R-310: { kind: rule, scope: R-035 }
+  R-311: { kind: rule, scope: R-007 }
+  R-312: { kind: reaction, scope: R-007 }
+  R-313: { kind: rule, scope: R-007 }
+  R-314: { kind: act, scope: R-009 }
+  R-315: { kind: act, scope: R-009 }
+  R-316: { kind: reaction, scope: R-009 }
+  R-317: { kind: view, scope: R-018 }
+  R-318: { kind: act, scope: R-009, decision: same_as, same_as: R-298 }
+  R-319:
+    kind: act
+    scope: R-009
+    decision: clarify
+    defect: D-5
+    note: >-
+      Чем руководитель возвращает задачу из REVIEW в работу? Во второй строке REVIEW только
+      «подтвердить» и «отменить» (§1), кнопки возврата нет.
+  R-320: { kind: rule, scope: R-009 }
+  R-321: { kind: rule, scope: R-009 }
