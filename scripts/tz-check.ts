@@ -127,7 +127,7 @@ export const BACKLOG_INDEX = 'README.md';
 /** 10.11: без данных ретрофита — 10, допустимо 5–25; калибруется по underdelivery_rate (M-23). Карточка — docs/backlog/README.md. */
 export const MAX_ATOMS_PER_STEP = 10;
 const ISSUE_ID = /^I-\d{2,}$/;
-const ISSUE_ATOM = /^- \[( |x)\] (R-\d{3,})\b/;
+const ISSUE_ATOM = /^- \[( |x|X)\] (R-\d{3,})\b/;
 const ISSUE_ELEMENT = /\b(?:U|A|E|L|INV|C|B|P|M|S)-\d+\b/g;
 
 export const EVENT_REGISTRY_PATH = 'contracts/event-registry.yaml';
@@ -674,7 +674,7 @@ export function parseIssue(doc: PdaDoc): { issue?: Issue; findings: Finding[] } 
   }
   const atoms = section(lines, 'Атомы ТЗ').flatMap(({ line, text }) => {
     const match = ISSUE_ATOM.exec(text.trim());
-    return match ? [{ id: match[2] ?? '', done: match[1] === 'x', line }] : [];
+    return match ? [{ id: match[2] ?? '', done: match[1] !== ' ', line }] : [];
   });
   const pda = section(lines, 'PDA')
     .map(({ text }) => text)
