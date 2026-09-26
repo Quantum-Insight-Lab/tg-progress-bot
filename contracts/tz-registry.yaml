@@ -719,3 +719,76 @@ atoms:
   R-591: { kind: act, scope: R-040 }
   R-592: { kind: act, scope: R-042 }
   R-593: { kind: rule, scope: R-439 }
+
+  # §6 Как задача попадает на канвас
+  R-594: { kind: tech, scope: R-001 }
+  R-595: { kind: rule, scope: R-001, decision: same_as, same_as: R-473 }
+  R-596: { kind: tech, scope: R-018 }
+  R-597: { kind: view, scope: R-018 }
+  R-598: { kind: view, scope: R-018 }
+  R-599: { kind: view, scope: R-018 }
+  R-600: { kind: view, scope: R-018, decision: same_as, same_as: R-123 }
+  R-601: { kind: view, scope: R-018, decision: same_as, same_as: R-124 }
+  R-602: { kind: view, scope: R-018, decision: same_as, same_as: R-125 }
+  R-603: { kind: view, scope: R-029, decision: same_as, same_as: R-126 }
+  R-604: { kind: view, scope: R-010, decision: same_as, same_as: R-143 }
+  R-605: { kind: view, scope: R-018, decision: same_as, same_as: R-144 }
+  R-606: { kind: view, scope: R-018, decision: same_as, same_as: R-328 }
+  R-607: { kind: view, scope: R-018, decision: same_as, same_as: R-145 }
+  R-608: { kind: tech, scope: R-018 }
+  R-609: { kind: reaction, scope: R-018 }
+  R-610: { kind: tech, scope: R-001 }
+  R-611: { kind: rule, scope: R-043 }
+  R-612: { kind: rule, scope: R-043 }
+  R-613: { kind: rule, scope: R-043 }
+  R-614: { kind: tech, scope: R-001 }
+  R-615: { kind: tech, scope: R-001 }
+  R-616: { kind: tech, scope: R-001 }
+  R-617: { kind: rule, scope: R-001 }
+  R-618: { kind: rule, scope: R-001 }
+  R-619: { kind: rule, scope: R-001, decision: same_as, same_as: R-161 }
+  R-620: { kind: entity, scope: R-042, decision: same_as, same_as: R-102 }
+  R-621: { kind: entity, scope: R-042 }
+  R-622: { kind: act, scope: R-027, decision: same_as, same_as: R-326 }
+  R-623: { kind: reaction, scope: R-027 }
+  R-624: { kind: reaction, scope: R-028, decision: same_as, same_as: R-106 }
+  R-625: { kind: rule, scope: R-027 }
+  R-626: { kind: rule, scope: R-011 }
+  R-627: { kind: reaction, scope: R-001 }
+  R-628: { kind: reaction, scope: R-001 }
+  R-629: { kind: reaction, scope: R-001 }
+  R-630: { kind: reaction, scope: R-001 }
+  R-631: { kind: reaction, scope: R-001 }
+  R-632: { kind: rule, scope: R-018 }
+  R-633: { kind: reaction, scope: R-018 }
+  R-634: { kind: rule, scope: R-001, decision: same_as, same_as: R-103 }
+  R-635: { kind: reaction, scope: R-029 }
+  R-636: { kind: view, scope: R-029, decision: same_as, same_as: R-126 }
+  R-637: { kind: reaction, scope: R-029 }
+  R-638: { kind: reaction, scope: R-019 }
+  R-639: { kind: view, scope: R-019 }
+  R-640: { kind: reaction, scope: R-009 }
+  R-641: { kind: act, scope: R-009, decision: same_as, same_as: R-298 }
+  R-642: { kind: view, scope: R-018, decision: same_as, same_as: R-132 }
+  R-643:
+    kind: rule
+    scope: R-014
+    decision: clarify
+    defect: D-5
+    note: >-
+      «Пока он не ответил, процент проекта прежний» читается так, будто подтверждение DONE двигает процент,
+      а по §1 и §4 задачи процент не двигают вовсе (R-146, R-147).
+  R-644: { kind: reaction, scope: R-009 }
+  R-645: { kind: act, scope: R-009, decision: same_as, same_as: R-248 }
+  R-646: { kind: act, scope: R-009, decision: same_as, same_as: R-247 }
+  R-647: { kind: rule, scope: R-009, decision: same_as, same_as: R-249 }
+  R-648: { kind: view, scope: R-018 }
+  R-649: { kind: rule, scope: R-029 }
+  R-650: { kind: rule, scope: R-014 }
+  R-651:
+    kind: reaction
+    scope: R-323
+    decision: clarify
+    note: передача задачи вне MVP (R-323) — убрать абзац из ТЗ или оставить как описание на будущее?
+  R-652: { kind: reaction, scope: R-323 }
+  R-653: { kind: rule, scope: R-323 }
