@@ -125,14 +125,7 @@ atoms:
 
   # §1 Основной сценарий
   R-102: { kind: entity, scope: R-042 }
-  R-103:
-    kind: rule
-    scope: R-001
-    decision: clarify
-    defect: D-5
-    note: >-
-      «Там одно сообщение бота — канвас», но в ту же ветку бот пишет вопрос о блокере (§2.3)
-      и первое сообщение сотруднику (§5.2), а канвас каждый день новый (§6). «Одно» — это канвас на дату?
+  R-103: { kind: rule, scope: R-001 }
   R-104: { kind: rule, scope: R-004 }
   R-105: { kind: act, scope: R-027 }
   R-106: { kind: reaction, scope: R-028 }
@@ -142,39 +135,18 @@ atoms:
   R-109: { kind: view, scope: R-016 }
   R-110: { kind: view, scope: R-013 }
   R-111: { kind: view, scope: R-015 }
-  R-112:
-    kind: view
-    scope: R-015
-    decision: clarify
-    defect: D-5
-    note: >-
-      «закрыл 4»: по §3.4 это issues completed, где человек assignee («Прошёл»),
-      а «кто закрыл» в §3.2 — это closed_by. Что считает строка?
+  R-112: { kind: view, scope: R-015 }
   R-113: { kind: view, scope: R-015 }
   R-114: { kind: view, scope: R-015 }
   R-115: { kind: view, scope: R-017 }
   R-116: { kind: view, scope: R-017 }
   R-117: { kind: view, scope: R-017 }
   R-118: { kind: view, scope: R-017 }
-  R-119:
-    kind: view
-    scope: R-017
-    decision: clarify
-    defect: D-2
-    note: >-
-      Имя у issue в «В работе» — пользователь бота по github_login assignee. Что печатать,
-      если логин ни на кого не записан, и как печатать несколько assignees?
+  R-119: { kind: view, scope: R-017 }
   R-120: { kind: view, scope: R-017 }
   R-121: { kind: view, scope: R-017 }
   R-122: { kind: view, scope: R-018 }
-  R-123:
-    kind: view
-    scope: R-018
-    decision: clarify
-    defect: D-5
-    note: >-
-      Чем исполнитель ставит и снимает галочку? Во второй строке IN_PROGRESS такой кнопки нет,
-      а `- [ ]` по §6 — рисунок без callback. Кружок у названия — это кнопка (RichTextButton)?
+  R-123: { kind: view, scope: R-018 }
   R-124: { kind: view, scope: R-018 }
   R-125: { kind: view, scope: R-018 }
   R-126: { kind: view, scope: R-029 }
@@ -202,3 +174,11 @@ atoms:
   R-147: { kind: rule, scope: R-014 }
   R-148: { kind: rule, scope: R-012 }
   R-149: { kind: rule, scope: R-012 }
+
+  # §1 · ответы на вопросы прохода 2
+  R-150: { kind: rule, scope: R-001 }
+  R-151: { kind: view, scope: R-017 }
+  R-152: { kind: view, scope: R-017 }
+  R-153: { kind: view, scope: R-017 }
+  R-154: { kind: act, scope: R-018 }
+  R-155: { kind: act, scope: R-018 }
