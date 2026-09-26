@@ -1144,3 +1144,31 @@ atoms:
   R-936: { kind: rule, scope: R-026 }
   R-937: { kind: view, scope: R-021, decision: same_as, same_as: R-938 }
   R-938: { kind: view, scope: R-021 }
+
+  # §10 AI-слой — вне MVP: пересказ в «Дальше» (R-057), AI целиком не входит (R-054)
+  R-939: { kind: reaction, scope: R-057, decision: deferred }
+  R-940: { kind: reaction, scope: R-961, decision: deferred }
+  R-941: { kind: rule, scope: R-057, decision: deferred }
+  R-942: { kind: rule, scope: R-057, decision: deferred }
+  R-943: { kind: rule, scope: R-057, decision: deferred }
+  R-944: { kind: rule, scope: R-057, decision: deferred }
+  R-945: { kind: rule, scope: R-057, decision: deferred }
+
+  # §11 Definition of Done
+  R-946: { kind: rule, scope: R-009 }
+  R-947: { kind: rule, scope: R-009 }
+  R-948: { kind: rule, scope: R-009 }
+  R-949: { kind: rule, scope: R-009 }
+  R-950: { kind: rule, scope: R-009 }
+
+  # §13 Критерий успеха
+  R-951: { kind: metric, scope: R-001 }
+  R-952: { kind: metric, scope: R-001 }
+  R-953: { kind: metric, scope: R-016 }
+  R-954: { kind: metric, scope: R-013 }
+  R-955: { kind: metric, scope: R-015 }
+  R-956: { kind: metric, scope: R-018 }
+  R-957: { kind: metric, scope: R-020 }
+  R-958: { kind: view, scope: R-021, decision: same_as, same_as: R-357 }
+  R-959: { kind: rule, scope: R-009 }
+  R-960: { kind: rule, scope: R-014, decision: same_as, same_as: R-081 }
