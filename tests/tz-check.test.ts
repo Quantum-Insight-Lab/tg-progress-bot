@@ -295,6 +295,17 @@ describe('Реестр событий', () => {
     expect(tr2).not.toContain('P-1: такой');
   });
 
+  it('контекст события — из графа домена', () => {
+    const graph = ['| ID | Сущность | Контекст | Из ТЗ |', '| --- | --- | --- | --- |', '| E-1 | Задача | `tasks` | derived: пример |'].join('\n');
+    const findings = (context: string): string[] =>
+      messages(
+        check(registry(atoms), () => tz, { gate: false }, [{ file: 'g.md', text: graph }], event('    invariants: []\n    realizes: [R-002]').replace('context: tasks', `context: ${context}`)).findings,
+        'TR-2',
+      );
+    expect(findings('tasks')).toEqual([]);
+    expect(findings('reports')).toEqual(['contracts/event-registry.yaml: task.created → контекст reports: его нет в графе домена']);
+  });
+
   it('обязательные поля и realizes', () => {
     const { elements, findings } = parseEventRegistry('events:\n  - type: task.checked\n    version: 1\n');
     expect(findings.map((f) => f.message).join('\n')).toContain('task.checked — нет полей context, actor, subject, payload, idempotency_key, invariants, owner');

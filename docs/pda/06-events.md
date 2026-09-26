@@ -43,6 +43,6 @@
 | `github.issue_changed`, `github.pull_request_changed`, `github.commits_pushed`, `github.workflow_completed`, `github.milestone_changed`, `github.issue_links_changed` | github | GitHub | зеркало | A-26, A-27 |
 | `github.reconciled`, `repo.pr_stalled` | github | система | сверка зеркала, застрявший PR | A-35 |
 | `progress.snapshot_taken` | progress | система | суточная доля | A-32 |
-| `report.sent` | reports | система, пользователь | отчёт в личку или в командный топик | A-12, A-33 |
+| `report.sent` | projects | система, пользователь | отчёт в личку или в командный топик | A-12, A-33 |
 
 Поле `projections` в реестре — какие проекции ([07](07-architecture.md)) перерисовывает событие.

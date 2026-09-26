@@ -538,7 +538,11 @@ events:
     subject: Repository
     payload:
       repository_id: string
-      commits: "[{ sha, author_login, message, created_at }]"
+      commits:
+        - sha: string
+          author_login: string
+          message: string
+          created_at: timestamp
     idempotency_key: GitHub delivery id
     invariants: [INV-13, INV-15, INV-21, INV-22]
     realizes: [R-345, R-071]
@@ -642,10 +646,10 @@ events:
     projections: [P-11, P-12, P-13]
     owner: max
 
-  # reports
+  # отчёты — доставка в личку и командный топик
   - type: report.sent
     version: 1
-    context: reports
+    context: projects
     actor: system | user
     subject: Chat
     payload:

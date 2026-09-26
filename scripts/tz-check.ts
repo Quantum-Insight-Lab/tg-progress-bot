@@ -107,6 +107,7 @@ export const COVERED_BY: Readonly<Record<Kind, readonly string[]>> = {
 export const EVENT_REGISTRY_PATH = 'contracts/event-registry.yaml';
 const EVENT_FIELDS = ['type', 'version', 'context', 'actor', 'subject', 'payload', 'idempotency_key', 'invariants', 'owner'] as const;
 const ACT_EVENT_COLUMN = 'Порождает событие';
+const CONTEXT_COLUMN = 'Контекст';
 
 /** События реестра — элементы PDA с префиксом EV: `realizes` — их ссылки на атомы (патч 1.3, 10.8). */
 export function parseEventRegistry(text: string, file = EVENT_REGISTRY_PATH): { elements: PdaElement[]; findings: Finding[] } {
@@ -135,18 +136,23 @@ export function parseEventRegistry(text: string, file = EVENT_REGISTRY_PATH): { 
       line: index + 1,
       refs,
       derived: typeof value.derived === 'string' && value.derived.trim() !== '',
-      cells: { invariants: strings(value.invariants).join(', '), projections: strings(value.projections).join(', ') },
+      cells: {
+        context: typeof value.context === 'string' ? value.context : '',
+        invariants: strings(value.invariants).join(', '),
+        projections: strings(value.projections).join(', '),
+      },
     });
   }
   return { elements, findings };
 }
 
-/** TR-2 между PDA и реестром: события из таблицы актов существуют, инварианты и проекции событий определены в PDA. */
+/** TR-2 между PDA и реестром: события из таблицы актов существуют; контексты, инварианты и проекции событий определены в PDA. */
 export function checkEventLinks(elements: PdaElement[]): Finding[] {
   const findings: Finding[] = [];
   const events = new Set(elements.filter((e) => e.id.startsWith('EV-')).map((e) => e.id.slice(3)));
   const invariants = new Set(elements.filter((e) => e.id.startsWith('INV-')).map((e) => e.id));
   const projections = new Set(elements.filter((e) => e.id.startsWith('P-')).map((e) => e.id));
+  const contexts = new Set(elements.filter((e) => e.id.startsWith('E-')).flatMap((e) => backticked(e.cells[CONTEXT_COLUMN])));
   if (events.size === 0) return findings;
   for (const element of elements) {
     if (element.id.startsWith('A-')) {
@@ -155,6 +161,10 @@ export function checkEventLinks(elements: PdaElement[]): Finding[] {
       }
     }
     if (element.id.startsWith('EV-')) {
+      const context = element.cells.context ?? '';
+      if (contexts.size > 0 && !contexts.has(context)) {
+        findings.push({ rule: 'TR-2', message: `${element.file}: ${element.id.slice(3)} → контекст ${context || '(пусто)'}: его нет в графе домена` });
+      }
       for (const inv of (element.cells.invariants ?? '').split(', ').filter(Boolean)) {
         if (!invariants.has(inv)) findings.push({ rule: 'TR-2', message: `${element.file}: ${element.id.slice(3)} → ${inv}: такого инварианта нет` });
       }
