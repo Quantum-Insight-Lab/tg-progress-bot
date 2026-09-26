@@ -166,6 +166,7 @@ export function parseEventRegistry(text: string, file = EVENT_REGISTRY_PATH): { 
         context: typeof value.context === 'string' ? value.context : '',
         invariants: strings(value.invariants).join(', '),
         projections: strings(value.projections).join(', '),
+        next: strings(value.next).join(', '),
       },
     });
   }
@@ -198,6 +199,9 @@ export function checkEventLinks(elements: PdaElement[]): Finding[] {
         if (!projections.has(projection)) {
           findings.push({ rule: 'TR-2', message: `${element.file}: ${element.id.slice(3)} → ${projection}: такой проекции нет` });
         }
+      }
+      for (const next of (element.cells.next ?? '').split(', ').filter(Boolean)) {
+        if (!events.has(next)) findings.push({ rule: 'TR-2', message: `${element.file}: ${element.id.slice(3)} → следствие ${next}: его нет в реестре` });
       }
     }
   }

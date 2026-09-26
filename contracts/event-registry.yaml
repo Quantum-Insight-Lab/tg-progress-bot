@@ -3,6 +3,7 @@
 # Схема существующего события меняется только через version + 1: в журнале уже лежат факты.
 # realizes — атомы ТЗ, которые событие реализует; invariants — INV из docs/pda/04-invariants.md;
 # projections — проекции P-xx из docs/pda/07-architecture.md, которые событие перерисовывает.
+# next — события-следствия (Event Card 5.5); правка канваса A-31 после любого изменения его содержимого здесь не повторяется.
 
 meta:
   schema: pda-event-registry/1
@@ -52,6 +53,7 @@ events:
     invariants: [INV-05, INV-11, INV-22]
     realizes: [R-154, R-314, R-640, R-609]
     projections: [P-6]
+    next: [task.confirmed, task.returned, review.reminded]
     owner: max
 
   - type: task.unchecked
@@ -164,6 +166,7 @@ events:
     invariants: [INV-05, INV-10, INV-22]
     realizes: [R-253, R-254]
     projections: [P-6, P-8, P-13, P-15]
+    next: [blocker.declared, blocker.dismissed]
     owner: max
 
   - type: blocker.declared
@@ -206,6 +209,7 @@ events:
     invariants: [INV-10, INV-22]
     realizes: [R-261]
     projections: [P-16]
+    next: [task.confirmed, task.returned]
     owner: max
 
   - type: canvas.posted
@@ -296,6 +300,7 @@ events:
     invariants: [INV-16, INV-17, INV-22]
     realizes: [R-555, R-304, R-528, R-529, R-530]
     projections: [P-18]
+    next: [project.created, project.member_added]
     owner: max
 
   - type: user.github_login_set
@@ -327,6 +332,7 @@ events:
     invariants: [INV-17, INV-19, INV-22]
     realizes: [R-299, R-531, R-534, R-535, R-536, R-537]
     projections: [P-2, P-12]
+    next: [project.chat_bound]
     owner: max
 
   - type: project.chat_bound
@@ -341,6 +347,7 @@ events:
     invariants: [INV-20, INV-22, INV-27]
     realizes: [R-538, R-540]
     projections: [P-1, P-12]
+    next: [project.repository_connected, chat.reports_topic_set, canvas.posted]
     owner: max
 
   - type: project.repository_connected
@@ -355,6 +362,7 @@ events:
     invariants: [INV-03, INV-19, INV-22]
     realizes: [R-183, R-544, R-546]
     projections: [P-3, P-4, P-5, P-9, P-12, P-14]
+    next: [github.reconciled]
     owner: max
 
   - type: project.repository_changed
@@ -370,6 +378,7 @@ events:
     invariants: [INV-03, INV-19, INV-22]
     realizes: [R-586, R-185, R-186]
     projections: [P-3, P-4, P-5, P-9, P-12, P-14]
+    next: [github.reconciled]
     owner: max
 
   - type: project.settings_changed
@@ -400,6 +409,7 @@ events:
     invariants: [INV-16, INV-18, INV-19, INV-22]
     realizes: [R-591, R-517]
     projections: [P-17, P-18]
+    next: [member.topic_set]
     owner: max
 
   - type: project.member_removed
@@ -415,6 +425,7 @@ events:
     invariants: [INV-18, INV-22]
     realizes: [R-251]
     projections: [P-6, P-18]
+    next: [task.cancelled]
     owner: max
 
   - type: member.topic_set
@@ -431,6 +442,7 @@ events:
     invariants: [INV-22, INV-23]
     realizes: [R-592, R-519, R-564, R-566, R-567, R-569, R-572, R-573]
     projections: [P-1, P-17]
+    next: [canvas.posted]
     owner: max
 
   - type: chat.reports_topic_set
@@ -446,6 +458,7 @@ events:
     invariants: [INV-22, INV-27]
     realizes: [R-548, R-549, R-550, R-520]
     projections: [P-12]
+    next: [chat.schedule_set]
     owner: max
 
   - type: chat.schedule_set
@@ -461,6 +474,7 @@ events:
     invariants: [INV-22, INV-24, INV-27]
     realizes: [R-551, R-585, R-523, R-584]
     projections: [P-12]
+    next: [report.sent]
     owner: max
 
   - type: chat.schedule_cleared
@@ -509,6 +523,7 @@ events:
     invariants: [INV-01, INV-21, INV-22]
     realizes: [R-344, R-347, R-069, R-094, R-338, R-339]
     projections: [P-3, P-4, P-5, P-13]
+    next: [divergence.detected]
     owner: max
 
   - type: github.pull_request_changed
@@ -529,6 +544,7 @@ events:
     invariants: [INV-12, INV-13, INV-21, INV-22]
     realizes: [R-346, R-070, R-338, R-339]
     projections: [P-8, P-9, P-14]
+    next: [repo.pr_stalled, divergence.detected]
     owner: max
 
   - type: github.commits_pushed
@@ -547,6 +563,7 @@ events:
     invariants: [INV-13, INV-15, INV-21, INV-22]
     realizes: [R-345, R-071]
     projections: [P-9, P-10, P-14]
+    next: [divergence.detected]
     owner: max
 
   - type: github.workflow_completed

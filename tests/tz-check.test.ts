@@ -290,10 +290,12 @@ describe('Реестр событий', () => {
   });
 
   it('событие из таблицы актов обязано быть в реестре, инварианты и проекции события — в PDA', () => {
-    const tr2 = messages(run(event('    invariants: [INV-01, INV-99]\n    projections: [P-1, P-9]\n    realizes: [R-002]')), 'TR-2').join('\n');
+    const tr2 = messages(run(event('    invariants: [INV-01, INV-99]\n    projections: [P-1, P-9]\n    next: [task.created, task.ghost]\n    realizes: [R-002]')), 'TR-2').join('\n');
     expect(tr2).toContain('A-1 → событие task.lost: его нет в реестре');
     expect(tr2).toContain('task.created → INV-99: такого инварианта нет');
     expect(tr2).toContain('task.created → P-9: такой проекции нет');
+    expect(tr2).toContain('task.created → следствие task.ghost: его нет в реестре');
+    expect(tr2).not.toContain('следствие task.created');
     expect(tr2).not.toContain('task.created: его нет');
     expect(tr2).not.toContain('P-1: такой');
   });
