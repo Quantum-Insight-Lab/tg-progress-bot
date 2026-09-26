@@ -47,7 +47,7 @@ export interface SectionReport {
   started: boolean;
 }
 
-export type Rule = 'TR-1' | 'TR-2' | 'TR-3' | 'TR-5' | 'REG' | 'GATE';
+export type Rule = 'TR-1' | 'TR-2' | 'TR-3' | 'TR-4' | 'TR-5' | 'REG' | 'GATE';
 
 export interface Finding {
   rule: Rule;
@@ -83,6 +83,32 @@ export const REGISTRY_PATH = 'contracts/tz-registry.yaml';
 export const PDA_DIR = 'docs/pda';
 const FROM_TZ_COLUMN = 'Из ТЗ';
 const ELEMENT_ID = /^[A-Z]+-\d+$/;
+
+/**
+ * Правило вида (10.4): атом покрывает только элемент PDA своего вида, по префиксу ID.
+ * A — акт, INV — инвариант, E/L — узел и связь графа, P — проекция или экран, B — решение blueprint, M — метрика.
+ * События покрывают reaction и integration через `realizes` в реестре событий (шаг 6).
+ */
+export const COVERED_BY: Readonly<Record<Kind, readonly string[]>> = {
+  act: ['A'],
+  reaction: ['A'],
+  rule: ['INV', 'E', 'L'],
+  entity: ['E', 'L'],
+  view: ['P'],
+  integration: ['B'],
+  tech: ['B'],
+  metric: ['M'],
+  scope: [],
+};
+
+export type Coverage = 'covered' | 'partial' | 'orphan';
+
+export interface CoverageRow {
+  id: string;
+  kind: Kind;
+  status: Coverage;
+  refs: string[];
+}
 
 const ANCHOR_AT_START = /^\{(?:R-\d{3,}|ctx)\}/;
 const ANY_ANCHOR = /\{(?:R-\d{3,}|ctx)\}/;
@@ -461,6 +487,37 @@ export function checkPda(elements: PdaElement[], registry: Registry): Finding[] 
   return findings;
 }
 
+/** Текст атома — от его якоря до следующего якоря внутри блока. */
+export function atomTexts(blocks: Block[]): Map<string, { text: string; section: string }> {
+  const texts = new Map<string, { text: string; section: string }>();
+  for (const block of blocks) {
+    const parts = block.text.split(/\{(R-\d{3,}|ctx)\}/);
+    for (let i = 1; i < parts.length; i += 2) {
+      const id = parts[i] ?? '';
+      if (id !== 'ctx') texts.set(id, { text: (parts[i + 1] ?? '').trim(), section: block.section.title });
+    }
+  }
+  return texts;
+}
+
+/** TR-4: покрытие атомов MVP элементами PDA нужного вида. Повторы, решения и атомы вида scope не считаются. */
+export function coverage(registry: Registry, elements: PdaElement[]): CoverageRow[] {
+  const refsTo = new Map<string, string[]>();
+  for (const element of elements) {
+    for (const ref of element.refs) refsTo.set(ref, [...(refsTo.get(ref) ?? []), element.id]);
+  }
+  const rows: CoverageRow[] = [];
+  for (const [id, atom] of registry.atoms) {
+    if (atom.kind === 'scope' || atom.decision !== undefined || releaseOf(atom, registry) !== 'mvp') continue;
+    const refs = refsTo.get(id) ?? [];
+    const allowed = COVERED_BY[atom.kind];
+    const status: Coverage =
+      refs.length === 0 ? 'orphan' : refs.some((ref) => allowed.includes(ref.split('-')[0] ?? '')) ? 'covered' : 'partial';
+    rows.push({ id, kind: atom.kind, status, refs });
+  }
+  return rows;
+}
+
 export function check(
   registryText: string,
   readSource: (path: string) => string,
@@ -487,6 +544,29 @@ function countBy<T>(items: Iterable<T>, key: (item: T) => string | undefined): s
   return [...counts].map(([k, n]) => `${k} ${n}`).join(' · ') || '—';
 }
 
+function coverageSummary(rows: CoverageRow[]): string {
+  const byKind = new Map<Kind, { covered: number; total: number }>();
+  for (const row of rows) {
+    const entry = byKind.get(row.kind) ?? { covered: 0, total: 0 };
+    entry.total += 1;
+    if (row.status === 'covered') entry.covered += 1;
+    byKind.set(row.kind, entry);
+  }
+  return [...byKind].map(([kind, { covered, total }]) => `${kind} ${covered}/${total}`).join(' · ') || '—';
+}
+
+export function formatUncovered(result: CheckResult, kind: string): string {
+  const texts = atomTexts(result.blocks);
+  const rows = coverage(result.registry, result.elements).filter((row) => row.kind === kind && row.status !== 'covered');
+  const lines = [`Не покрыты атомы MVP вида ${kind} (${rows.length}):`];
+  for (const row of rows) {
+    const entry = texts.get(row.id);
+    const refs = row.refs.length > 0 ? ` [ссылки чужого вида: ${row.refs.join(', ')}]` : '';
+    lines.push(`  ${row.id} ${row.status} · ${entry?.section ?? '?'} · ${entry?.text ?? ''}${refs}`);
+  }
+  return lines.join('\n');
+}
+
 export function formatReport(result: CheckResult): string {
   const { registry, sections, blocks, findings } = result;
   const atoms = [...registry.atoms.values()];
@@ -499,6 +579,7 @@ export function formatReport(result: CheckResult): string {
     ['TR-2', `атомов ${atoms.length}, следующий номер ${formatId(Math.max(0, ...numbers) + 1)}`],
     ['TR-3', `релизы scope: ${countBy(atoms, (a) => (a.kind === 'scope' ? a.release : undefined))}`],
     ['TR-5', `элементов PDA: ${countBy(result.elements, (e) => e.id.split('-')[0])}; ссылок на атомы: ${result.elements.reduce((n, e) => n + e.refs.length, 0)}`],
+    ['TR-4', `покрыто атомов MVP по видам: ${coverageSummary(coverage(registry, result.elements))}`],
     ['REG', `виды: ${countBy(atoms, (a) => a.kind)}; решения: ${countBy(atoms, (a) => a.decision)}`],
   ];
   if (result.gate) rules.push(['GATE', 'D-1…D-6 по 10.10']);
@@ -506,7 +587,8 @@ export function formatReport(result: CheckResult): string {
   const lines = [`tz:check · ${result.source || '?'} · ${result.gate ? 'gate' : 'шаг 0'}`];
   for (const [rule, summary] of rules) {
     const own = findings.filter((f) => f.rule === rule);
-    lines.push(`${rule.padEnd(5)} ${own.length === 0 ? 'ok' : `✗ ${own.length}`}  ${summary}`);
+    const status = own.length > 0 ? `✗ ${own.length}` : rule === 'TR-4' ? 'отчёт' : 'ok';
+    lines.push(`${rule.padEnd(5)} ${status}  ${summary}`);
     for (const finding of own) lines.push(`      ${finding.message}`);
   }
   if (pending.length > 0 && !result.gate) {
@@ -546,6 +628,8 @@ function main(argv: string[]): number {
     readPdaDocs(),
   );
   console.log(formatReport(result));
+  const uncovered = argv.indexOf('--uncovered');
+  if (uncovered >= 0) console.log(`\n${formatUncovered(result, argv[uncovered + 1] ?? '')}`);
   return result.findings.length === 0 ? 0 : 1;
 }
 

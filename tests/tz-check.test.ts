@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { check, parsePdaElements, splitBlocks, type Finding, type Rule } from '../scripts/tz-check.ts';
+import { check, coverage, parsePdaElements, splitBlocks, type Finding, type Rule } from '../scripts/tz-check.ts';
 
 const registry = (atoms: string, glossary = ''): string => `source: tz.md\n${glossary}atoms:\n${atoms}`;
 
@@ -239,5 +239,37 @@ describe('PDA: колонка «Из ТЗ»', () => {
   it('корректная таблица проходит', () => {
     const findings = runPda(table(['| U-1 | a | R-002 |']));
     expect(findings.filter((f) => f.rule === 'TR-2' || f.rule === 'TR-5')).toEqual([]);
+  });
+});
+
+describe('TR-4: покрытие по правилу вида', () => {
+  const atoms = [
+    '  R-001: { kind: scope, release: mvp }',
+    '  R-002: { kind: scope, release: later }',
+    '  R-003: { kind: act, scope: R-001 }',
+    '  R-004: { kind: act, scope: R-001 }',
+    '  R-005: { kind: act, scope: R-001 }',
+    '  R-006: { kind: act, scope: R-001, decision: same_as, same_as: R-003 }',
+    '  R-007: { kind: act, scope: R-002, decision: deferred }',
+    '  R-008: { kind: rule, scope: R-001 }',
+    '',
+  ].join('\n');
+  const tz = ['{R-001} a', '{R-002} b', '{R-003} c', '{R-004} d', '{R-005} e', '{R-006} f', '{R-007} g', '{R-008} h'].join('\n\n');
+  const pda = [
+    '| ID | Что | Из ТЗ |',
+    '| --- | --- | --- |',
+    '| U-1 | неопределённость | R-004 |',
+    '| A-1 | акт | R-003, R-008 |',
+  ].join('\n');
+
+  it('акт покрывает act, неопределённость — нет; повторы, отложенное и scope не считаются', () => {
+    const result = check(registry(atoms), () => tz, { gate: false }, [{ file: 'p.md', text: pda }]);
+    const rows = coverage(result.registry, result.elements);
+    expect(rows.map((r) => [r.id, r.status])).toEqual([
+      ['R-003', 'covered'],
+      ['R-004', 'partial'],
+      ['R-005', 'orphan'],
+      ['R-008', 'partial'],
+    ]);
   });
 });
