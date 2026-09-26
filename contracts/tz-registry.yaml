@@ -221,7 +221,11 @@ atoms:
   R-181: { kind: view, scope: R-016 }
   R-182: { kind: view, scope: R-021 }
   R-183: { kind: act, scope: R-038 }
-  R-184: { kind: act, scope: R-038 }
+  R-184:
+    kind: act
+    scope: R-038
+    decision: withdrawn
+    note: смену репозитория делает только корень (решение 26.09) — R-586
   R-185: { kind: reaction, scope: R-038 }
   R-186: { kind: reaction, scope: R-038 }
   R-187: { kind: rule, scope: R-038 }
@@ -359,7 +363,11 @@ atoms:
   R-298: { kind: act, scope: R-009 }
   R-299: { kind: act, scope: R-036 }
   R-300: { kind: act, scope: R-038, decision: same_as, same_as: R-183 }
-  R-301: { kind: act, scope: R-040 }
+  R-301:
+    kind: act
+    scope: R-040
+    decision: withdrawn
+    note: участников добавляет только корень (решение 26.09) — R-591
   R-302: { kind: rule, scope: R-006 }
   R-303: { kind: rule, scope: R-005 }
   R-304: { kind: reaction, scope: R-035 }
@@ -367,7 +375,11 @@ atoms:
   R-306: { kind: rule, scope: R-035 }
   R-307: { kind: rule, scope: R-036 }
   R-308: { kind: rule, scope: R-040 }
-  R-309: { kind: rule, scope: R-007 }
+  R-309:
+    kind: rule
+    scope: R-007
+    decision: withdrawn
+    note: добавляет только корень (решение 26.09) — R-589
   R-310: { kind: rule, scope: R-035 }
   R-311: { kind: rule, scope: R-007 }
   R-312: { kind: reaction, scope: R-007 }
@@ -581,25 +593,11 @@ atoms:
   R-488: { kind: view, scope: R-018 }
   R-489: { kind: view, scope: R-018 }
   R-490: { kind: view, scope: R-018 }
-  R-491:
-    kind: view
-    scope: R-018
-    decision: clarify
-    defect: D-5
-    note: >-
-      «Название с днём на первой строке» для всех задач блока, а в макете §1 у задачи в REVIEW
-      вместо дня стоит «на подтверждении» (R-131). Что печатается у REVIEW?
+  R-491: { kind: view, scope: R-018 }
   R-492: { kind: view, scope: R-018 }
   R-493: { kind: view, scope: R-018 }
   R-494: { kind: view, scope: R-019 }
-  R-495:
-    kind: view
-    scope: R-019
-    decision: clarify
-    defect: D-5
-    note: >-
-      В «План» задача уходит кнопкой «в план» (R-231), а обратного пути нет: у задачи в «Плане»
-      только слово приоритета, без галочки (§6). Как задача из «Плана» возвращается в «Задачи»?
+  R-495: { kind: view, scope: R-019 }
   R-496: { kind: rule, scope: R-019 }
   R-497: { kind: rule, scope: R-019 }
   R-498: { kind: view, scope: R-019 }
@@ -611,28 +609,14 @@ atoms:
   R-504: { kind: view, scope: R-021, decision: same_as, same_as: R-357 }
   R-505: { kind: view, scope: R-021, decision: same_as, same_as: R-182 }
   R-506: { kind: view, scope: R-022 }
-  R-507:
-    kind: view
-    scope: R-022
-    decision: clarify
-    defect: D-5
-    note: >-
-      «Последние снимки доли одной строкой»: сколько точек и с каким шагом? Снимок пишется раз в сутки (R-465),
-      а в примере точки 10.09 и 17.09 — через неделю.
+  R-507: { kind: view, scope: R-022 }
   R-508: { kind: view, scope: R-045 }
   R-509: { kind: view, scope: R-018 }
   R-510: { kind: view, scope: R-018, decision: same_as, same_as: R-509 }
   R-511: { kind: view, scope: R-030 }
 
   # §5.1 Настройки
-  R-512:
-    kind: rule
-    scope: R-439
-    decision: clarify
-    defect: D-5
-    note: >-
-      Кто меняет какие настройки? Про репозиторий сказано — руководитель (R-547), про логин — сам человек
-      (R-561), про остальные — ничего.
+  R-512: { kind: rule, scope: R-439 }
   R-513: { kind: act, scope: R-439 }
   R-514: { kind: act, scope: R-439 }
   R-515: { kind: act, scope: R-439 }
@@ -642,15 +626,8 @@ atoms:
   R-519: { kind: act, scope: R-439 }
   R-520: { kind: act, scope: R-439 }
   R-521: { kind: act, scope: R-439 }
-  R-522: { kind: act, scope: R-038, decision: same_as, same_as: R-184 }
-  R-523:
-    kind: act
-    scope: R-439
-    decision: clarify
-    defect: D-2
-    note: >-
-      Час отчёта считается по таймзоне группы (R-164), но ни в настройках, ни в онбординге таймзону группы
-      не задаёт никто — есть только таймзона проекта. Откуда она берётся?
+  R-522: { kind: act, scope: R-038, decision: same_as, same_as: R-586 }
+  R-523: { kind: act, scope: R-439 }
   R-524: { kind: rule, scope: R-439 }
   R-525: { kind: rule, scope: R-439 }
   R-526: { kind: rule, scope: R-439 }
@@ -659,14 +636,7 @@ atoms:
   R-527: { kind: reaction, scope: R-035, decision: same_as, same_as: R-304 }
   R-528: { kind: reaction, scope: R-035 }
   R-529: { kind: reaction, scope: R-040 }
-  R-530:
-    kind: reaction
-    scope: R-040
-    decision: clarify
-    defect: D-5
-    note: >-
-      «Доступ появится, когда руководителя добавят в проект» — по §2.4 доступ появляется, когда корень
-      или lead добавит самого человека (R-309). Опечатка?
+  R-530: { kind: reaction, scope: R-040 }
   R-531: { kind: act, scope: R-036 }
   R-532: { kind: act, scope: R-036, decision: same_as, same_as: R-299 }
   R-533: { kind: rule, scope: R-439 }
@@ -683,7 +653,11 @@ atoms:
   R-544: { kind: act, scope: R-038 }
   R-545: { kind: rule, scope: R-038 }
   R-546: { kind: reaction, scope: R-038 }
-  R-547: { kind: rule, scope: R-038 }
+  R-547:
+    kind: rule
+    scope: R-038
+    decision: withdrawn
+    note: подключает руководитель, меняет только корень (решение 26.09) — R-587, R-588
   R-548: { kind: reaction, scope: R-039 }
   R-549: { kind: act, scope: R-039 }
   R-550: { kind: reaction, scope: R-039 }
@@ -693,15 +667,27 @@ atoms:
   R-554: { kind: act, scope: R-040 }
   R-555: { kind: act, scope: R-040 }
   R-556: { kind: reaction, scope: R-040, decision: same_as, same_as: R-529 }
-  R-557: { kind: view, scope: R-040 }
-  R-558: { kind: act, scope: R-040 }
+  R-557:
+    kind: view
+    scope: R-040
+    decision: withdrawn
+    note: людей без проекта видит только корень (решение 26.09) — R-590
+  R-558:
+    kind: act
+    scope: R-040
+    decision: withdrawn
+    note: участников добавляет только корень (решение 26.09) — R-591
   R-559: { kind: reaction, scope: R-041 }
   R-560: { kind: rule, scope: R-041 }
   R-561: { kind: act, scope: R-041, decision: same_as, same_as: R-521 }
   R-562: { kind: rule, scope: R-008 }
   R-563: { kind: rule, scope: R-008 }
   R-564: { kind: reaction, scope: R-042 }
-  R-565: { kind: act, scope: R-042 }
+  R-565:
+    kind: act
+    scope: R-042
+    decision: withdrawn
+    note: топик участника указывает корень (решение 26.09) — R-592
   R-566: { kind: reaction, scope: R-042 }
   R-567: { kind: reaction, scope: R-042 }
   R-568: { kind: reaction, scope: R-042, decision: same_as, same_as: R-566 }
@@ -715,3 +701,21 @@ atoms:
   R-576: { kind: view, scope: R-040 }
   R-577: { kind: view, scope: R-040 }
   R-578: { kind: view, scope: R-040 }
+
+  # Ответы на вопросы прохода 5
+  R-579: { kind: act, scope: R-019 }
+  R-580: { kind: view, scope: R-019 }
+  R-581: { kind: view, scope: R-018, decision: same_as, same_as: R-131 }
+  R-582: { kind: view, scope: R-022 }
+  R-583: { kind: rule, scope: R-439 }
+  R-584: { kind: act, scope: R-439 }
+  R-585: { kind: reaction, scope: R-033 }
+  # уточнение: настройки меняет только корень, кроме своего логина GitHub
+  R-586: { kind: act, scope: R-038 }
+  R-587: { kind: rule, scope: R-038 }
+  R-588: { kind: rule, scope: R-038 }
+  R-589: { kind: rule, scope: R-007 }
+  R-590: { kind: view, scope: R-040 }
+  R-591: { kind: act, scope: R-040 }
+  R-592: { kind: act, scope: R-042 }
+  R-593: { kind: rule, scope: R-439 }
