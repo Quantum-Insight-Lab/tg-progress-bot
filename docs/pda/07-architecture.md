@@ -24,18 +24,19 @@
 
 ## Слои и направление зависимостей
 
-Решение архитектуры, в ТЗ его нет; правила границ проверит CI на шаге инвариантов сборки (патч 1.2).
+Решение архитектуры, в ТЗ его нет. Границы проверяет CI — инварианты сборки S-1, S-2, S-5, S-6 в [09](09-structural-invariants.md).
 
 | Слой | Что внутри | Может импортировать |
 | --- | --- | --- |
-| `src/domain` | законы: переходы статусов, права, доля бэклога, застой, принадлежность фактов (INV) | `src/events` (типы), `src/config` |
-| `src/events` | журнал и публикация событий по реестру | `src/config` |
-| `src/projections` | канвас, отчёты, срезы, строки — только чтение | `src/events` (типы), чтение БД |
-| `src/telegram` | обработчики обновлений, guard доступа, rich messages | `src/domain`, `src/projections`, `src/events` (типы) |
-| `src/github` | webhooks, сверка, запись зеркала | `src/domain`, `src/events` (типы) |
+| `src/domain` | законы: переходы статусов, права, доля бэклога, застой, принадлежность фактов (INV); порты вроде `Clock` — в `src/domain/shared` | `src/events` (типы), `src/config` |
+| `src/events` | журнал и публикация событий по реестру; типы — `src/events/generated` | `src/config` |
+| `src/projections` | канвас, отчёты, срезы, строки — только чтение | `src/events/generated`, чтение БД |
+| `src/telegram` | обработчики обновлений, guard доступа, rich messages | `src/domain`, `src/projections`, `src/events` |
+| `src/github` | webhooks, сверка, запись зеркала | `src/domain`, `src/events` |
+| `src/infrastructure` | единственные реализации механизмов: часы, БД, логгер | `src/domain` (порты), `src/config` |
 | `src/config` | константы C-xx | ничего из `src` |
 
-Контексты `projects`, `tasks`, `github`, `progress` не импортируют друг друга: связь только через события (S-2). Проекции не пишут в журнал (S-5).
+Контексты `projects`, `tasks`, `github`, `progress` не импортируют друг друга: связь только через события (S-2), общий код — `src/domain/shared`. Проекции не пишут в журнал (S-5).
 
 ## Потоки
 
