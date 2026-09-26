@@ -90,6 +90,10 @@ export interface Issue {
   id: string;
   file: string;
   title: string;
+  milestone?: string;
+  labels: string[];
+  /** Номер issue на GitHub после публикации. */
+  github?: number;
   closed: boolean;
   blockedBy: string[];
   atoms: { id: string; done: boolean; line: number }[];
@@ -676,8 +680,20 @@ export function parseIssue(doc: PdaDoc): { issue?: Issue; findings: Finding[] } 
     .map(({ text }) => text)
     .join('\n');
   const elements = [...new Set([...[...pda.matchAll(ISSUE_ELEMENT)].map((m) => m[0]), ...backticked(pda).map((name) => `EV-${name}`)])];
-  const blockedBy = Array.isArray(meta.blocked_by) ? meta.blocked_by.filter((ref): ref is string => typeof ref === 'string') : [];
-  return { issue: { id: meta.id, file: doc.file, title: meta.title, closed: meta.state === 'closed', blockedBy, atoms, elements }, findings: [] };
+  const strings = (list: unknown): string[] => (Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string') : []);
+  const issue: Issue = {
+    id: meta.id,
+    file: doc.file,
+    title: meta.title,
+    labels: strings(meta.labels),
+    closed: meta.state === 'closed',
+    blockedBy: strings(meta.blocked_by),
+    atoms,
+    elements,
+  };
+  if (typeof meta.milestone === 'string') issue.milestone = meta.milestone;
+  if (typeof meta.github === 'number') issue.github = meta.github;
+  return { issue, findings: [] };
 }
 
 function cycleThrough(issues: Map<string, Issue>): string[] | null {
@@ -897,7 +913,7 @@ export function formatTrace(result: CheckResult, ids: string[], testsByInvariant
     const status = row?.status ?? atom.decision ?? (atom.kind === 'scope' ? `scope ${atom.release ?? ''}`.trim() : releaseOf(atom, result.registry) ?? '?');
     const issues = (result.issues ?? []).flatMap((issue) => {
       const item = issue.atoms.find((a) => a.id === id);
-      return item ? [`${issue.id}${item.done ? ' ✓' : ''}`] : [];
+      return item ? [`${issue.id}${issue.github === undefined ? '' : ` #${issue.github}`}${item.done ? ' ✓' : ''}`] : [];
     });
     const tests = [...new Set(refs.filter((ref) => ref.startsWith('INV-')).flatMap((inv) => testsByInvariant.get(inv) ?? []))];
     lines.push(`${id}  §${entry?.section ?? '?'}  ${status}`, `  «${entry?.text ?? ''}»`);

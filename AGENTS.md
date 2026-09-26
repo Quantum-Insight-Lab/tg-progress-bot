@@ -36,6 +36,7 @@ src/config         ничего не импортирует из src
 | Тесты | Vitest; тест инварианта начинается с его ID, `INV-xx` | есть |
 | Проверки | `npm run ci`: типы, ESLint, dependency-cruiser, сверка генерации, S-7, тесты, `tz:check --gate --pda` с TR-7 и TR-8 по backlog | есть |
 | Трасса атома | `npm run tz:trace -- R-xxx`: атом → элементы PDA → issues → тесты | есть |
+| Публикация backlog | `npm run backlog:publish`: сухой прогон по умолчанию, `--apply` — запись в GitHub, `--preview I-xx` — тело issue | есть |
 
 ## Запреты
 
