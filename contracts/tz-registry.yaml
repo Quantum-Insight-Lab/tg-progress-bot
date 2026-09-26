@@ -2,6 +2,89 @@
 # Проверяется `npm run tz:check`. Новый атом получает следующий свободный номер; номера не переиспользуются.
 source: docs/tz.md
 
-glossary: {}
+glossary:
+  ветка: топик исполнителя в супергруппе проекта; «ветка исполнителя» и «топик исполнителя» — одно и то же
+  топик: topic Telegram внутри супергруппы — топик исполнителя или командный топик
 
-atoms: {}
+atoms:
+  # §12 Объём работ · MVP
+  R-001: { kind: scope, release: mvp }
+  R-002: { kind: scope, release: mvp }
+  R-003: { kind: scope, release: mvp }
+  R-004: { kind: scope, release: mvp }
+  R-005: { kind: scope, release: mvp }
+  R-006: { kind: scope, release: mvp }
+  R-007: { kind: scope, release: mvp }
+  R-008: { kind: scope, release: mvp }
+  R-009: { kind: scope, release: mvp }
+  R-010: { kind: scope, release: mvp }
+  R-011: { kind: scope, release: mvp }
+  R-012: { kind: scope, release: mvp }
+  R-013: { kind: scope, release: mvp }
+  R-014: { kind: scope, release: mvp }
+  R-015: { kind: scope, release: mvp }
+  R-016: { kind: scope, release: mvp }
+  R-017: { kind: scope, release: mvp }
+  R-018: { kind: scope, release: mvp }
+  R-019: { kind: scope, release: mvp }
+  R-020: { kind: scope, release: mvp }
+  R-021: { kind: scope, release: mvp }
+  R-022:
+    kind: scope
+    release: mvp
+    decision: clarify
+    defect: D-5
+    note: >-
+      MVP п.5 включает «короткую динамику» (и §5 рисует строку последних снимков доли),
+      а «Дальше» откладывает «динамику по снимкам» (R-059). Что из динамики входит в MVP?
+  R-023: { kind: scope, release: mvp }
+  R-024: { kind: scope, release: mvp }
+  R-025: { kind: scope, release: mvp }
+  R-026: { kind: scope, release: mvp }
+  R-027: { kind: scope, release: mvp }
+  R-028: { kind: scope, release: mvp }
+  R-029: { kind: scope, release: mvp }
+  R-030: { kind: scope, release: mvp }
+  R-031: { kind: scope, release: mvp }
+  R-032: { kind: scope, release: mvp }
+  R-033: { kind: scope, release: mvp }
+  R-034: { kind: scope, release: mvp }
+  R-035: { kind: scope, release: mvp }
+  R-036: { kind: scope, release: mvp }
+  R-037: { kind: scope, release: mvp }
+  R-038: { kind: scope, release: mvp }
+  R-039: { kind: scope, release: mvp }
+  R-040: { kind: scope, release: mvp }
+  R-041: { kind: scope, release: mvp }
+  R-042: { kind: scope, release: mvp }
+  R-043: { kind: scope, release: mvp }
+  R-044: { kind: scope, release: mvp }
+  R-045: { kind: scope, release: mvp }
+
+  # §12 Объём работ · Не входит в MVP. release: later — если пункт назван и в «Дальше».
+  R-046: { kind: scope, release: out }
+  R-047: { kind: scope, release: out }
+  R-048: { kind: scope, release: out }
+  R-049: { kind: scope, release: out }
+  R-050: { kind: scope, release: later }
+  R-051: { kind: scope, release: out }
+  R-052: { kind: scope, release: out }
+  R-053: { kind: scope, release: out }
+  R-054:
+    kind: scope
+    release: out
+    note: из AI в «Дальше» назван только пересказ блоков отчёта — R-057
+  R-055: { kind: scope, release: later }
+  R-056: { kind: scope, release: later }
+
+  # §12 Объём работ · Дальше
+  R-057: { kind: scope, release: later }
+  R-058: { kind: scope, release: later, decision: same_as, same_as: R-055 }
+  R-059: { kind: scope, release: later }
+  R-060: { kind: scope, release: later, decision: same_as, same_as: R-050 }
+  R-061: { kind: scope, release: later }
+  R-062: { kind: scope, release: later }
+  R-063: { kind: scope, release: later, decision: same_as, same_as: R-056 }
+  R-064: { kind: scope, release: later }
+  R-065: { kind: scope, release: later }
+  R-066: { kind: scope, release: later }
