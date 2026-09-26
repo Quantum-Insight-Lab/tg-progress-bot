@@ -532,110 +532,202 @@
 
 ## 8. Архитектура
 
-```
-Telegram Bot → Bot API / Webhook → Backend → Progress Engine → PostgreSQL
-                                             ├── Tasks
-                                             ├── GitHub mirror (на репозиторий)
-                                             ├── Event Processor
-                                             └── Report Generator
-GitHub: API + Webhooks → Event Processor
-```
+- {R-773} Telegram Bot → Bot API / Webhook → {R-774} Backend → Progress Engine → {R-775} PostgreSQL;
+- {ctx} в Progress Engine:
+  - {R-776} Tasks;
+  - {R-777} GitHub mirror (на репозиторий);
+  - {R-778} Event Processor;
+  - {R-779} Report Generator;
+- {R-780} GitHub: API + Webhooks → Event Processor.
 
-Задачи с зеркалом не соединены внешним ключом. Сопоставление человека и логина происходит в момент показа.
+{R-781} Задачи с зеркалом не соединены внешним ключом. {R-782} Сопоставление человека и логина происходит в момент показа.
 
 ---
 
 ## 9. Структура данных
 
-Сначала люди и чат, потом проекты и задачи, потом канвас, в конце зеркало репозитория. Задача на issue не ссылается.
+{ctx} Сначала люди и чат, потом проекты и задачи, потом канвас, в конце зеркало репозитория. {R-783} Задача на issue не ссылается.
 
 ### users
 
-`id`, `telegram_user_id`, `github_login` (пусто — сопоставления нет), `name`, `is_root`
+- {R-784} `id`;
+- {R-785} `telegram_user_id`;
+- {R-786} `github_login` {R-787} (пусто — сопоставления нет);
+- {R-788} `name`;
+- {R-789} `is_root`.
 
-`telegram_user_id` уникален. Пустой логин уникальности не нарушает, занятый логин — один на бота. `is_root` истинен ровно у одного пользователя: того, кто первым нажал `/start`.
+{R-790} `telegram_user_id` уникален. {R-791} Пустой логин уникальности не нарушает, {R-792} занятый логин — один на бота. {R-793} `is_root` истинен ровно у одного пользователя: {R-794} того, кто первым нажал `/start`.
 
 ### chats
 
-`id`, `telegram_chat_id` — супергруппа, не топик, `reports_topic_id` — командный топик внутри этой группы (пусто — не выбран), `timezone`, `daily_cron`, `weekly_cron`, `daily_enabled`, `weekly_enabled`
+- {R-795} `id`;
+- {R-796} `telegram_chat_id` {R-797} — супергруппа, не топик;
+- {R-798} `reports_topic_id` — командный топик внутри этой группы {R-799} (пусто — не выбран);
+- {R-800} `timezone`;
+- {R-801} `daily_cron`;
+- {R-802} `weekly_cron`;
+- {R-803} `daily_enabled`;
+- {R-804} `weekly_enabled`.
 
-Топик исполнителя здесь не хранится: он в `project_members.topic_id`. Расписание отчётов живёт на группе, не на проекте. В `reports_topic_id` уходит один отчёт сразу по всем проектам этой группы.
+{R-805} Топик исполнителя здесь не хранится: {R-806} он в `project_members.topic_id`. {R-807} Расписание отчётов живёт на группе, не на проекте. {R-808} В `reports_topic_id` уходит один отчёт сразу по всем проектам этой группы.
 
 ### projects
 
-`id`, `chat_id`, `name`, `description`, `repository_id` (пусто — репозиторий не подключён), `timezone`, `created_at`
+- {R-809} `id`;
+- {R-810} `chat_id`;
+- {R-811} `name`;
+- {R-812} `description`;
+- {R-813} `repository_id` {R-814} (пусто — репозиторий не подключён);
+- {R-815} `timezone`;
+- {R-816} `created_at`.
 
-Несколько проектов могут ссылаться на один `chat_id` и на один `repository_id`. Сутки задач и застой считаются по таймзоне проекта. Час отчёта — по таймзоне чата.
+{R-817} Несколько проектов могут ссылаться на один `chat_id` {R-818} и на один `repository_id`. {R-819} Сутки задач {R-820} и застой считаются по таймзоне проекта. {R-821} Час отчёта — по таймзоне чата.
 
 ### project_members
 
-`id`, `project_id`, `user_id`, `role` (`member` / `lead`), `topic_id` — топик исполнителя; пусто, пока чат не привязан
+- {R-822} `id`;
+- {R-823} `project_id`;
+- {R-824} `user_id`;
+- {R-825} `role` (`member` / `lead`);
+- {R-826} `topic_id` — топик исполнителя; {R-827} пусто, пока чат не привязан.
 
-Уникально `project_id + user_id`. Канвас живёт в `topic_id`. Командный топик сюда не пишется.
+{R-828} Уникально `project_id + user_id`. {R-829} Канвас живёт в `topic_id`. {R-830} Командный топик сюда не пишется.
 
 ### tasks
 
-`id`, `project_id`, `number`, `title`, `status` (`PLANNED` / `IN_PROGRESS` / `BLOCKED` / `REVIEW` / `DONE` / `CANCELLED`), `priority` (`high` / `normal` / `low`), `assignee_id`, `created_at`, `updated_at`, `completed_at`
+- {R-831} `id`;
+- {R-832} `project_id`;
+- {R-833} `number`;
+- {R-834} `title`;
+- {R-835} `status` (`PLANNED` / `IN_PROGRESS` / `BLOCKED` / `REVIEW` / `DONE` / `CANCELLED`);
+- {R-836} `priority` (`high` / `normal` / `low`);
+- {R-837} `assignee_id`;
+- {R-838} `created_at`;
+- {R-839} `updated_at`;
+- {R-840} `completed_at`.
 
-`number` уникален в проекте. Колонок issue и прогресса задачи нет. Вес не хранится.
+{R-841} `number` уникален в проекте. {R-842} Колонок issue {R-843} и прогресса задачи нет. {R-844} Вес не хранится.
 
 ### blockers
 
-`id`, `task_id`, `reason`, `asked_at`, `resolved_at`
+- {R-845} `id`;
+- {R-846} `task_id`;
+- {R-847} `reason`;
+- {R-848} `asked_at`;
+- {R-849} `resolved_at`.
 
-Только блокеры задач. Строки про CI и PR сюда не пишутся: они выводятся из зеркала.
+{R-850} Только блокеры задач. {R-851} Строки про CI и PR сюда не пишутся: {R-852} они выводятся из зеркала.
 
 ### canvases
 
-`id`, `project_id`, `assignee_id`, `topic_id`, `message_id`, `canvas_date`
+- {R-853} `id`;
+- {R-854} `project_id`;
+- {R-855} `assignee_id`;
+- {R-856} `topic_id`;
+- {R-857} `message_id`;
+- {R-858} `canvas_date`.
 
-Одно rich-сообщение канваса. Уникально `project_id + assignee_id + canvas_date`.
+{R-859} Одно rich-сообщение канваса. {R-860} Уникально `project_id + assignee_id + canvas_date`.
 
 ### canvas_items
 
-`id`, `canvas_id`, `task_id`, `position`, `carried_from_canvas_id`
+- {R-861} `id`;
+- {R-862} `canvas_id`;
+- {R-863} `task_id`;
+- {R-864} `position`;
+- {R-865} `carried_from_canvas_id`.
 
-Какие задачи нарисованы на этом канвасе и в каком порядке. Галочка, «в план», «подтвердить» и «отменить» в таблицу кнопок не складываются: их рисуют из `tasks.status`.
+{R-866} Какие задачи нарисованы на этом канвасе и в каком порядке. {R-867} Галочка, «в план», «подтвердить» и «отменить» в таблицу кнопок не складываются: {R-868} их рисуют из `tasks.status`.
 
 ### repositories
 
-`id`, `owner`, `name`, `default_branch_ci`
+- {R-869} `id`;
+- {R-870} `owner`;
+- {R-871} `name`;
+- {R-872} `default_branch_ci`.
 
 ### issues
 
-`id`, `repository_id`, `issue_number`, `title`, `state`, `state_reason` (`completed` / `not_planned`, пусто у открытого), `closed_by_login`, `updated_at`, `closed_at`
+- {R-873} `id`;
+- {R-874} `repository_id`;
+- {R-875} `issue_number`;
+- {R-876} `title`;
+- {R-877} `state`;
+- {R-878} `state_reason` (`completed` / `not_planned`, {R-879} пусто у открытого);
+- {R-880} `closed_by_login`;
+- {R-881} `updated_at`;
+- {R-882} `closed_at`.
 
-Природный ключ — репозиторий и номер, не проект. Из этой таблицы считается доля бэклога.
+{R-883} Природный ключ — репозиторий и номер, {R-884} не проект. {R-885} Из этой таблицы считается доля бэклога.
 
 ### issue_assignees
 
-`issue_id`, `login` — зеркало assignees. Один issue может быть назначен нескольким людям. По этим логинам строится срез 3.4.
+- {R-886} `issue_id`;
+- {R-887} `login`.
+
+{R-888} Зеркало assignees. {R-889} Один issue может быть назначен нескольким людям. {R-890} По этим логинам строится срез 3.4.
 
 ### issue_dependencies
 
-`issue_id`, `depends_on_issue_id`, `link_type` (`blocked_by` / `sub_issue`) — дописывается к issue, который и так попал в срез канваса
+- {R-891} `issue_id`;
+- {R-892} `depends_on_issue_id`;
+- {R-893} `link_type` (`blocked_by` / `sub_issue`).
+
+{R-894} Дописывается к issue, который и так попал в срез канваса.
 
 ### milestones
 
-`id`, `repository_id`, `milestone_number`, `title`, `state`, `due_on` — зеркало GitHub, не этапы проекта. Отдельного процента нет.
+- {R-895} `id`;
+- {R-896} `repository_id`;
+- {R-897} `milestone_number`;
+- {R-898} `title`;
+- {R-899} `state`;
+- {R-900} `due_on`.
+
+{R-901} Зеркало GitHub, {R-902} не этапы проекта. {R-903} Отдельного процента нет.
 
 ### pull_requests
 
-`id`, `repository_id`, `pull_request_number`, `title`, `author_login`, `state`, `ci_status`, `updated_at`, `merged_at`, `merged_by_login`
+- {R-904} `id`;
+- {R-905} `repository_id`;
+- {R-906} `pull_request_number`;
+- {R-907} `title`;
+- {R-908} `author_login`;
+- {R-909} `state`;
+- {R-910} `ci_status`;
+- {R-911} `updated_at`;
+- {R-912} `merged_at`;
+- {R-913} `merged_by_login`.
 
 ### commits
 
-`id`, `repository_id`, `sha`, `message`, `author_login`, `created_at` — хвост для строки GitHub на канвасе и блока отчёта, не журнал всей истории
+- {R-914} `id`;
+- {R-915} `repository_id`;
+- {R-916} `sha`;
+- {R-917} `message`;
+- {R-918} `author_login`;
+- {R-919} `created_at`.
+
+{R-920} Хвост для строки GitHub на канвасе и блока отчёта, {R-921} не журнал всей истории.
 
 ### progress_snapshots
 
-`id`, `project_id`, `progress`, `created_at`
+- {R-922} `id`;
+- {R-923} `project_id`;
+- {R-924} `progress`;
+- {R-925} `created_at`.
 
-Суточная доля бэклога проекта. У двух проектов с одним репозиторием числа совпадают. Смена репозитория старые строки не переписывает.
+{R-926} Суточная доля бэклога проекта. {R-927} У двух проектов с одним репозиторием числа совпадают. {R-928} Смена репозитория старые строки не переписывает.
 
 ### events
 
-`id`, `source`, `event_type`, `payload`, `created_at` — журнал только дополняется
+- {R-929} `id`;
+- {R-930} `source`;
+- {R-931} `event_type`;
+- {R-932} `payload`;
+- {R-933} `created_at`.
+
+{R-934} Журнал только дополняется.
 
 ---
 

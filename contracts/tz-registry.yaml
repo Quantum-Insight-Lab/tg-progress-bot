@@ -935,3 +935,221 @@ atoms:
   # Ответы на вопросы прохода 7
   R-771: { kind: rule, scope: R-033 }
   R-772: { kind: act, scope: R-033 }
+
+  # §8 Архитектура
+  R-773: { kind: tech, scope: R-001 }
+  R-774: { kind: tech, scope: R-001 }
+  R-775: { kind: tech, scope: R-001 }
+  R-776: { kind: tech, scope: R-009 }
+  R-777: { kind: tech, scope: R-043 }
+  R-778: { kind: tech, scope: R-043 }
+  R-779: { kind: tech, scope: R-030 }
+  R-780: { kind: tech, scope: R-043 }
+  R-781: { kind: rule, scope: R-011 }
+  R-782: { kind: rule, scope: R-015, decision: same_as, same_as: R-422 }
+
+  # §9 Структура данных
+  R-783: { kind: rule, scope: R-011, decision: same_as, same_as: R-214 }
+  # users
+  R-784: { kind: entity, scope: R-005 }
+  R-785: { kind: entity, scope: R-005 }
+  R-786: { kind: entity, scope: R-008 }
+  R-787: { kind: rule, scope: R-008 }
+  R-788: { kind: entity, scope: R-005 }
+  R-789: { kind: entity, scope: R-035 }
+  R-790: { kind: rule, scope: R-005 }
+  R-791: { kind: rule, scope: R-008 }
+  R-792: { kind: rule, scope: R-008, decision: same_as, same_as: R-289 }
+  R-793: { kind: rule, scope: R-035 }
+  R-794: { kind: rule, scope: R-035 }
+  # chats
+  R-795: { kind: entity, scope: R-037 }
+  R-796: { kind: entity, scope: R-037 }
+  R-797: { kind: rule, scope: R-037 }
+  R-798: { kind: entity, scope: R-039 }
+  R-799: { kind: rule, scope: R-039 }
+  R-800: { kind: entity, scope: R-033 }
+  R-801: { kind: entity, scope: R-033 }
+  R-802: { kind: entity, scope: R-055, decision: deferred }
+  R-803:
+    kind: entity
+    scope: R-033
+    decision: clarify
+    defect: D-5
+    note: >-
+      `daily_enabled` — отдельный флаг включения, а по решению прохода 7 рассылка включена, пока задано время
+      (R-771), отдельного переключателя нет. Убрать `daily_enabled` и по аналогии `weekly_enabled`?
+  R-804: { kind: entity, scope: R-055, decision: deferred }
+  R-805: { kind: rule, scope: R-042 }
+  R-806: { kind: rule, scope: R-042 }
+  R-807: { kind: rule, scope: R-033, decision: same_as, same_as: R-767 }
+  R-808: { kind: rule, scope: R-031, decision: same_as, same_as: R-170 }
+  # projects
+  R-809: { kind: entity, scope: R-036 }
+  R-810: { kind: entity, scope: R-037, decision: same_as, same_as: R-160 }
+  R-811: { kind: entity, scope: R-036, decision: same_as, same_as: R-157 }
+  R-812: { kind: entity, scope: R-036, decision: same_as, same_as: R-158 }
+  R-813: { kind: entity, scope: R-038 }
+  R-814: { kind: rule, scope: R-003 }
+  R-815: { kind: entity, scope: R-036, decision: same_as, same_as: R-159 }
+  R-816: { kind: entity, scope: R-036 }
+  R-817: { kind: rule, scope: R-037, decision: same_as, same_as: R-541 }
+  R-818: { kind: rule, scope: R-002, decision: same_as, same_as: R-166 }
+  R-819: { kind: rule, scope: R-029, decision: same_as, same_as: R-162 }
+  R-820: { kind: rule, scope: R-023, decision: same_as, same_as: R-163 }
+  R-821: { kind: rule, scope: R-033, decision: same_as, same_as: R-164 }
+  # project_members
+  R-822: { kind: entity, scope: R-005 }
+  R-823: { kind: entity, scope: R-005 }
+  R-824: { kind: entity, scope: R-005 }
+  R-825: { kind: entity, scope: R-006 }
+  R-826: { kind: entity, scope: R-042 }
+  R-827: { kind: rule, scope: R-037, decision: same_as, same_as: R-570 }
+  R-828: { kind: rule, scope: R-005 }
+  R-829: { kind: rule, scope: R-001, decision: same_as, same_as: R-470 }
+  R-830: { kind: rule, scope: R-039 }
+  # tasks — поля повторяют §2.2
+  R-831: { kind: entity, scope: R-009 }
+  R-832: { kind: entity, scope: R-009, decision: same_as, same_as: R-205 }
+  R-833: { kind: entity, scope: R-009, decision: same_as, same_as: R-201 }
+  R-834: { kind: entity, scope: R-009, decision: same_as, same_as: R-202 }
+  R-835: { kind: entity, scope: R-009, decision: same_as, same_as: R-208 }
+  R-836: { kind: entity, scope: R-010, decision: same_as, same_as: R-206 }
+  R-837: { kind: entity, scope: R-009, decision: same_as, same_as: R-207 }
+  R-838: { kind: entity, scope: R-009, decision: same_as, same_as: R-209 }
+  R-839: { kind: entity, scope: R-009, decision: same_as, same_as: R-210 }
+  R-840: { kind: entity, scope: R-009, decision: same_as, same_as: R-211 }
+  R-841: { kind: rule, scope: R-009 }
+  R-842: { kind: rule, scope: R-011, decision: same_as, same_as: R-214 }
+  R-843: { kind: rule, scope: R-014, decision: same_as, same_as: R-216 }
+  R-844: { kind: rule, scope: R-014, decision: same_as, same_as: R-215 }
+  # blockers
+  R-845: { kind: entity, scope: R-024 }
+  R-846: { kind: entity, scope: R-024 }
+  R-847: { kind: entity, scope: R-024, decision: same_as, same_as: R-263 }
+  R-848: { kind: entity, scope: R-024 }
+  R-849:
+    kind: entity
+    scope: R-024
+    decision: clarify
+    defect: D-2
+    note: >-
+      Когда блокер закрывается (`resolved_at`)? Про «нет блокера» сказано (R-257), а если задачу отметили
+      галочкой, отправили в план или отменили — не сказано.
+  R-850: { kind: rule, scope: R-024 }
+  R-851: { kind: rule, scope: R-025 }
+  R-852: { kind: rule, scope: R-025 }
+  # canvases
+  R-853: { kind: entity, scope: R-001 }
+  R-854: { kind: entity, scope: R-001 }
+  R-855: { kind: entity, scope: R-001 }
+  R-856: { kind: entity, scope: R-001 }
+  R-857: { kind: entity, scope: R-001 }
+  R-858: { kind: entity, scope: R-001 }
+  R-859: { kind: entity, scope: R-001 }
+  R-860: { kind: rule, scope: R-001, decision: same_as, same_as: R-618 }
+  # canvas_items
+  R-861: { kind: entity, scope: R-018 }
+  R-862: { kind: entity, scope: R-018 }
+  R-863: { kind: entity, scope: R-018 }
+  R-864: { kind: entity, scope: R-018 }
+  R-865: { kind: entity, scope: R-029 }
+  R-866: { kind: entity, scope: R-018 }
+  R-867:
+    kind: rule
+    scope: R-018
+    decision: clarify
+    defect: D-5
+    note: >-
+      Перечень кнопок устарел: после решений прохода 2 и 5 есть ещё «вернуть» (R-327) и «в работу» (R-579).
+      Написать общо — «кнопки задачи в таблицу не складываются»?
+  R-868: { kind: rule, scope: R-018 }
+  # repositories
+  R-869: { kind: entity, scope: R-038 }
+  R-870: { kind: entity, scope: R-038 }
+  R-871: { kind: entity, scope: R-038 }
+  R-872: { kind: entity, scope: R-025 }
+  # issues
+  R-873: { kind: entity, scope: R-012 }
+  R-874: { kind: entity, scope: R-012 }
+  R-875: { kind: entity, scope: R-012 }
+  R-876: { kind: entity, scope: R-017 }
+  R-877: { kind: entity, scope: R-012 }
+  R-878: { kind: entity, scope: R-012 }
+  R-879: { kind: rule, scope: R-012 }
+  R-880: { kind: entity, scope: R-045 }
+  R-881: { kind: entity, scope: R-012 }
+  R-882: { kind: entity, scope: R-017 }
+  R-883: { kind: rule, scope: R-012 }
+  R-884: { kind: rule, scope: R-002 }
+  R-885: { kind: rule, scope: R-012 }
+  # issue_assignees
+  R-886: { kind: entity, scope: R-015 }
+  R-887: { kind: entity, scope: R-015 }
+  R-888: { kind: entity, scope: R-015 }
+  R-889: { kind: rule, scope: R-015 }
+  R-890: { kind: rule, scope: R-015 }
+  # issue_dependencies
+  R-891: { kind: entity, scope: R-017 }
+  R-892: { kind: entity, scope: R-017 }
+  R-893: { kind: entity, scope: R-017 }
+  R-894: { kind: view, scope: R-017, decision: same_as, same_as: R-386 }
+  # milestones
+  R-895: { kind: entity, scope: R-021 }
+  R-896: { kind: entity, scope: R-021 }
+  R-897: { kind: entity, scope: R-021 }
+  R-898: { kind: entity, scope: R-021 }
+  R-899: { kind: entity, scope: R-021 }
+  R-900: { kind: entity, scope: R-021 }
+  R-901: { kind: entity, scope: R-021, decision: same_as, same_as: R-189 }
+  R-902: { kind: rule, scope: R-011, decision: same_as, same_as: R-190 }
+  R-903: { kind: rule, scope: R-021, decision: same_as, same_as: R-193 }
+  # pull_requests
+  R-904: { kind: entity, scope: R-021 }
+  R-905: { kind: entity, scope: R-021 }
+  R-906: { kind: entity, scope: R-021 }
+  R-907: { kind: entity, scope: R-021 }
+  R-908:
+    kind: entity
+    scope: R-026
+    decision: clarify
+    defect: D-2
+    note: >-
+      PR относится к участнику по автору и запрошенному ревьюеру (R-392, R-393), но запрошенных ревьюеров
+      в `pull_requests` нет. Добавить таблицу ревьюеров?
+  R-909: { kind: entity, scope: R-021 }
+  R-910: { kind: entity, scope: R-026 }
+  R-911: { kind: entity, scope: R-026 }
+  R-912: { kind: entity, scope: R-034 }
+  R-913: { kind: entity, scope: R-034 }
+  # commits
+  R-914: { kind: entity, scope: R-034 }
+  R-915: { kind: entity, scope: R-034 }
+  R-916: { kind: entity, scope: R-034 }
+  R-917: { kind: entity, scope: R-034 }
+  R-918: { kind: entity, scope: R-045 }
+  R-919: { kind: entity, scope: R-034 }
+  R-920:
+    kind: rule
+    scope: R-034
+    decision: clarify
+    defect: D-5
+    note: >-
+      «Хвост для строки GitHub на канвасе», но строка GitHub на канвасе коммитов не показывает (§3.1, R-357);
+      коммиты нужны блоку отчёта (R-379) и сигналу расхождения (R-408).
+  R-921: { kind: rule, scope: R-034 }
+  # progress_snapshots
+  R-922: { kind: entity, scope: R-022 }
+  R-923: { kind: entity, scope: R-022 }
+  R-924: { kind: entity, scope: R-022 }
+  R-925: { kind: entity, scope: R-022 }
+  R-926: { kind: entity, scope: R-022, decision: same_as, same_as: R-466 }
+  R-927: { kind: rule, scope: R-002, decision: same_as, same_as: R-174 }
+  R-928: { kind: rule, scope: R-022, decision: same_as, same_as: R-188 }
+  # events
+  R-929: { kind: entity, scope: R-043 }
+  R-930: { kind: entity, scope: R-043 }
+  R-931: { kind: entity, scope: R-043 }
+  R-932: { kind: entity, scope: R-043 }
+  R-933: { kind: entity, scope: R-043 }
+  R-934: { kind: rule, scope: R-043 }
