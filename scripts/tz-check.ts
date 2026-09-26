@@ -66,6 +66,7 @@ export interface PdaElement {
   line: number;
   refs: string[];
   derived: boolean;
+  cells: Record<string, string>;
 }
 
 export interface CheckResult {
@@ -461,6 +462,7 @@ export function parsePdaElements(doc: PdaDoc): PdaElement[] {
       line: index + 1,
       refs: [...refs.matchAll(/R-\d{3,}/g)].map((match) => match[0]),
       derived: refs.includes('derived:'),
+      cells: Object.fromEntries(header.map((name, column) => [name, cells[column] ?? ''])),
     });
   }
   return elements;
@@ -500,8 +502,33 @@ export function atomTexts(blocks: Block[]): Map<string, { text: string; section:
   return texts;
 }
 
+const TABLE_COLUMN = 'Таблица';
+const FIELDS_COLUMN = 'Поля';
+const TABLE_SECTION = /^[a-z_]+$/;
+
+function backticked(text: string | undefined): string[] {
+  return [...(text ?? '').matchAll(/`([^`]+)`/g)].map((match) => match[1] ?? '');
+}
+
+/** Поле схемы — атом вида entity в разделе-таблице §9; узел графа покрывает его по имени поля (10.13). */
+function nodeByField(section: string, text: string, elements: PdaElement[]): string | undefined {
+  if (!TABLE_SECTION.test(section)) return undefined;
+  const field = backticked(text)[0];
+  if (field === undefined) return undefined;
+  return elements.find(
+    (element) =>
+      element.id.startsWith('E-') &&
+      backticked(element.cells[TABLE_COLUMN]).includes(section) &&
+      backticked(element.cells[FIELDS_COLUMN]).includes(field),
+  )?.id;
+}
+
 /** TR-4: покрытие атомов MVP элементами PDA нужного вида. Повторы, решения и атомы вида scope не считаются. */
-export function coverage(registry: Registry, elements: PdaElement[]): CoverageRow[] {
+export function coverage(
+  registry: Registry,
+  elements: PdaElement[],
+  texts: Map<string, { text: string; section: string }> = new Map(),
+): CoverageRow[] {
   const refsTo = new Map<string, string[]>();
   for (const element of elements) {
     for (const ref of element.refs) refsTo.set(ref, [...(refsTo.get(ref) ?? []), element.id]);
@@ -509,7 +536,10 @@ export function coverage(registry: Registry, elements: PdaElement[]): CoverageRo
   const rows: CoverageRow[] = [];
   for (const [id, atom] of registry.atoms) {
     if (atom.kind === 'scope' || atom.decision !== undefined || releaseOf(atom, registry) !== 'mvp') continue;
-    const refs = refsTo.get(id) ?? [];
+    const refs = [...(refsTo.get(id) ?? [])];
+    const entry = texts.get(id);
+    const node = atom.kind === 'entity' && entry ? nodeByField(entry.section, entry.text, elements) : undefined;
+    if (node !== undefined && !refs.includes(node)) refs.push(node);
     const allowed = COVERED_BY[atom.kind];
     const status: Coverage =
       refs.length === 0 ? 'orphan' : refs.some((ref) => allowed.includes(ref.split('-')[0] ?? '')) ? 'covered' : 'partial';
@@ -557,7 +587,7 @@ function coverageSummary(rows: CoverageRow[]): string {
 
 export function formatUncovered(result: CheckResult, kind: string): string {
   const texts = atomTexts(result.blocks);
-  const rows = coverage(result.registry, result.elements).filter((row) => row.kind === kind && row.status !== 'covered');
+  const rows = coverage(result.registry, result.elements, texts).filter((row) => row.kind === kind && row.status !== 'covered');
   const lines = [`Не покрыты атомы MVP вида ${kind} (${rows.length}):`];
   for (const row of rows) {
     const entry = texts.get(row.id);
@@ -579,7 +609,7 @@ export function formatReport(result: CheckResult): string {
     ['TR-2', `атомов ${atoms.length}, следующий номер ${formatId(Math.max(0, ...numbers) + 1)}`],
     ['TR-3', `релизы scope: ${countBy(atoms, (a) => (a.kind === 'scope' ? a.release : undefined))}`],
     ['TR-5', `элементов PDA: ${countBy(result.elements, (e) => e.id.split('-')[0])}; ссылок на атомы: ${result.elements.reduce((n, e) => n + e.refs.length, 0)}`],
-    ['TR-4', `покрыто атомов MVP по видам: ${coverageSummary(coverage(registry, result.elements))}`],
+    ['TR-4', `покрыто атомов MVP по видам: ${coverageSummary(coverage(registry, result.elements, atomTexts(blocks)))}`],
     ['REG', `виды: ${countBy(atoms, (a) => a.kind)}; решения: ${countBy(atoms, (a) => a.decision)}`],
   ];
   if (result.gate) rules.push(['GATE', 'D-1…D-6 по 10.10']);

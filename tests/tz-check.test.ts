@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { check, coverage, parsePdaElements, splitBlocks, type Finding, type Rule } from '../scripts/tz-check.ts';
+import { atomTexts, check, coverage, parsePdaElements, splitBlocks, type Finding, type Rule } from '../scripts/tz-check.ts';
 
 const registry = (atoms: string, glossary = ''): string => `source: tz.md\n${glossary}atoms:\n${atoms}`;
 
@@ -261,6 +261,21 @@ describe('TR-4: покрытие по правилу вида', () => {
     '| U-1 | неопределённость | R-004 |',
     '| A-1 | акт | R-003, R-008 |',
   ].join('\n');
+
+  it('узел графа покрывает поле схемы по имени, без ссылки', () => {
+    const fieldAtoms = ['  R-001: { kind: scope, release: mvp }', '  R-002: { kind: entity, scope: R-001 }', '  R-003: { kind: entity, scope: R-001 }', ''].join('\n');
+    const schema = ['### users', '', '- {R-001} `id`;', '- {R-002} `telegram_user_id`;', '- {R-003} `name`.'].join('\n');
+    const graph = [
+      '| ID | Сущность | Таблица | Поля | Из ТЗ |',
+      '| --- | --- | --- | --- | --- |',
+      '| E-1 | Пользователь | `users` | `id`, `telegram_user_id` | derived: пример |',
+    ].join('\n');
+    const result = check(registry(fieldAtoms), () => schema, { gate: false }, [{ file: 'g.md', text: graph }]);
+    expect(coverage(result.registry, result.elements, atomTexts(result.blocks)).map((r) => [r.id, r.status, r.refs])).toEqual([
+      ['R-002', 'covered', ['E-1']],
+      ['R-003', 'orphan', []],
+    ]);
+  });
 
   it('акт покрывает act, неопределённость — нет; повторы, отложенное и scope не считаются', () => {
     const result = check(registry(atoms), () => tz, { gate: false }, [{ file: 'p.md', text: pda }]);
