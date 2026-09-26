@@ -1172,3 +1172,6 @@ atoms:
   R-958: { kind: view, scope: R-021, decision: same_as, same_as: R-357 }
   R-959: { kind: rule, scope: R-009 }
   R-960: { kind: rule, scope: R-014, decision: same_as, same_as: R-081 }
+
+  # Ответ на вопрос прохода 9
+  R-961: { kind: scope, release: later }
