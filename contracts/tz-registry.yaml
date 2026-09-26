@@ -523,3 +523,6 @@ atoms:
   R-436: { kind: integration, scope: R-043 }
   R-437: { kind: integration, scope: R-043 }
   R-438: { kind: integration, scope: R-043 }
+
+  # Решение 26.09: личка — админка
+  R-439: { kind: scope, release: mvp }
