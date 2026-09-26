@@ -1175,3 +1175,6 @@ atoms:
 
   # Ответ на вопрос прохода 9
   R-961: { kind: scope, release: later }
+
+  # Решение 26.09 при шаге 2 PDA
+  R-962: { kind: rule, scope: R-018 }
