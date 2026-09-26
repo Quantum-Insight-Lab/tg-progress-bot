@@ -1,7 +1,8 @@
 # Источник правды по событиям (PDA 4.4; патч 1.2 — 9.4; патч 1.3 — realizes).
 # Когда появится код, типы и схемы генерируются из этого файла, ручное объявление типа — ошибка сборки (S-3).
 # Схема существующего события меняется только через version + 1: в журнале уже лежат факты.
-# realizes — атомы ТЗ, которые событие реализует; invariants — INV из docs/pda/04-invariants.md.
+# realizes — атомы ТЗ, которые событие реализует; invariants — INV из docs/pda/04-invariants.md;
+# projections — проекции P-xx из docs/pda/07-architecture.md, которые событие перерисовывает.
 
 meta:
   schema: pda-event-registry/1
@@ -37,6 +38,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-04, INV-05, INV-08, INV-22]
     realizes: [R-326, R-226, R-623, R-106]
+    projections: [P-6, P-13]
     owner: max
 
   - type: task.checked
@@ -49,6 +51,7 @@ events:
     idempotency_key: callback_query_id
     invariants: [INV-05, INV-11, INV-22]
     realizes: [R-154, R-314, R-640, R-609]
+    projections: [P-6]
     owner: max
 
   - type: task.unchecked
@@ -61,6 +64,7 @@ events:
     idempotency_key: callback_query_id
     invariants: [INV-05, INV-22]
     realizes: [R-155, R-315, R-316]
+    projections: [P-6]
     owner: max
 
   - type: task.confirmed
@@ -74,6 +78,7 @@ events:
     idempotency_key: callback_query_id
     invariants: [INV-05, INV-06, INV-11, INV-22]
     realizes: [R-298]
+    projections: [P-6, P-13]
     owner: max
 
   - type: task.returned
@@ -87,6 +92,7 @@ events:
     idempotency_key: callback_query_id
     invariants: [INV-05, INV-22]
     realizes: [R-319]
+    projections: [P-6]
     owner: max
 
   - type: task.planned
@@ -99,6 +105,7 @@ events:
     idempotency_key: callback_query_id
     invariants: [INV-05, INV-07, INV-22]
     realizes: [R-231]
+    projections: [P-6, P-7]
     owner: max
 
   - type: task.resumed
@@ -111,6 +118,7 @@ events:
     idempotency_key: callback_query_id
     invariants: [INV-05, INV-07, INV-22]
     realizes: [R-579]
+    projections: [P-6, P-7]
     owner: max
 
   - type: task.prioritized
@@ -125,6 +133,7 @@ events:
     idempotency_key: callback_query_id
     invariants: [INV-07, INV-08, INV-22]
     realizes: [R-237]
+    projections: [P-6, P-7]
     owner: max
 
   - type: task.cancelled
@@ -139,6 +148,7 @@ events:
     idempotency_key: callback_query_id | member_removed event_id + task_id
     invariants: [INV-05, INV-18, INV-22]
     realizes: [R-247, R-248, R-644]
+    projections: [P-6, P-7, P-13]
     owner: max
 
   - type: blocker.detected
@@ -153,6 +163,7 @@ events:
     idempotency_key: task_id + date
     invariants: [INV-05, INV-10, INV-22]
     realizes: [R-253, R-254]
+    projections: [P-6, P-8, P-13, P-15]
     owner: max
 
   - type: blocker.declared
@@ -166,6 +177,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-11, INV-22]
     realizes: [R-256]
+    projections: [P-8, P-13]
     owner: max
 
   - type: blocker.dismissed
@@ -179,6 +191,7 @@ events:
     idempotency_key: callback_query_id
     invariants: [INV-05, INV-11, INV-22]
     realizes: [R-257]
+    projections: [P-6, P-8]
     owner: max
 
   - type: review.reminded
@@ -192,6 +205,7 @@ events:
     idempotency_key: task_id + date
     invariants: [INV-10, INV-22]
     realizes: [R-261]
+    projections: [P-16]
     owner: max
 
   - type: canvas.posted
@@ -208,6 +222,7 @@ events:
     idempotency_key: project_id + assignee_id + canvas_date
     invariants: [INV-23, INV-24]
     realizes: [R-627, R-571]
+    projections: [P-1]
     owner: max
 
   - type: canvas.edited
@@ -221,6 +236,7 @@ events:
     idempotency_key: canvas_id + causation_id
     invariants: [INV-09, INV-23]
     realizes: [R-628, R-629, R-630, R-631]
+    projections: [P-1]
     owner: max
 
   - type: canvas.full
@@ -233,6 +249,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-09, INV-23]
     realizes: [R-633]
+    projections: [P-1]
     owner: max
 
   - type: canvas.carried_over
@@ -247,6 +264,7 @@ events:
     idempotency_key: project_id + assignee_id + canvas_date
     invariants: [INV-09, INV-22, INV-24]
     realizes: [R-245, R-635, R-637, R-638]
+    projections: [P-1, P-6, P-7]
     owner: max
 
   - type: divergence.detected
@@ -260,6 +278,7 @@ events:
     idempotency_key: project_id + date
     invariants: [INV-15, INV-22]
     realizes: [R-407, R-414]
+    projections: [P-10, P-13]
     owner: max
 
   # projects
@@ -276,6 +295,7 @@ events:
     idempotency_key: telegram_user_id
     invariants: [INV-16, INV-17, INV-22]
     realizes: [R-555, R-304, R-528, R-529, R-530]
+    projections: [P-18]
     owner: max
 
   - type: user.github_login_set
@@ -289,6 +309,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-14, INV-19, INV-20, INV-22]
     realizes: [R-559, R-521]
+    projections: [P-4, P-5]
     owner: max
 
   - type: project.created
@@ -305,6 +326,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-17, INV-19, INV-22]
     realizes: [R-299, R-531, R-534, R-535, R-536, R-537]
+    projections: [P-2, P-12]
     owner: max
 
   - type: project.chat_bound
@@ -318,6 +340,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-20, INV-22, INV-27]
     realizes: [R-538, R-540]
+    projections: [P-1, P-12]
     owner: max
 
   - type: project.repository_connected
@@ -331,6 +354,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-03, INV-19, INV-22]
     realizes: [R-183, R-544, R-546]
+    projections: [P-3, P-4, P-5, P-9, P-12, P-14]
     owner: max
 
   - type: project.repository_changed
@@ -345,6 +369,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-03, INV-19, INV-22]
     realizes: [R-586, R-185, R-186]
+    projections: [P-3, P-4, P-5, P-9, P-12, P-14]
     owner: max
 
   - type: project.settings_changed
@@ -359,6 +384,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-19, INV-22, INV-24]
     realizes: [R-513, R-514, R-515, R-516, R-518]
+    projections: [P-2, P-12]
     owner: max
 
   - type: project.member_added
@@ -373,6 +399,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-16, INV-18, INV-19, INV-22]
     realizes: [R-591, R-517]
+    projections: [P-17, P-18]
     owner: max
 
   - type: project.member_removed
@@ -387,6 +414,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-18, INV-22]
     realizes: [R-251]
+    projections: [P-6, P-18]
     owner: max
 
   - type: member.topic_set
@@ -402,6 +430,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-22, INV-23]
     realizes: [R-592, R-519, R-564, R-566, R-567, R-569, R-572, R-573]
+    projections: [P-1, P-17]
     owner: max
 
   - type: chat.reports_topic_set
@@ -416,6 +445,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-22, INV-27]
     realizes: [R-548, R-549, R-550, R-520]
+    projections: [P-12]
     owner: max
 
   - type: chat.schedule_set
@@ -430,6 +460,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-22, INV-24, INV-27]
     realizes: [R-551, R-585, R-523, R-584]
+    projections: [P-12]
     owner: max
 
   - type: chat.schedule_cleared
@@ -442,6 +473,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-22, INV-27]
     realizes: [R-772]
+    projections: [P-12]
     owner: max
 
   - type: access.denied
@@ -455,6 +487,7 @@ events:
     idempotency_key: telegram update_id
     invariants: [INV-16]
     realizes: [R-312]
+    projections: []
     owner: max
 
   # github — пишет только адаптер GitHub
@@ -475,6 +508,7 @@ events:
     idempotency_key: GitHub delivery id
     invariants: [INV-01, INV-21, INV-22]
     realizes: [R-344, R-347, R-069, R-094, R-338, R-339]
+    projections: [P-3, P-4, P-5, P-13]
     owner: max
 
   - type: github.pull_request_changed
@@ -494,6 +528,7 @@ events:
     idempotency_key: GitHub delivery id
     invariants: [INV-12, INV-13, INV-21, INV-22]
     realizes: [R-346, R-070, R-338, R-339]
+    projections: [P-8, P-9, P-14]
     owner: max
 
   - type: github.commits_pushed
@@ -507,6 +542,7 @@ events:
     idempotency_key: GitHub delivery id
     invariants: [INV-13, INV-15, INV-21, INV-22]
     realizes: [R-345, R-071]
+    projections: [P-9, P-10, P-14]
     owner: max
 
   - type: github.workflow_completed
@@ -523,6 +559,7 @@ events:
     idempotency_key: GitHub delivery id
     invariants: [INV-12, INV-21, INV-22]
     realizes: [R-348, R-072, R-271]
+    projections: [P-8, P-9, P-14]
     owner: max
 
   - type: github.milestone_changed
@@ -539,6 +576,7 @@ events:
     idempotency_key: GitHub delivery id
     invariants: [INV-21, INV-22]
     realizes: [R-436, R-073]
+    projections: [P-9]
     owner: max
 
   - type: github.issue_links_changed
@@ -555,6 +593,7 @@ events:
     idempotency_key: GitHub delivery id
     invariants: [INV-21, INV-22]
     realizes: [R-437, R-438]
+    projections: [P-5]
     owner: max
 
   - type: github.reconciled
@@ -568,6 +607,7 @@ events:
     idempotency_key: repository_id + run_started_at
     invariants: [INV-21, INV-22]
     realizes: [R-350, R-780]
+    projections: [P-3, P-5, P-9]
     owner: max
 
   - type: repo.pr_stalled
@@ -583,6 +623,7 @@ events:
     idempotency_key: repository_id + pull_request_number + date
     invariants: [INV-12, INV-13, INV-22]
     realizes: [R-273]
+    projections: [P-8, P-13]
     owner: max
 
   # progress
@@ -598,6 +639,7 @@ events:
     idempotency_key: project_id + date
     invariants: [INV-01, INV-02, INV-22]
     realizes: [R-465]
+    projections: [P-11, P-12, P-13]
     owner: max
 
   # reports
@@ -616,4 +658,5 @@ events:
     idempotency_key: chat_id + date for schedule, telegram update_id for command
     invariants: [INV-22, INV-25, INV-26, INV-27]
     realizes: [R-754, R-759, R-758]
+    projections: [P-12, P-13, P-14]
     owner: max
