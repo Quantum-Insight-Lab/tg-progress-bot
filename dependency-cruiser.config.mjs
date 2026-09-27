@@ -1,102 +1,35 @@
-/** @type {import("dependency-cruiser").IConfiguration} */
+// Инварианты сборки S-1, S-2, S-5, S-6 (docs/pda/09-structural-invariants.md), слои — docs/pda/07-architecture.md.
+const layer = (name, comment, from, to, pathNot) => ({
+  name,
+  comment,
+  severity: 'error',
+  from: { path: from },
+  to: pathNot === undefined ? { path: to } : { path: to, pathNot },
+});
+
+/** @type {import('dependency-cruiser').IConfiguration} */
 export default {
   forbidden: [
-    {
-      name: "S-1-domain-not-telegram",
-      comment: "S-1: domain не импортирует telegram",
-      severity: "error",
-      from: { path: "^src/domain" },
-      to: { path: "^src/telegram" },
-    },
-    {
-      name: "S-1-domain-not-github",
-      comment: "S-1: domain не импортирует github",
-      severity: "error",
-      from: { path: "^src/domain" },
-      to: { path: "^src/github" },
-    },
-    {
-      name: "S-1-domain-not-projections",
-      comment: "S-1: domain не импортирует projections",
-      severity: "error",
-      from: { path: "^src/domain" },
-      to: { path: "^src/projections" },
-    },
-    {
-      name: "S-1-telegram-not-github",
-      comment: "слои telegram и github не импортируют друг друга",
-      severity: "error",
-      from: { path: "^src/telegram" },
-      to: { path: "^src/github" },
-    },
-    {
-      name: "S-1-github-not-telegram",
-      comment: "слои telegram и github не импортируют друг друга",
-      severity: "error",
-      from: { path: "^src/github" },
-      to: { path: "^src/telegram" },
-    },
-    {
-      name: "S-1-projections-not-domain",
-      comment: "проекции не обращаются к домену",
-      severity: "error",
-      from: { path: "^src/projections" },
-      to: { path: "^src/domain" },
-    },
-    {
-      name: "S-2-projects-not-tasks",
-      comment: "S-2: projects не импортирует tasks",
-      severity: "error",
-      from: { path: "^src/domain/projects" },
-      to: { path: "^src/domain/tasks" },
-    },
-    {
-      name: "S-2-tasks-not-projects",
-      comment: "S-2: tasks не импортирует projects",
-      severity: "error",
-      from: { path: "^src/domain/tasks" },
-      to: { path: "^src/domain/projects" },
-    },
-    {
-      name: "S-2-github-not-projects",
-      comment: "S-2: github-контекст не импортирует projects",
-      severity: "error",
-      from: { path: "^src/domain/github" },
-      to: { path: "^src/domain/projects" },
-    },
-    {
-      name: "S-2-github-not-tasks",
-      comment: "S-2: github-контекст не импортирует tasks",
-      severity: "error",
-      from: { path: "^src/domain/github" },
-      to: { path: "^src/domain/tasks" },
-    },
-    {
-      name: "config-no-src",
-      comment: "src/config ничего не импортирует из src",
-      severity: "error",
-      from: { path: "^src/config" },
-      to: { path: "^src/", pathNot: "^src/config" },
-    },
-    {
-      name: "S-5-projections-not-write-events",
-      comment:
-        "S-5: проекции читают только типы событий, не emit и не журнал",
-      severity: "error",
-      from: { path: "^src/projections" },
-      to: { path: "^src/events", pathNot: "^src/events/generated" },
-    },
+    layer('S-1-domain', 'S-1: домен не импортирует адаптеры, проекции и инфраструктуру', '^src/domain/', '^src/(telegram|github|projections|infrastructure)/'),
+    layer('S-1-events', 'S-1: журнал событий не знает о домене и адаптерах', '^src/events/', '^src/(domain|telegram|github|projections|infrastructure)/'),
+    layer('S-1-config', 'S-1: src/config ничего не импортирует из src', '^src/config/', '^src/', '^src/config/'),
+    layer('S-1-telegram-github', 'S-1: адаптеры Telegram и GitHub не импортируют друг друга', '^src/telegram/', '^src/github/'),
+    layer('S-1-github-telegram', 'S-1: адаптеры Telegram и GitHub не импортируют друг друга', '^src/github/', '^src/telegram/'),
+    layer('S-1-projections', 'S-1: проекции не обращаются к домену и адаптерам', '^src/projections/', '^src/(domain|telegram|github)/'),
+    layer(
+      'S-2-contexts',
+      'S-2: контексты домена связаны только событиями',
+      '^src/domain/([^/]+)/',
+      '^src/domain/[^/]+/',
+      ['^src/domain/$1/', '^src/domain/shared/'],
+    ),
+    layer('S-5-projections-journal', 'S-5: проекции читают типы событий, но не публикуют и не пишут журнал', '^src/projections/', '^src/events/', '^src/events/generated/'),
+    { name: 'S-6-no-circular', comment: 'S-6: циклов между модулями нет', severity: 'error', from: {}, to: { circular: true } },
   ],
   options: {
-    doNotFollow: {
-      path: "node_modules",
-    },
+    doNotFollow: { path: 'node_modules' },
     tsPreCompilationDeps: true,
-    tsConfig: {
-      fileName: "tsconfig.json",
-    },
-    enhancedResolveOptions: {
-      extensions: [".ts", ".js", ".mjs"],
-    },
+    tsConfig: { fileName: 'tsconfig.json' },
+    enhancedResolveOptions: { extensions: ['.ts', '.js', '.mjs'] },
   },
 };

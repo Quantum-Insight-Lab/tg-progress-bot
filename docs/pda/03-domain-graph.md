@@ -1,4 +1,4 @@
-> Domain Graph Canvas (PDA 5.2). Отношения первичны: таблицы и API — реализация графа, а не его источник.
+> Domain Graph Canvas (PDA 5.2, шаг 3). Отношения первичны: таблицы и API — реализация графа, а не его источник. Колонка «Поля» перечисляет поля таблицы §9: `tz-check` сверяет с ней поля-атомы по имени, без ручных ссылок (патч 1.3, 10.13). Колонка «Из ТЗ» — остальные атомы: понятия, значения и ограничения.
 
 # Граф домена
 
@@ -6,57 +6,66 @@
 
 | Контекст | Что внутри | Чем владеет | Роль |
 | --- | --- | --- | --- |
-| `projects` | Project, Stage, User, ProjectMember | конфигурация проекта, состав участников, права | ядро |
-| `tasks` | Task, TaskList, TaskListItem, Blocker | работа и её состояние — то, ради чего продукт существует | ядро |
-| `github` | Issue, PullRequest, CheckRun | зеркало внешних фактов, только чтение | интеграция |
-| `progress` | ProgressSnapshot и расчёт процента | производные величины | проекция |
-| `reports` | ReportTarget, сборка отчётов | доставка | проекция |
+| `projects` | Пользователь, Группа, Проект, Участник проекта | люди, состав, роли, настройки | ядро |
+| `tasks` | Задача, Блокер, Канвас, Пункт канваса | работа дня и её состояние | ядро |
+| `github` | Репозиторий, Issue, Assignee issue, Связь issues, Milestone, Pull request, Коммит | зеркало GitHub, только чтение | интеграция |
+| `progress` | Снимок доли | производная величина | проекция |
+| `events` | Событие | журнал фактов всех контекстов | общий |
 
-Ядро (`projects`, `tasks`) содержит законы. `progress` и `reports` ничего не решают: они читают и показывают. `github` не имеет права писать во внешний мир.
+Законы живут в `projects` и `tasks`. `progress` ничего не решает: доля считается из зеркала. В `github` пишет только адаптер GitHub, и только данными webhook или ответа API.
 
 ## Часть A: сущности
 
-| Сущность | Описание | Ключевые поля | ID / ключ | Контекст | Источник |
-| --- | --- | --- | --- | --- | --- |
-| Project | единица, по которой считается прогресс и шлются отчёты | `name`, `repository`, `timezone`, `telegram_chat_id` | `id` | `projects` | бот |
-| Stage | этап проекта | `name`, `order`, `status`, `due_on` | `id`; природный `project_id + milestone_number` | `projects` | зеркало GitHub milestone |
-| User | человек, известный системе в двух мирах | `telegram_user_id`, `github_login` | `id`; уникальны оба внешних ключа | `projects` | бот |
-| ProjectMember | участие человека в проекте с ролью | `role`, `topic_id` | `id`; уникально `project_id + user_id` | `projects` | бот |
-| Task | шаг работы, который ведёт человек | `title`, `status`, `priority`, `progress` | `id` | `tasks` | бот |
-| TaskList | список задач на дату | `list_date`, `topic_id`, `message_id` | `id`; уникально `project_id + list_date` | `tasks` | бот |
-| TaskListItem | пункт списка, ссылающийся на задачу | `position`, `is_done`, `carried_from_list_id` | `id` | `tasks` | бот |
-| Blocker | причина остановки или факт застоя | `source`, `signal_type`, `reason`, `impact`, `required_action` | `id` | `tasks` | бот + сигналы GitHub |
-| Issue | границы работы в GitHub | `issue_number`, `title`, `state`, `assignee`, `milestone` | `id`; природный `project_id + issue_number` | `github` | зеркало |
-| PullRequest | техническая реализация issue | `pull_request_number`, `state`, `merged_at` | `id` | `github` | зеркало |
-| CheckRun | состояние CI по PR | `status`, `conclusion`, `completed_at` | `id` | `github` | зеркало |
-| ProgressSnapshot | значение прогресса на момент времени | `progress`, `created_at` | `id` | `progress` | расчёт |
-| ReportTarget | куда и когда доставлять отчёт | `chat_id`, `topic_id`, `report_type`, `schedule_cron` | `id` | `reports` | бот |
-| Event | факт в журнале, append-only | `event_type`, `payload`, `idempotency_key` | `id` | ядро | все контексты |
+| ID | Сущность | Описание | Таблица | Поля | Ключ | Контекст | Источник | Из ТЗ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| E-1 | Пользователь | человек в двух мирах: аккаунт Telegram и, если записан, логин GitHub | `users` | `id`, `telegram_user_id`, `github_login`, `name`, `is_root` | `id`; уникальны `telegram_user_id` и непустой `github_login`; `is_root` ровно у одного | `projects` | `/start` в личке | R-075, R-284, R-285, R-290, R-790, R-791, R-289, R-793 |
+| E-2 | Группа | супергруппа с топиками, в которой живут проекты; на ней расписание отчёта | `chats` | `id`, `telegram_chat_id`, `reports_topic_id`, `timezone`, `daily_cron` | `id` | `projects` | привязка группы в личке | R-764, R-765, R-766, R-797, R-799, R-805 |
+| E-3 | Проект | единица людей и учёта | `projects` | `id`, `chat_id`, `name`, `description`, `repository_id`, `timezone`, `created_at` | `id` | `projects` | «Новый проект» в личке | R-156, R-157, R-158, R-159, R-160, R-076 |
+| E-4 | Участник проекта | пользователь в проекте с ролью и своим топиком | `project_members` | `id`, `project_id`, `user_id`, `role`, `topic_id` | `id`; уникально `project_id + user_id` | `projects` | корень добавляет | R-295, R-297, R-102, R-621, R-828, R-806, R-570, R-830 |
+| E-5 | Задача | шаг, который человек ведёт в Telegram | `tasks` | `id`, `project_id`, `number`, `title`, `status`, `priority`, `assignee_id`, `created_at`, `updated_at`, `completed_at` | `id`; `number` уникален в проекте | `tasks` | `/task` в топике | R-067, R-201, R-202, R-205, R-206, R-207, R-208, R-209, R-210, R-211, R-217, R-219, R-220, R-222, R-224, R-225, R-233, R-234, R-235, R-841, R-215, R-216 |
+| E-6 | Блокер | причина, по которой задача стоит | `blockers` | `id`, `task_id`, `reason`, `asked_at`, `resolved_at` | `id` | `tasks` | вопрос бота и reply исполнителя | R-263, R-850, R-851 |
+| E-7 | Канвас | одно rich-сообщение в топике исполнителя на дату | `canvases` | `id`, `project_id`, `assignee_id`, `topic_id`, `message_id`, `canvas_date` | `id`; уникально `project_id + assignee_id + canvas_date` | `tasks` | бот, первое событие дня | R-859, R-618 |
+| E-8 | Пункт канваса | задача, нарисованная на канвасе, и её место | `canvas_items` | `id`, `canvas_id`, `task_id`, `position`, `carried_from_canvas_id` | `id` | `tasks` | бот | R-866, R-867, R-868 |
+| E-9 | Репозиторий | репозиторий установки GitHub App и состояние CI основной git-ветки | `repositories` | `id`, `owner`, `name`, `default_branch_ci` | `id` | `github` | установка GitHub App | R-367, R-172, R-354 |
+| E-10 | Issue | единица бэклога, из которой считается доля | `issues` | `id`, `repository_id`, `issue_number`, `title`, `state`, `state_reason`, `closed_by_login`, `updated_at`, `closed_at` | `id`; природный `repository_id + issue_number` | `github` | webhook `issues`, сверка | R-371, R-883, R-879 |
+| E-11 | Assignee issue | логин, назначенный на issue | `issue_assignees` | `issue_id`, `login` | `issue_id + login` | `github` | webhook `issues` | R-888, R-889 |
+| E-12 | Связь issues | `blocked by` или sub-issue между двумя issues | `issue_dependencies` | `issue_id`, `depends_on_issue_id`, `link_type` | `issue_id + depends_on_issue_id + link_type` | `github` | события связей issues | R-384, R-385 |
+| E-13 | Milestone | факт GitHub с названием и сроком | `milestones` | `id`, `repository_id`, `milestone_number`, `title`, `state`, `due_on` | `id`; природный `repository_id + milestone_number` | `github` | webhook `milestone` | R-189, R-372, R-193 |
+| E-14 | Pull request | открытый или смерженный PR с CI и автором | `pull_requests` | `id`, `repository_id`, `pull_request_number`, `title`, `author_login`, `state`, `ci_status`, `updated_at`, `merged_at`, `merged_by_login` | `id`; природный `repository_id + pull_request_number` | `github` | webhook `pull_request`, `workflow_run` | R-368, R-369 |
+| E-15 | Коммит | хвост коммитов, а не вся история | `commits` | `id`, `repository_id`, `sha`, `message`, `author_login`, `created_at` | `id`; природный `repository_id + sha` | `github` | webhook `push` | R-370, R-920, R-921 |
+| E-16 | Снимок доли | доля бэклога проекта на сутки | `progress_snapshots` | `id`, `project_id`, `progress`, `created_at` | `id` | `progress` | раз в сутки | R-466, R-188 |
+| E-17 | Событие | факт в журнале, только дополняется | `events` | `id`, `source`, `event_type`, `payload`, `created_at` | `id` | `events` | все контексты | R-934 |
 
-Зеркальные сущности (Issue, PullRequest, CheckRun, Stage) имеют два ключа: свой `id` и природный ключ из GitHub. Природный ключ нужен для дедупликации при повторной доставке webhook, `id` — для ссылок внутри домена.
+Зеркальные сущности имеют природный ключ из GitHub рядом со своим `id`: по нему повторная доставка webhook не создаёт дубль. Контракт события шаг 6 дополнит ключом идемпотентности и полями причинности — это решение архитектуры, в ТЗ его нет.
 
 ## Часть B: связи
 
-| Связь | От | К | Тип | Смысл и правило | Ключевые события |
-| --- | --- | --- | --- | --- | --- |
-| `belongs_to` | Task | Project | N:1 | задача существует только внутри проекта; проект не меняется за время жизни задачи | `task.created` |
-| `references` | Task | Issue | N:1 | обязательна: issue задаёт границы работы, задач у одного issue может быть несколько | `task.created` |
-| `assigned_to` | Task | User | N:1 | обязательна: задача без исполнителя не существует, ему адресуется вопрос о блокере | `task.created`, `task.reassigned` |
-| `listed_in` | Task | TaskList | N:M через TaskListItem | задача может появляться в списках нескольких дней подряд, но незакрытый пункт у неё один | `task.created`, `task.carried_over` |
-| `raised_on` | Blocker | Task | N:1 | блокер живёт на задаче, а не на issue: остановился конкретный шаг | `blocker.detected`, `blocker.declared` |
-| `belongs_to` | Issue | Stage | N:1, необязательна | этап issue — его milestone; без milestone issue попадает в «Без этапа» | `github.issue_updated` |
-| `belongs_to` | Stage | Project | N:1 | один milestone может быть этапом в нескольких проектах репозитория | `github.milestone_updated` |
-| `depends_on` | Issue | Issue | N:M | зеркало связей `blocked by` и sub-issues; задаёт порядок в плане и «Влияние» блокера | `github.issue_linked` |
-| `implements` | PullRequest | Issue | N:1 | PR привязан к issue ссылкой в GitHub, не к задаче | `github.pull_request_updated` |
-| `reports_on` | CheckRun | PullRequest | N:1 | красный CI по открытому PR — факт застоя | `github.checks_failed` |
-| `member_of` | User | Project | N:M через ProjectMember | членство определяет и доступ, и ветку для задач | `project.member_added` |
-| `measures` | ProgressSnapshot | Project | N:1 | снимок принадлежит проекту; общий процент по всем проектам считается на лету, не хранится | `progress.snapshot_taken` |
-| `delivers` | ReportTarget | Project | N:1 | ветка отчётов может не совпадать с ветками задач участников | `report.sent` |
+| ID | Связь | От | К | Тип | Смысл и правило | Ключевые события | Из ТЗ |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| L-1 | `is` | Участник проекта | Пользователь | N:1 | один человек может состоять в нескольких проектах | `project.member_added` | R-292 |
+| L-2 | `member_of` | Участник проекта | Проект | N:1 | роль задаётся в каждом проекте отдельно | `project.member_added`, `project.settings_changed` | R-293 |
+| L-3 | `lives_in` | Проект | Группа | N:1 | новый проект может сесть в группу, к которой уже привязан другой | `project.chat_bound` | R-541 |
+| L-4 | `mirrors` | Проект | Репозиторий | N:0..1 | у проекта не больше одного репозитория, один репозиторий — у нескольких проектов, без репозитория допустимо | `project.repository_connected`, `project.repository_changed` | R-165, R-166, R-176, R-814 |
+| L-5 | `belongs_to` | Задача | Проект | N:1 | задачи, роли и канвасы у проектов одного репозитория свои | `task.created` | R-167, R-168, R-169 |
+| L-6 | `assigned_to` | Задача | Пользователь | N:1 | исполнитель — хозяин топика и участник этого проекта | `task.created` | R-227, R-232 |
+| L-7 | `raised_on` | Блокер | Задача | N:1 | блокеры есть только у задач | `blocker.detected`, `blocker.declared` | R-850 |
+| L-8 | `drawn_for` | Канвас | Проект и исполнитель | N:1 | канвас свой у каждого исполнителя, один на проект и дату | `canvas.posted` | R-617, R-618 |
+| L-9 | `shows` | Пункт канваса | Задача | N:1 | какие задачи на канвасе и в каком порядке; перенос ссылается на канвас прошлого дня | `canvas.carried_over` | R-866 |
+| L-10 | `in_repo` | Issue | Репозиторий | N:1 | природный ключ — репозиторий и номер, не проект | `github.*` | R-883, R-884 |
+| L-11 | `assigned` | Assignee issue | Issue | N:1 | у issue может быть несколько assignees | `github.*` | R-888, R-889 |
+| L-12 | `depends_on` | Связь issues | Issue | N:1, дважды | `blocked by` и sub-issues дописываются к issue в срезе; порядок плана от них не зависит | `github.*` | R-384, R-385, R-387 |
+| L-13 | `in_repo` | Milestone | Репозиторий | N:1 | факт GitHub, не этап задач | `github.*` | R-190 |
+| L-14 | `in_repo` | Pull request | Репозиторий | N:1 | зеркало открытых и смерженных PR | `github.*` | R-368 |
+| L-15 | `in_repo` | Коммит | Репозиторий | N:1 | хвост коммитов | `github.*` | R-370 |
+| L-16 | `measures` | Снимок доли | Проект | N:1 | у проектов одного репозитория доля одна | `progress.snapshot_taken` | R-466, R-174 |
+| L-17 | `known_as` | Пользователь | логины зеркала | по значению | `github_login` сопоставляется с логинами зеркала в момент показа, без внешнего ключа; несопоставленный логин остаётся логином | — | R-422, R-287, R-288 |
+| L-18 | нет связи | Задача | зеркало GitHub | — | задача не ссылается на issue, PR и коммит; номер issue в названии связью не считается | — | R-074, R-077, R-214, R-242, R-781 |
 
 ## Правила графа
 
-1. **Задача — центр домена.** Все вопросы продукта («что делаю», «что стоит», «что сделано») отвечаются через Task, а не через Issue. Issue — это контекст задачи, а не её замена.
-2. **Блокер висит на задаче, влияние считается по issue.** Остановка касается шага, а последствия — продуктовой единицы, поэтому «кто кого ждёт» берётся из связей issues.
-3. **Зеркало не редактируется.** Запись в `github`-контекст возможна только из GitHub Adapter и только из данных webhook или API-ответа. Никакой код домена не создаёт и не меняет Issue, PullRequest, CheckRun (INV-09, S-2).
-4. **Прогресс не является сущностью домена.** Это функция от задач (см. [04](04-invariants.md), INV-10). В базе хранятся только снимки, чтобы строить динамику.
-5. **Расширение графа — отдельное решение.** Новая сущность, связь или переход статуса начинается с правки этого файла; агент, упёршийся в нехватку связи, останавливается и спрашивает (`AGENTS.md`).
+1. **Два слоя, два общих узла.** Задачи и зеркало GitHub встречаются только в Пользователе (через логин) и в Проекте (через репозиторий). Прямой связи задачи с зеркалом нет (L-18), и появиться она не должна.
+2. **Зеркало живёт на репозитории, а не на проекте.** Два проекта одного репозитория читают одни и те же объекты (E-9) и видят одну долю (L-16).
+3. **Логин сопоставляется в момент показа.** Внешнего ключа от зеркала к пользователю нет (L-17): смена логина не переписывает зеркало, а старый логин просто перестаёт совпадать.
+4. **Доля бэклога — не сущность.** Она считается из issues; храним только суточные снимки (E-16), чтобы строить динамику.
+5. **Канвас хранит только сообщение и порядок пунктов.** Кнопки рисуются из статуса задачи (E-8), отдельной таблицы кнопок нет.
+6. **Расширение графа — отдельное решение.** Новая сущность, связь или поле начинается с правки этого файла и ТЗ, а не с миграции.

@@ -7,37 +7,25 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run",
     "boundaries": "depcruise src --config dependency-cruiser.config.mjs",
-    "circular": "madge --circular --extensions ts --ts-config tsconfig.json src",
-    "knip": "knip",
+    "test": "vitest run",
     "codegen:events": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/codegen-events.ts",
-    "check:generated": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-generated-events.ts",
     "check:invariants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-invariants.ts",
-    "migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/migrate.ts",
-    "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/index.ts",
-    "ci": "npm run lint && npm run build && npm run boundaries && npm run circular && npm run check:generated && npm run check:invariants && npm test"
-  },
-  "dependencies": {
-    "@octokit/rest": "^21.1.1",
-    "grammy": "^1.36.3",
-    "kysely": "^0.28.2",
-    "pg": "^8.23.0",
-    "zod": "^4.6.5"
+    "tz:check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts",
+    "tz:trace": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts --trace",
+    "backlog:publish": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/backlog-publish.ts",
+    "ci": "npm run typecheck && npm run lint && npm run boundaries && npm run codegen:events -- --check && npm run check:invariants && npm test && npm run tz:check -- --gate --pda"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.15.17",
-    "@types/pg": "^8.23.1",
+    "@types/node": "^22.20.4",
     "dependency-cruiser": "^18.4.0",
     "eslint": "^10.11.0",
-    "knip": "^6.37.0",
-    "madge": "^8.0.0",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.70.0",
-    "vitest": "^3.1.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^3.2.7",
     "yaml": "^2.9.1"
   }
 }

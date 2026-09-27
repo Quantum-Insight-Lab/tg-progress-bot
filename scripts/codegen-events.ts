@@ -1,238 +1,123 @@
 /**
- * S-3: типы и Zod-схемы только из contracts/event-registry.yaml.
+ * S-3: типы событий генерируются из реестра, ручного объявления типа события нет.
+ *   npm run codegen:events             — перегенерировать src/events/generated/events.ts
+ *   npm run codegen:events -- --check  — упасть, если закоммиченный файл разошёлся с реестром
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { parse } from "yaml";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { parse as parseYaml } from 'yaml';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const registryPath = join(root, "contracts/event-registry.yaml");
-const outDir = join(root, "src/events/generated");
+export const EVENT_REGISTRY_PATH = 'contracts/event-registry.yaml';
+export const GENERATED_PATH = 'src/events/generated/events.ts';
 
-const HEADER = `/**
- * Generated from contracts/event-registry.yaml. Do not edit.
- * Source: npm run codegen:events
- */
-`;
-
-const PRIMITIVE_TS: Record<string, string> = {
-  string: "string",
-  int: "number",
-  float: "number",
-  boolean: "boolean",
-  timestamp: "string",
-  uuid: "string",
-  object: "Record<string, unknown>",
+const PRIMITIVES: Readonly<Record<string, string>> = {
+  string: 'string',
+  int: 'number',
+  number: 'number',
+  bool: 'boolean',
+  date: 'string',
+  time: 'string',
+  timestamp: 'string',
+  uuid: 'string',
+  object: 'Record<string, unknown>',
+  null: 'null',
 };
 
-const PRIMITIVE_ZOD: Record<string, string> = {
-  string: "z.string()",
-  int: "z.number().int()",
-  float: "z.number()",
-  boolean: "z.boolean()",
-  timestamp: "z.string()",
-  uuid: "z.string()",
-  object: "z.record(z.string(), z.unknown())",
-};
+const HEADER = '// Сгенерировано из contracts/event-registry.yaml командой npm run codegen:events. Руками не править (S-3).\n';
 
-type RegistryEvent = {
-  type: string;
-  version: number;
-  context: string;
-  payload: Record<string, unknown>;
-};
-
-type Registry = {
-  envelope: Record<string, unknown>;
-  events: RegistryEvent[];
-};
-
-function toConstName(eventType: string): string {
-  return eventType
-    .split(".")
-    .map((part) => part.split("_").map((s) => s.toUpperCase()).join("_"))
-    .join("_");
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function toPascal(eventType: string): string {
-  return eventType
+function scalar(spec: string): string {
+  const values = /^enum\[(.+)\]$/.exec(spec)?.[1];
+  if (values !== undefined) {
+    return values
+      .split(',')
+      .map((value) => `'${value.trim()}'`)
+      .join(' | ');
+  }
+  const item = /^(.+)\[\]$/.exec(spec)?.[1];
+  if (item !== undefined) return `${scalar(item)}[]`;
+  const primitive = PRIMITIVES[spec];
+  if (primitive === undefined) throw new Error(`неизвестный тип поля: ${spec}`);
+  return primitive;
+}
+
+/** Тип поля реестра: примитив, `enum[a, b]`, `T[]`, `A | null`; вложенный объект; список из одного объекта — массив объектов. */
+export function typeOf(spec: unknown, indent = 0): string {
+  if (Array.isArray(spec)) {
+    if (spec.length !== 1) throw new Error('список в схеме описывает ровно один элемент');
+    return `${typeOf(spec[0], indent)}[]`;
+  }
+  if (isRecord(spec)) {
+    const pad = '  '.repeat(indent + 1);
+    const fields = Object.entries(spec).map(([key, value]) => `${pad}${key}: ${typeOf(value, indent + 1)};`);
+    return `{\n${fields.join('\n')}\n${'  '.repeat(indent)}}`;
+  }
+  if (typeof spec !== 'string') throw new Error(`неизвестный тип поля: ${JSON.stringify(spec)}`);
+  return spec
+    .split('|')
+    .map((part) => scalar(part.trim()))
+    .join(' | ');
+}
+
+const constName = (type: string): string => type.replace(/[.]/g, '_').toUpperCase();
+const pascal = (type: string): string =>
+  type
     .split(/[._]/)
-    .map((s) => s.slice(0, 1).toUpperCase() + s.slice(1))
-    .join("");
-}
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
 
-function splitNullable(spec: string): { core: string; nullable: boolean } {
-  if (spec.endsWith(" | null")) {
-    return { core: spec.slice(0, -" | null".length), nullable: true };
+/** Текст src/events/generated/events.ts по тексту реестра. */
+export function generate(registryText: string): string {
+  const root: unknown = parseYaml(registryText);
+  if (!isRecord(root) || !isRecord(root.envelope) || !Array.isArray(root.events) || root.events.length === 0) {
+    throw new Error(`${EVENT_REGISTRY_PATH}: нужны envelope и непустой events`);
   }
-  return { core: spec, nullable: false };
-}
-
-function yamlScalarToTs(spec: string): string {
-  const { core, nullable } = splitNullable(spec);
-  const enumMatch = /^enum\[(.+)\]$/.exec(core);
-  const arrayMatch = /^array\[(.+)\]$/.exec(core);
-  let ts: string;
-  if (enumMatch?.[1] !== undefined) {
-    ts = enumMatch[1]
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => JSON.stringify(s))
-      .join(" | ");
-  } else if (arrayMatch?.[1] !== undefined) {
-    ts = `${yamlScalarToTs(arrayMatch[1])}[]`;
-  } else {
-    const mapped = PRIMITIVE_TS[core];
-    if (mapped === undefined) {
-      throw new Error(`Unknown YAML type: ${core}`);
+  const events = root.events.map((event, index) => {
+    if (!isRecord(event) || typeof event.type !== 'string' || typeof event.version !== 'number' || !isRecord(event.payload)) {
+      throw new Error(`${EVENT_REGISTRY_PATH}: событие №${index + 1} без type, version или payload`);
     }
-    ts = mapped;
-  }
-  return nullable ? `${ts} | null` : ts;
+    return { type: event.type, version: event.version, payload: event.payload };
+  });
+  return [
+    HEADER,
+    'export const EVENT_TYPES = {',
+    ...events.map((e) => `  ${constName(e.type)}: '${e.type}',`),
+    '} as const;',
+    '',
+    'export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];',
+    '',
+    'export const EVENT_VERSIONS = {',
+    ...events.map((e) => `  '${e.type}': ${e.version},`),
+    '} as const satisfies Record<EventType, number>;',
+    '',
+    `export interface EventEnvelope ${typeOf(root.envelope)}`,
+    ...events.flatMap((e) => ['', `export interface ${pascal(e.type)}Payload ${typeOf(e.payload)}`]),
+    '',
+    'export interface PayloadByType {',
+    ...events.map((e) => `  '${e.type}': ${pascal(e.type)}Payload;`),
+    '}',
+    '',
+  ].join('\n');
 }
 
-function yamlScalarToZod(spec: string): string {
-  const { core, nullable } = splitNullable(spec);
-  const enumMatch = /^enum\[(.+)\]$/.exec(core);
-  const arrayMatch = /^array\[(.+)\]$/.exec(core);
-  let expr: string;
-  if (enumMatch?.[1] !== undefined) {
-    const values = enumMatch[1]
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => JSON.stringify(s));
-    expr = `z.enum([${values.join(", ")}])`;
-  } else if (arrayMatch?.[1] !== undefined) {
-    expr = `z.array(${yamlScalarToZod(arrayMatch[1])})`;
-  } else {
-    const mapped = PRIMITIVE_ZOD[core];
-    if (mapped === undefined) {
-      throw new Error(`Unknown YAML type: ${core}`);
-    }
-    expr = mapped;
+function main(argv: string[]): number {
+  const expected = generate(readFileSync(EVENT_REGISTRY_PATH, 'utf8'));
+  if (argv.includes('--check')) {
+    const actual = existsSync(GENERATED_PATH) ? readFileSync(GENERATED_PATH, 'utf8') : '';
+    if (actual === expected) return 0;
+    console.error(`S-3: ${GENERATED_PATH} расходится с ${EVENT_REGISTRY_PATH}. Запустите npm run codegen:events и закоммитьте результат.`);
+    return 1;
   }
-  return nullable ? `${expr}.nullable()` : expr;
+  mkdirSync(dirname(GENERATED_PATH), { recursive: true });
+  writeFileSync(GENERATED_PATH, expected);
+  console.log(`${GENERATED_PATH}: обновлён`);
+  return 0;
 }
 
-function toTsType(spec: unknown, indent = 0): string {
-  if (spec !== null && typeof spec === "object" && !Array.isArray(spec)) {
-    const fieldPad = "  ".repeat(indent + 1);
-    const closePad = "  ".repeat(indent);
-    const fields = Object.entries(spec as Record<string, unknown>)
-      .map(([key, value]) => `${fieldPad}${key}: ${toTsType(value, indent + 1)};`)
-      .join("\n");
-    return `{\n${fields}\n${closePad}}`;
-  }
-  if (typeof spec !== "string") {
-    throw new Error(`Unsupported type spec: ${JSON.stringify(spec)}`);
-  }
-  return yamlScalarToTs(spec);
-}
-
-function toZodExpr(spec: unknown): string {
-  if (spec !== null && typeof spec === "object" && !Array.isArray(spec)) {
-    const fields = Object.entries(spec as Record<string, unknown>)
-      .map(([key, value]) => `  ${key}: ${toZodExpr(value)},`)
-      .join("\n");
-    return `z.object({\n${fields}\n})`;
-  }
-  if (typeof spec !== "string") {
-    throw new Error(`Unsupported type spec: ${JSON.stringify(spec)}`);
-  }
-  return yamlScalarToZod(spec);
-}
-
-export function generateEventTypes(): void {
-  const registry = parse(readFileSync(registryPath, "utf8")) as Registry;
-  if (!Array.isArray(registry.events) || registry.events.length === 0) {
-    throw new Error("event-registry.yaml: events[] пуст");
-  }
-
-  const constEntries = registry.events
-    .map((event) => `  ${toConstName(event.type)}: ${JSON.stringify(event.type)},`)
-    .join("\n");
-
-  const eventTypes = `${HEADER}
-export const EVENT_TYPES = {
-${constEntries}
-} as const;
-
-export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
-
-export const EVENT_TYPE_VALUES: readonly EventType[] = Object.values(EVENT_TYPES);
-
-export const EVENT_SCHEMA_VERSIONS = {
-${registry.events.map((event) => `  ${JSON.stringify(event.type)}: ${String(event.version)},`).join("\n")}
-} as const satisfies Record<EventType, number>;
-`;
-
-  const envelopeFields = Object.entries(registry.envelope)
-    .map(([key, value]) => `  ${key}: ${toTsType(value, 1)};`)
-    .join("\n");
-
-  const payloadTypes = registry.events
-    .map((event) => {
-      const name = `${toPascal(event.type)}Payload`;
-      return `export type ${name} = ${toTsType(event.payload)};`;
-    })
-    .join("\n\n");
-
-  const payloads = `${HEADER}
-export type EventEnvelope = {
-${envelopeFields}
-};
-
-${payloadTypes}
-
-export type PayloadByType = {
-${registry.events.map((event) => `  ${JSON.stringify(event.type)}: ${toPascal(event.type)}Payload;`).join("\n")}
-};
-`;
-
-  const schemaConsts = registry.events
-    .map((event) => {
-      const pascal = toPascal(event.type);
-      const schemaName = `${pascal.slice(0, 1).toLowerCase()}${pascal.slice(1)}PayloadSchema`;
-      return `export const ${schemaName} = ${toZodExpr(event.payload)};`;
-    })
-    .join("\n\n");
-
-  const schemaMap = registry.events
-    .map((event) => {
-      const pascal = toPascal(event.type);
-      const schemaName = `${pascal.slice(0, 1).toLowerCase()}${pascal.slice(1)}PayloadSchema`;
-      return `  [EVENT_TYPES.${toConstName(event.type)}]: ${schemaName},`;
-    })
-    .join("\n");
-
-  const schemas = `${HEADER}
-import { z } from "zod";
-import { EVENT_TYPES } from "./event-types.js";
-
-${schemaConsts}
-
-export const payloadSchemas = {
-${schemaMap}
-} as const;
-`;
-
-  const index = `${HEADER}
-export * from "./event-types.js";
-export * from "./payloads.js";
-export * from "./schemas.js";
-`;
-
-  mkdirSync(outDir, { recursive: true });
-  writeFileSync(join(outDir, "event-types.ts"), eventTypes);
-  writeFileSync(join(outDir, "payloads.ts"), payloads);
-  writeFileSync(join(outDir, "schemas.ts"), schemas);
-  writeFileSync(join(outDir, "index.ts"), index);
-}
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-if (isMain) {
-  generateEventTypes();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = main(process.argv.slice(2));
 }
