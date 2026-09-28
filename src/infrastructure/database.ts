@@ -55,10 +55,18 @@ export interface ProjectMembersTable {
   topic_id: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
+/** Репозиторий установки GitHub App (E-9). Ключ — id GitHub, не проект. */
+export interface RepositoriesTable {
+  id: string;
+  owner: string;
+  name: string;
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
   projects: ProjectsTable;
   chats: ChatsTable;
   project_members: ProjectMembersTable;
+  repositories: RepositoriesTable;
 }

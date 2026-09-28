@@ -34,6 +34,7 @@
   "dependencies": {
     "grammy": "^1.46.0",
     "kysely": "^0.29.6",
+    "octokit": "^5.0.5",
     "pg": "^8.23.0",
     "zod": "^4.6.5"
   }
