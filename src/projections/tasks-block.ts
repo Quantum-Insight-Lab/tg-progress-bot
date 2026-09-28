@@ -36,7 +36,7 @@ export const TASK_RETURN_LABEL = 'вернуть';
 export const TASK_CANCEL_LABEL = 'отменить';
 
 /** Промежуток между кнопками второй строки, как в макете. */
-const TASK_LINE_GAP = ' · ';
+export const TASK_LINE_GAP = ' · ';
 
 const TASK_CANVAS_ACTIONS = {
   plan: TASK_PLAN_LABEL,
