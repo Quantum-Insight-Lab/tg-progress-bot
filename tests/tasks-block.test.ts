@@ -26,6 +26,7 @@ import {
 import {
   TASK_CANCEL_LABEL,
   TASK_CONFIRM_LABEL,
+  TASK_MARK_ACTION,
   TASK_OPEN_MARK,
   TASK_PLAN_LABEL,
   TASK_PRIORITY_ACTION,
@@ -102,6 +103,16 @@ describe('блок «Задачи»: первая строка', () => {
     expect(firstRow(lines[2]).startsWith('○ ')).toBe(true);
   });
 
+  it('R-154 кружок служит кнопкой', () => {
+    const open = block[1]?.pieces[0];
+    const review = block[2]?.pieces[0];
+    expect(open).toEqual({ kind: 'action', label: '○', callbackData: 'task:mark:7' });
+    expect(review).toEqual({ kind: 'action', label: '✓', callbackData: 'task:mark:9' });
+    expect(open).toMatchObject({ callbackData: taskCanvasActionData(TASK_MARK_ACTION, openLine.number) });
+    expect(firstRow(lines[2])).toBe('○ 7 — Классификация сигнала — 3-й день');
+    expect(firstRow(lines[3])).toBe('✓ 9 — Черновик карточки — на подтверждении');
+  });
+
   it('R-124 «7»', () => {
     expect(firstRow(lines[2])).toContain(' 7 — ');
   });
@@ -139,7 +150,12 @@ describe('блок «Задачи»: первая строка', () => {
       '○ 7 — Классификация сигнала — 3-й день',
       '✓ 9 — Черновик карточки — на подтверждении',
     ]);
-    expect(block[1]?.pieces[0]).toEqual({ kind: 'text', text: '○ 7 — Классификация сигнала — 3-й день\n' });
+    expect(block[1]?.pieces[0]).toEqual({
+      kind: 'action',
+      label: TASK_OPEN_MARK,
+      callbackData: taskCanvasActionData(TASK_MARK_ACTION, 7),
+    });
+    expect(block[1]?.pieces[1]).toEqual({ kind: 'text', text: ' 7 — Классификация сигнала — 3-й день\n' });
     expect(firstRow(lines[2])).not.toContain('\n');
     expect(lines[2]?.split('\n')).toHaveLength(2);
   });
@@ -217,8 +233,13 @@ describe('блок «Задачи»: первая строка', () => {
     const twice = tasksBlockParagraphs([openLine]);
     expect(once).toEqual(twice);
     expect(once).toHaveLength(2);
-    expect(once[1]?.pieces[0]).toEqual({ kind: 'text', text: '○ 7 — Классификация сигнала — 3-й день\n' });
-    expect(once.filter((paragraph) => paragraph.pieces.some((piece) => piece.kind === 'text' && piece.text.startsWith('○')))).toHaveLength(1);
+    expect(once[1]?.pieces[0]).toEqual({
+      kind: 'action',
+      label: '○',
+      callbackData: 'task:mark:7',
+    });
+    expect(once[1]?.pieces[1]).toEqual({ kind: 'text', text: ' 7 — Классификация сигнала — 3-й день\n' });
+    expect(once.filter((paragraph) => paragraph.pieces.some((piece) => piece.kind === 'action' && piece.label === '○'))).toHaveLength(1);
   });
 });
 
@@ -226,9 +247,14 @@ describe('блок «Задачи»: вторая строка', () => {
   const openText = canvas.blocks[2]?.text ?? '';
   const reviewText = canvas.blocks[3]?.text ?? '';
 
-  function labels(text: CanvasRichText): string[] {
-    return buttonsOf(text).map((button) => button.button.text);
-  }
+function labels(text: CanvasRichText): string[] {
+  return buttonsOf(text).map((button) => button.button.text);
+}
+
+/** Кнопки второй строки: кружок и галочка стоят на первой. */
+function actionLabels(text: CanvasRichText): string[] {
+  return labels(text).filter((label) => label !== TASK_OPEN_MARK && label !== TASK_REVIEW_MARK);
+}
 
   it('R-127 «high»', () => {
     expect(secondRow(visible(openText)).startsWith('high · ')).toBe(true);
@@ -260,7 +286,7 @@ describe('блок «Задачи»: вторая строка', () => {
     expect(confirm?.button.text).toBe('подтвердить');
     expect(confirm?.button.style).toBe('link');
     expect(confirm?.button.callback_data).toBe('task:confirm:9');
-    expect(labels(reviewText)[1]).toBe('подтвердить');
+    expect(actionLabels(reviewText)[1]).toBe('подтвердить');
   });
 
   it('R-133 «отменить»', () => {
@@ -280,8 +306,10 @@ describe('блок «Задачи»: вторая строка', () => {
   });
 
   it('R-328 у задачи на подтверждении — ещё «вернуть»', () => {
-    expect(labels(reviewText)).toEqual(['normal', 'подтвердить', 'вернуть', 'отменить']);
-    expect(labels(openText)).toEqual(['high', 'в план', 'отменить']);
+    expect(actionLabels(reviewText)).toEqual(['normal', 'подтвердить', 'вернуть', 'отменить']);
+    expect(actionLabels(openText)).toEqual(['high', 'в план', 'отменить']);
+    expect(labels(openText)[0]).toBe('○');
+    expect(labels(reviewText)[0]).toBe('✓');
     expect(secondRow(visible(reviewText))).toBe('normal · подтвердить · вернуть · отменить');
     expect(secondRow(visible(openText))).not.toContain('вернуть');
   });
@@ -305,18 +333,18 @@ describe('блок «Задачи»: вторая строка', () => {
   });
 
   it('R-144 затем «в план» или «подтвердить»', () => {
-    expect(labels(openText)[1]).toBe('в план');
-    expect(labels(openText)).not.toContain('подтвердить');
-    expect(labels(reviewText)[1]).toBe('подтвердить');
-    expect(labels(reviewText)).not.toContain('в план');
+    expect(actionLabels(openText)[1]).toBe('в план');
+    expect(actionLabels(openText)).not.toContain('подтвердить');
+    expect(actionLabels(reviewText)[1]).toBe('подтвердить');
+    expect(actionLabels(reviewText)).not.toContain('в план');
     const blocked = renderCanvas({
       projectName: 'Общественный сенсор',
       canvasDate: '2026-09-17',
       sections: { tasks: tasksBlockParagraphs([{ ...openLine, status: TASK_STATUS_BLOCKED }]) },
     });
-    expect(labels(blocked.blocks[2]?.text ?? '')[1]).toBe('в план');
-    expect(labels(blocked.blocks[2]?.text ?? '')).not.toContain('подтвердить');
-    expect(labels(blocked.blocks[2]?.text ?? '')).not.toContain('вернуть');
+    expect(actionLabels(blocked.blocks[2]?.text ?? '')[1]).toBe('в план');
+    expect(actionLabels(blocked.blocks[2]?.text ?? '')).not.toContain('подтвердить');
+    expect(actionLabels(blocked.blocks[2]?.text ?? '')).not.toContain('вернуть');
     expect(JSON.stringify(canvas)).not.toContain('tg-button-row');
     expect(JSON.stringify(canvas)).not.toContain('"type":"buttons"');
   });
@@ -375,6 +403,10 @@ function paragraphButtons(index: number): CanvasTextButton[] {
   return buttonsOf(membership.blocks[index]?.text ?? '');
 }
 
+function buttonByData(buttons: CanvasTextButton[], data: string): CanvasTextButton | undefined {
+  return buttons.find((button) => button.button.callback_data === data);
+}
+
 describe('блок «Задачи»: какие задачи в нём стоят', () => {
   it('R-218 в блоке «Задачи» не стоит', () => {
     expect(standing.map((task) => task.status)).not.toContain(TASK_STATUS_PLANNED);
@@ -389,7 +421,7 @@ describe('блок «Задачи»: какие задачи в нём стоя�
   });
 
   it('R-238 слово текущего приоритета на второй строке абзаца — кнопка', () => {
-    const priority = paragraphButtons(2)[0];
+    const priority = buttonByData(paragraphButtons(2), taskCanvasActionData(TASK_PRIORITY_ACTION, 7));
     expect(priority?.button.text).toBe(TASK_PRIORITY_HIGH);
     expect(priority?.button.text).toBe('high');
     expect(priority?.button.style).toBe(CANVAS_LINK_STYLE);
@@ -405,13 +437,13 @@ describe('блок «Задачи»: какие задачи в нём стоя�
         tasks: tasksBlockParagraphs([lineOf(taskOf(TASK_STATUS_IN_PROGRESS, 5, 'Спокойная', TASK_PRIORITY_LOW))]),
       },
     });
-    const lowButton = buttonsOf(low.blocks[2]?.text ?? '')[0];
+    const lowButton = buttonByData(buttonsOf(low.blocks[2]?.text ?? ''), 'task:priority:5');
     expect(lowButton?.button.text).toBe('low');
     expect(lowButton?.button.style).toBe('link');
     expect(lowButton?.button.callback_data).toBe('task:priority:5');
-    expect(paragraphButtons(3)[0]?.button.text).toBe('normal');
-    expect(paragraphButtons(4)[0]?.button.text).toBe('normal');
-    expect(paragraphButtons(4)[0]?.button.callback_data).toBe('task:priority:9');
+    expect(buttonByData(paragraphButtons(3), 'task:priority:8')?.button.text).toBe('normal');
+    expect(buttonByData(paragraphButtons(4), 'task:priority:9')?.button.text).toBe('normal');
+    expect(buttonByData(paragraphButtons(4), 'task:priority:9')?.button.callback_data).toBe('task:priority:9');
   });
 
   it('R-317 и снова стоит в «Задачах» на канвасе', () => {
@@ -448,7 +480,7 @@ describe('блок «Задачи»: какие задачи в нём стоя�
     expect(standing.map((task) => task.status)).toContain(TASK_STATUS_BLOCKED);
     expect(firstRow(membershipLines[3])).toBe('○ 8 — Ждёт ответ — 3-й день');
     expect(secondRow(membershipLines[3])).toBe('normal · в план · отменить');
-    expect(paragraphButtons(3).map((button) => button.button.text)).toEqual(['normal', 'в план', 'отменить']);
+    expect(paragraphButtons(3).map((button) => button.button.text)).toEqual(['○', 'normal', 'в план', 'отменить']);
   });
 
   it('R-490 и REVIEW', () => {
@@ -459,9 +491,10 @@ describe('блок «Задачи»: какие задачи в нём стоя�
 
   it('R-492 действия — на следующей', () => {
     const openPieces = tasksBlockParagraphs(standing.map(lineOf))[1]?.pieces ?? [];
-    expect(openPieces[0]).toEqual({ kind: 'text', text: '○ 7 — Классификация сигнала — 3-й день\n' });
-    expect(openPieces.slice(1).some((piece) => piece.kind === 'action' && piece.label === 'в план')).toBe(true);
-    expect(openPieces.slice(1).some((piece) => piece.kind === 'action' && piece.label === 'отменить')).toBe(true);
+    expect(openPieces[0]).toEqual({ kind: 'action', label: '○', callbackData: 'task:mark:7' });
+    expect(openPieces[1]).toEqual({ kind: 'text', text: ' 7 — Классификация сигнала — 3-й день\n' });
+    expect(openPieces.slice(2).some((piece) => piece.kind === 'action' && piece.label === 'в план')).toBe(true);
+    expect(openPieces.slice(2).some((piece) => piece.kind === 'action' && piece.label === 'отменить')).toBe(true);
     expect(firstRow(membershipLines[2])).not.toContain('в план');
     expect(firstRow(membershipLines[2])).not.toContain('отменить');
     expect(firstRow(membershipLines[4])).not.toContain('подтвердить');
@@ -551,9 +584,9 @@ describe('блок «Задачи»: какие задачи в нём стоя�
   });
 
   it('INV-08 слово на кнопке — текущий приоритет задачи', () => {
-    expect(paragraphButtons(2)[0]?.button.text).toBe(progressTask.priority);
-    expect(paragraphButtons(3)[0]?.button.text).toBe(blockedTask.priority);
-    expect(paragraphButtons(4)[0]?.button.text).toBe(reviewTask.priority);
+    expect(buttonByData(paragraphButtons(2), 'task:priority:7')?.button.text).toBe(progressTask.priority);
+    expect(buttonByData(paragraphButtons(3), 'task:priority:8')?.button.text).toBe(blockedTask.priority);
+    expect(buttonByData(paragraphButtons(4), 'task:priority:9')?.button.text).toBe(reviewTask.priority);
     expect([TASK_PRIORITY_HIGH, TASK_PRIORITY_NORMAL, TASK_PRIORITY_LOW]).toEqual(['high', 'normal', 'low']);
     const lowLine = lineOf(taskOf(TASK_STATUS_BLOCKED, 1, 'Тихая', TASK_PRIORITY_LOW));
     const lowText = renderCanvas({
@@ -561,7 +594,7 @@ describe('блок «Задачи»: какие задачи в нём стоя�
       canvasDate: '2026-09-17',
       sections: { tasks: tasksBlockParagraphs([lowLine]) },
     }).blocks[2]?.text;
-    expect(buttonsOf(lowText ?? '')[0]?.button.text).toBe('low');
+    expect(buttonByData(buttonsOf(lowText ?? ''), 'task:priority:1')?.button.text).toBe('low');
     expect(secondRow(visible(lowText ?? ''))).toBe('low · в план · отменить');
   });
 

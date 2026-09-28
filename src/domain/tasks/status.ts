@@ -7,10 +7,10 @@ export const TASK_STATUS_PLANNED = 'PLANNED';
 /** `IN_PROGRESS` — стоит в «Задачах» на канвасе исполнителя. */
 export const TASK_STATUS_IN_PROGRESS = 'IN_PROGRESS';
 
-/** `BLOCKED` — в списке без галочки дольше порога застоя. */
+/** `BLOCKED` — два дня в списке без галочки, причина выясняется. */
 export const TASK_STATUS_BLOCKED = 'BLOCKED';
 
-/** `REVIEW` — исполнитель поставил галочку. */
+/** `REVIEW` — исполнитель поставил галочку, ждёт подтверждения руководителя. */
 export const TASK_STATUS_REVIEW = 'REVIEW';
 
 /** `DONE` — руководитель подтвердил. */
@@ -94,4 +94,14 @@ export function tasksStandingInBlock<T extends { status: TaskStatus }>(tasks: re
  */
 export function blockedByListSilence(lastMark: Date, now: Date, timezone: string): boolean {
   return staleByProjectZone(lastMark, now, timezone);
+}
+
+/** `BLOCKED`: причина ещё выясняется. Галочка её не называет. */
+export function reasonBeingClarified(status: TaskStatus): boolean {
+  return status === TASK_STATUS_BLOCKED;
+}
+
+/** `REVIEW`: ждёт подтверждения руководителя. */
+export function awaitsLeadConfirmation(status: TaskStatus): boolean {
+  return status === TASK_STATUS_REVIEW;
 }

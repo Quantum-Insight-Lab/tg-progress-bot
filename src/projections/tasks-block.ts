@@ -50,7 +50,10 @@ type TaskCanvasAction = keyof typeof TASK_CANVAS_ACTIONS;
 /** Слово текущего приоритета — кнопка на второй строке. */
 export const TASK_PRIORITY_ACTION = 'priority';
 
-type TaskCanvasCallback = TaskCanvasAction | typeof TASK_PRIORITY_ACTION;
+/** Кружок или галочка на первой строке. Нажатие ставит или снимает галочку. */
+export const TASK_MARK_ACTION = 'mark';
+
+type TaskCanvasCallback = TaskCanvasAction | typeof TASK_PRIORITY_ACTION | typeof TASK_MARK_ACTION;
 
 /** Callback кнопки второй строки: акт разберёт нажатие, здесь только адрес задачи на канвасе. */
 export function taskCanvasActionData(action: TaskCanvasCallback, taskNumber: number): string {
@@ -100,9 +103,20 @@ export function taskSecondLinePieces(task: TaskFirstLine): CanvasPiece[] {
   return pieces;
 }
 
-/** Абзац задачи: первая строка и кнопки второй. */
+/**
+ * Абзац задачи: кружок или галочка — кнопка первой строки, остальное — текст,
+ * затем кнопки второй. Отметка рисуется из статуса, не из native checkbox.
+ */
 export function taskParagraphPieces(task: TaskFirstLine): CanvasPiece[] {
-  return [{ kind: 'text', text: `${taskFirstLine(task)}\n` }, ...taskSecondLinePieces(task)];
+  const review = task.status === REVIEW;
+  const mark = review ? TASK_REVIEW_MARK : TASK_OPEN_MARK;
+  const line = taskFirstLine(task);
+  const rest = line.startsWith(mark) ? line.slice(mark.length) : line;
+  return [
+    { kind: 'action', label: mark, callbackData: taskCanvasActionData(TASK_MARK_ACTION, task.number) },
+    { kind: 'text', text: `${rest}\n` },
+    ...taskSecondLinePieces(task),
+  ];
 }
 
 /**

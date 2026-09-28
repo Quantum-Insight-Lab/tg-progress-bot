@@ -18,7 +18,7 @@ import { createInstallationRepositories } from './infrastructure/installation-re
 import { createProjectSettings } from './infrastructure/settings.ts';
 import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
-import { createTaskActions } from './infrastructure/tasks.ts';
+import { createTaskActions, createTaskMarkActions } from './infrastructure/tasks.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { attachAccessGuard } from './telegram/access-guard.ts';
@@ -38,6 +38,7 @@ import { editCanvasMessage, sendCanvasMessage } from './telegram/canvas-message.
 import { renderCanvas } from './projections/canvas-message.ts';
 import { tasksBlockParagraphs } from './projections/tasks-block.ts';
 import { attachTaskCommand } from './telegram/task-command.ts';
+import { attachTaskMark } from './telegram/task-mark.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
 
 const DEFAULT_HOST = '0.0.0.0';
@@ -164,8 +165,8 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachSettings(bot, createProjectSettings(config.db, config.clock));
     attachProjectRepository(bot, projectRepository, installation);
     attachInstallationRepositories(bot, installation);
-    attachTaskCommand(bot, createTaskActions(config.db, config.clock), {
-      redraw(input) {
+    const redrawTaskCanvas = {
+      redraw(input: { projectId: string; assigneeId: string; causationId: string }) {
         return canvas
           .show({
             projectId: input.projectId,
@@ -177,7 +178,9 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
           })
           .then(() => undefined);
       },
-    });
+    };
+    attachTaskCommand(bot, createTaskActions(config.db, config.clock), redrawTaskCanvas);
+    attachTaskMark(bot, createTaskMarkActions(config.db, config.clock), redrawTaskCanvas);
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);
