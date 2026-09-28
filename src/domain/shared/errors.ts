@@ -1,6 +1,10 @@
 /** Код причины, по которой домен отклонил команду. */
 export const DOMAIN_ERROR = {
   USERS_ALREADY_EXIST: 'users_already_exist',
+  PROJECT_ID_BLANK: 'project_id_blank',
+  PROJECT_NAME_BLANK: 'project_name_blank',
+  PROJECT_TIMEZONE_BLANK: 'project_timezone_blank',
+  PROJECT_CREATED_AT_BLANK: 'project_created_at_blank',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

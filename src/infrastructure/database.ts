@@ -26,7 +26,17 @@ export interface UsersTable {
   is_root: boolean;
 }
 
+export interface ProjectsTable {
+  id: string;
+  name: string;
+  description: string;
+  timezone: string;
+  chat_id: string | null;
+  created_at: Date;
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
+  projects: ProjectsTable;
 }
