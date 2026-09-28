@@ -187,23 +187,20 @@ describe('топик исполнителя — колонка project_members.t
   });
 
   it('topic_id живёт на участнике, в chats его нет, ноль и отрицательный номер не пишутся', async () => {
-    const handle = await openDb();
-    opened.push(handle);
+    const fixture = await seed(false);
+    opened.push(fixture);
     const members = await sql<{ column_name: string }>`
       SELECT column_name FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'project_members'
       ORDER BY column_name
-    `.execute(handle.db);
+    `.execute(fixture.db);
     expect(members.rows.map((row) => row.column_name)).toContain('topic_id');
     const chats = await sql<{ column_name: string }>`
       SELECT column_name FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'chats'
       ORDER BY column_name
-    `.execute(handle.db);
+    `.execute(fixture.db);
     expect(chats.rows.map((row) => row.column_name)).not.toContain('topic_id');
-
-    const fixture = await seed(false);
-    opened.push(fixture);
     const zero = sql`
       UPDATE project_members SET topic_id = 0 WHERE user_id = ${fixture.borisId}::uuid
     `.execute(fixture.db);
