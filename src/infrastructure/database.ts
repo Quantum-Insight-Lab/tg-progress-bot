@@ -22,6 +22,7 @@ export interface EventsTable {
 export interface UsersTable {
   id: string;
   telegram_user_id: string;
+  github_login: string | null;
   name: string;
   is_root: boolean;
 }

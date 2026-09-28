@@ -307,8 +307,14 @@ describe('INV-18 добавление member и снятие незакрыты�
   });
 
   it('INV-18 удаление записывает незакрытые задачи в том же акте', async () => {
-    const root: User = { id: '00000000-0000-4000-8000-000000000001', telegramUserId: '1001', name: 'Аня', isRoot: true };
-    const boris: User = { id: borisId, telegramUserId: '1002', name: 'Борис', isRoot: false };
+    const root: User = {
+      id: '00000000-0000-4000-8000-000000000001',
+      telegramUserId: '1001',
+      githubLogin: null,
+      name: 'Аня',
+      isRoot: true,
+    };
+    const boris: User = { id: borisId, telegramUserId: '1002', githubLogin: null, name: 'Борис', isRoot: false };
     const member: ProjectMemberView = {
       id: memberId,
       projectId: projectAlpha,

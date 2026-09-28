@@ -1,0 +1,81 @@
+import { sql, type Kysely, type Transaction } from 'kysely';
+import {
+  assertGithubLoginAvailable,
+  withCurrentGithubLogin,
+} from '../domain/projects/github-login.ts';
+import type { User } from '../domain/projects/user.ts';
+import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import type { Database } from './database.ts';
+
+function asText(value: unknown, label: string): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  throw new Error(`${label} повреждён`);
+}
+
+function userOf(row: {
+  id: string;
+  telegram_user_id: unknown;
+  github_login: string | null;
+  name: string;
+  is_root: boolean;
+}): User {
+  return {
+    id: row.id,
+    telegramUserId: asText(row.telegram_user_id, 'telegram_user_id'),
+    githubLogin: row.github_login,
+    name: row.name,
+    isRoot: row.is_root,
+  };
+}
+
+function takenError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  if ('code' in error && error.code === '23505') return true;
+  if (error instanceof Error && error.message.includes('users_github_login_unique')) return true;
+  if ('cause' in error) return takenError(error.cause);
+  return false;
+}
+
+async function findUser(trx: Transaction<Database>, userId: string): Promise<User | null> {
+  const row = await trx
+    .selectFrom('users')
+    .select(['id', 'telegram_user_id', 'github_login', 'name', 'is_root'])
+    .where('id', '=', userId)
+    .forUpdate()
+    .executeTakeFirst();
+  if (row === undefined) return null;
+  return userOf(row);
+}
+
+async function ownerId(trx: Transaction<Database>, login: string): Promise<string | null> {
+  const result = await sql<{ id: string }>`
+    SELECT id::text AS id
+    FROM users
+    WHERE github_login IS NOT NULL AND lower(github_login) = lower(${login})
+    FOR UPDATE
+  `.execute(trx);
+  const row = result.rows[0];
+  return row === undefined ? null : row.id;
+}
+
+/** Записать текущий логин. Пустая строка очищает поле. Занятый логин не переходит к другому. */
+export async function recordGithubLogin(db: Kysely<Database>, userId: string, login: string | null): Promise<User> {
+  return db.transaction().execute(async (trx) => {
+    const user = await findUser(trx, userId);
+    if (user === null) throw new DomainError(DOMAIN_ERROR.USER_NOT_FOUND, 'Пользователь не найден');
+    const updated = withCurrentGithubLogin(user, login);
+    if (updated.githubLogin !== null) {
+      assertGithubLoginAvailable(await ownerId(trx, updated.githubLogin), user.id);
+    }
+    try {
+      await trx.updateTable('users').set({ github_login: updated.githubLogin }).where('id', '=', user.id).execute();
+    } catch (error) {
+      if (takenError(error)) {
+        throw new DomainError(DOMAIN_ERROR.GITHUB_LOGIN_TAKEN, 'Один логин GitHub принадлежит одному пользователю бота');
+      }
+      throw error;
+    }
+    return updated;
+  });
+}
