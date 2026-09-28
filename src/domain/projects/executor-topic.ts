@@ -304,7 +304,7 @@ export async function assignNamedExecutorTopic(
     actor: input.actor,
     chat: input.chat,
     projectId: project.id,
-    target: { id: member.userId, telegramUserId: member.telegramUserId, name: member.name, isRoot: false },
+    target: { id: member.userId, telegramUserId: member.telegramUserId, githubLogin: null, name: member.name, isRoot: false },
     topicId: input.topicId,
     created: false,
     idempotencyKey: input.idempotencyKey,

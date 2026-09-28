@@ -33,5 +33,5 @@ export function readProjectMembersMigration(root = process.cwd()): string {
 
 /** Топик исполнителя: колонка `project_members.topic_id` и constraint номера. */
 export function readMemberTopicMigration(root = process.cwd()): string {
-  return readFileSync(join(root, 'migrations', '006_member_topic.sql'), 'utf8');
+  return readFileSync(join(root, 'migrations', '007_member_topic.sql'), 'utf8');
 }
