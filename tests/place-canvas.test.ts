@@ -33,6 +33,7 @@ import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import { createExecutorTopics } from '../src/infrastructure/executor-topic.ts';
 import { createMembership } from '../src/infrastructure/membership.ts';
 import {
+  readCanvasItemsMigration,
   readCanvasesMigration,
   readChatsMigration,
   readEventsMigration,
@@ -153,6 +154,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readMemberTopicMigration());
   await pglite.exec(readTasksMigration());
   await pglite.exec(readCanvasesMigration());
+  await pglite.exec(readCanvasItemsMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
