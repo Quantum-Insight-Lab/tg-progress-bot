@@ -100,6 +100,16 @@ export const DOMAIN_ERROR = {
   REPOSITORY_UNAVAILABLE: 'repository_unavailable',
   REPOSITORY_IDEMPOTENCY_KEY: 'repository_idempotency_key',
   REPOSITORY_IDENTITY: 'repository_identity',
+  PROJECT_REPOSITORY_CHAT: 'project_repository_chat',
+  PROJECT_REPOSITORY_ACTOR: 'project_repository_actor',
+  PROJECT_REPOSITORY_ACCESS: 'project_repository_access',
+  PROJECT_REPOSITORY_PROJECT_MISSING: 'project_repository_project_missing',
+  PROJECT_REPOSITORY_PROJECT_AMBIGUOUS: 'project_repository_project_ambiguous',
+  PROJECT_REPOSITORY_ID: 'project_repository_id',
+  PROJECT_REPOSITORY_UNKNOWN: 'project_repository_unknown',
+  PROJECT_REPOSITORY_ALREADY: 'project_repository_already',
+  PROJECT_REPOSITORY_DUPLICATE: 'project_repository_duplicate',
+  PROJECT_REPOSITORY_IDEMPOTENCY_KEY: 'project_repository_idempotency_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

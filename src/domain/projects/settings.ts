@@ -154,7 +154,8 @@ async function viewOf(store: SettingsStore, projectId: string): Promise<Settings
 async function apply(store: SettingsStore, clock: Clock, project: StoredProject, update: SettingUpdate): Promise<string> {
   switch (update.field) {
     case 'name': {
-      const next = defineProject({ ...project, name: update.value.trim() });
+      // Ссылка на репозиторий этим актом не пишется: в проверку имени она не входит.
+      const next = defineProject({ ...project, repositoryId: null, name: update.value.trim() });
       await store.saveName(project.id, next.name);
       return next.name;
     }
@@ -164,7 +165,7 @@ async function apply(store: SettingsStore, clock: Clock, project: StoredProject,
       return description;
     }
     case 'timezone': {
-      const next = defineProject({ ...project, timezone: update.value.trim() });
+      const next = defineProject({ ...project, repositoryId: null, timezone: update.value.trim() });
       projectCalendarDate(clock.now(), next.timezone);
       await store.saveTimezone(project.id, next.timezone);
       return next.timezone;

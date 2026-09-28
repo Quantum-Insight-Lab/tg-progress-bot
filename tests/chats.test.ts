@@ -16,12 +16,21 @@ import { EVENT_TYPES } from '../src/events/index.ts';
 import { createChatBinding } from '../src/infrastructure/chats.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
-import { readChatsMigration, readEventsMigration, readProjectMembersMigration, readProjectsMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
+import {
+  readChatsMigration,
+  readEventsMigration,
+  readProjectMembersMigration,
+  readProjectRepositoryMigration,
+  readProjectsMigration,
+  readRepositoriesMigration,
+  readUsersMigration,
+} from '../src/infrastructure/migrate.ts';
 import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
 import { ACCESS_DENIED_REPLY } from '../src/telegram/access-guard.ts';
 import { SUPERGROUP_BOUND, SUPERGROUP_REQUEST, SUPERGROUP_SHARED } from '../src/telegram/chat-binding.ts';
+import { PROJECT_REPOSITORY_HEADING } from '../src/telegram/connect-repository.ts';
 import { NEW_PROJECT_HEADING } from '../src/telegram/new-project.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
@@ -57,6 +66,8 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readProjectsMigration());
   await pglite.exec(readChatsMigration());
   await pglite.exec(readProjectMembersMigration());
+  await pglite.exec(readRepositoriesMigration());
+  await pglite.exec(readProjectRepositoryMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
@@ -632,7 +643,9 @@ describe('привязка супергруппы в боте', () => {
 
     const confirmed = await post(callbackBody(55, rootAccount, data));
     expect(confirmed).toBe(200);
-    expect(sent.at(-1)?.text).toBe(SUPERGROUP_BOUND);
+    expect(sent.at(-2)?.text).toBe(SUPERGROUP_BOUND);
+    expect(sent.at(-1)?.text.startsWith(PROJECT_REPOSITORY_HEADING)).toBe(true);
+    expect(sent.at(-1)?.text).toContain('Альфа');
     expect(await countChats(handle.db)).toBe(1);
     expect(await chatEvents(handle.db)).toHaveLength(1);
     const linked = await sql<{ chat_id: string | null }>`SELECT chat_id::text AS chat_id FROM projects`.execute(handle.db);
@@ -663,7 +676,9 @@ describe('привязка супергруппы в боте', () => {
 
     const shared = await post(callbackBody(57, rootAccount, joinData));
     expect(shared).toBe(200);
-    expect(sent.at(-1)?.text).toBe(SUPERGROUP_SHARED);
+    expect(sent.at(-2)?.text).toBe(SUPERGROUP_SHARED);
+    expect(sent.at(-1)?.text.startsWith(PROJECT_REPOSITORY_HEADING)).toBe(true);
+    expect(sent.at(-1)?.text).toContain('Бета');
     expect(await countChats(handle.db)).toBe(1);
     const rows = await sql<{ name: string; chat_id: string }>`
       SELECT name, chat_id::text AS chat_id FROM projects ORDER BY name
