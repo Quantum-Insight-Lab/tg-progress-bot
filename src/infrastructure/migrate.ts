@@ -51,12 +51,17 @@ export function readProjectRepositoryMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '010_project_repository.sql'), 'utf8');
 }
 
-/** Таблица задач: поля, затем допустимые статус и приоритет. */
+/** Таблица задач: поля, перечень статуса и приоритета, уникальный номер в проекте. */
 export function readTasksMigration(root = process.cwd()): string {
-  return `${readFileSync(join(root, 'migrations', '011_tasks.sql'), 'utf8')}\n${readTaskStatusMigration(root)}`;
+  return `${readFileSync(join(root, 'migrations', '011_tasks.sql'), 'utf8')}\n${readTaskStatusMigration(root)}\n${readTaskNumberMigration(root)}`;
 }
 
 /** Статусы и приоритеты `tasks`: перечень — constraint. Ключ таблицы — `id`. */
 export function readTaskStatusMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '012_task_status_priority.sql'), 'utf8');
+}
+
+/** `tasks.number` уникален в проекте. */
+export function readTaskNumberMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '013_task_number.sql'), 'utf8');
 }
