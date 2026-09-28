@@ -2,6 +2,7 @@ import { InlineKeyboard, type Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import { canvasHome, type AssignedTopic, type ExecutorTopicActions, type TopicBoard } from '../domain/projects/executor-topic.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { FIRST_MESSAGE_TASK, renderFirstEmployeeMessage } from '../projections/first-employee-message.ts';
 
 /** Строка настроек: топик исполнителя. */
 export const EXECUTOR_TOPIC_HEADING = 'Топик исполнителя';
@@ -28,8 +29,8 @@ export const EXECUTOR_TOPIC_SET = 'Топик указан.';
 
 export const EXECUTOR_TOPIC_CREATED = 'Топик создан.';
 
-/** В топик, не в личку: задача заводится здесь. */
-export const TASK_IN_TOPIC = 'Задача заводится командой /task в этом топике.';
+/** В топике та же строка, что и в личке: задача заводится здесь и появляется на канвасе. */
+export const TASK_IN_TOPIC = FIRST_MESSAGE_TASK;
 
 const BUTTON_TEXT_LIMIT = 64;
 
@@ -40,6 +41,7 @@ const CREATE_PREFIX = 'Нет: ';
 export interface TopicChannel {
   create(telegramChatId: string, name: string): Promise<number>;
   tell(telegramChatId: string, topicId: number, text: string): Promise<void>;
+  direct(telegramUserId: string, text: string): Promise<void>;
 }
 
 export interface ScreenReply {
@@ -186,9 +188,16 @@ function inPrivate(chatType: string | undefined, from: TelegramAccount | undefin
   return chatType === PRIVATE_CHAT && from !== undefined && !from.is_bot;
 }
 
-async function placeNotice(channel: TopicChannel, assigned: AssignedTopic): Promise<void> {
+/** Один текст сотруднику в личку и тем же текстом в его топик. Канвас этим сообщением не становится. */
+async function deliverFirstMessage(channel: TopicChannel, assigned: AssignedTopic): Promise<void> {
   const home = canvasHome(assigned.home.telegramChatId, assigned.home.topicId);
-  await channel.tell(home.telegramChatId, home.topicId, TASK_IN_TOPIC);
+  const text = renderFirstEmployeeMessage({
+    projectName: assigned.projectName,
+    topicId: home.topicId,
+    githubLogin: assigned.githubLogin,
+  });
+  await channel.direct(assigned.telegramUserId, text);
+  await channel.tell(home.telegramChatId, home.topicId, text);
 }
 
 /** Экран топиков в личке корня. Вне лички молчит. */
@@ -215,7 +224,7 @@ export async function replyToExecutorTopicMessage(
       chat: chatType,
       idempotencyKey,
     });
-    await placeNotice(channel, assigned);
+    await deliverFirstMessage(channel, assigned);
     return { text: EXECUTOR_TOPIC_SET };
   } catch (error) {
     return replyOf(error);
@@ -244,7 +253,7 @@ export async function replyToHasTopic(
   }
 }
 
-/** «Нет» — бот создаёт топик с именем человека и пишет в него про `/task`. */
+/** «Нет» — бот создаёт топик с именем человека и шлёт первое сообщение в личку и в топик. */
 export async function replyToCreateTopic(
   chatType: string | undefined,
   from: TelegramAccount | undefined,
@@ -273,7 +282,7 @@ export async function replyToCreateTopic(
       chat: chatType,
       idempotencyKey,
     });
-    await placeNotice(channel, assigned);
+    await deliverFirstMessage(channel, assigned);
     return { text: EXECUTOR_TOPIC_CREATED };
   } catch (error) {
     return replyOf(error);
@@ -293,6 +302,9 @@ function channelOf(bot: Bot): TopicChannel {
     },
     async tell(telegramChatId, topicId, text) {
       await bot.api.sendMessage(telegramChatId, text, { message_thread_id: topicId });
+    },
+    async direct(telegramUserId, text) {
+      await bot.api.sendMessage(telegramUserId, text);
     },
   };
 }
