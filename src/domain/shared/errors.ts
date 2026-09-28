@@ -28,6 +28,7 @@ export const DOMAIN_ERROR = {
   CHAT_ALREADY_BOUND: 'chat_already_bound',
   CHAT_DUPLICATE: 'chat_duplicate',
   CHAT_IDEMPOTENCY_KEY: 'chat_idempotency_key',
+  REPORTS_TOPIC_ID: 'reports_topic_id',
   PROJECT_MEMBER_ID_BLANK: 'project_member_id_blank',
   PROJECT_MEMBER_PROJECT_BLANK: 'project_member_project_blank',
   PROJECT_MEMBER_USER_BLANK: 'project_member_user_blank',

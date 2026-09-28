@@ -21,9 +21,14 @@ export function readProjectsMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '003_projects.sql'), 'utf8');
 }
 
-/** Таблица супергрупп: поля и constraint'ы группы. */
+/** Таблица супергрупп: поля и constraint'ы группы, затем командный топик и время рассылки. */
 export function readChatsMigration(root = process.cwd()): string {
-  return readFileSync(join(root, 'migrations', '004_chats.sql'), 'utf8');
+  return `${readFileSync(join(root, 'migrations', '004_chats.sql'), 'utf8')}\n${readChatDeliveryMigration(root)}`;
+}
+
+/** Командный топик и `daily_cron` на `chats`: пусто допустимо, пустая строка и неположительный номер — нет. */
+export function readChatDeliveryMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '008_chat_delivery.sql'), 'utf8');
 }
 
 /** Таблица участников: поля и constraint'ы роли. */

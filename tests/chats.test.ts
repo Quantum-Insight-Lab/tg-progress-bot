@@ -6,6 +6,8 @@ import {
   assessSupergroup,
   canvasAndReportTarget,
   defineChat,
+  defineDailyCron,
+  defineReportsTopicId,
   type SupergroupOffer,
 } from '../src/domain/projects/chat.ts';
 import type { Clock } from '../src/domain/shared/clock.ts';
@@ -130,7 +132,13 @@ describe('E-2 группа — таблица chats', () => {
       WHERE table_schema = 'public' AND table_name = 'chats'
       ORDER BY column_name
     `.execute(handle.db);
-    expect(columns.rows.map((row) => row.column_name)).toEqual(['id', 'telegram_chat_id', 'timezone']);
+    expect(columns.rows.map((row) => row.column_name)).toEqual([
+      'daily_cron',
+      'id',
+      'reports_topic_id',
+      'telegram_chat_id',
+      'timezone',
+    ]);
     await sql`
       INSERT INTO chats (id, telegram_chat_id, timezone)
       VALUES (${chat.id}::uuid, ${chat.telegramChatId}::bigint, ${chat.timezone})
@@ -181,6 +189,128 @@ describe('E-2 группа — таблица chats', () => {
       `.execute(handle.db),
     ).rejects.toThrow(/chats_telegram_chat_id_unique|23505/);
     expect(await countChats(handle.db)).toBe(1);
+  });
+});
+
+describe('E-2 командный топик и время — поля chats', () => {
+  const opened: { close: () => Promise<void> }[] = [];
+
+  afterEach(async () => {
+    await Promise.all(opened.splice(0).map((item) => item.close()));
+  });
+
+  it('E-2 reports_topic_id пуст, пока не выбран; ноль и отрицательный номер не пишутся', async () => {
+    expect(defineReportsTopicId(null)).toBeNull();
+    expect(defineReportsTopicId(7)).toBe(7);
+    expect(() => defineReportsTopicId(0)).toThrow(expect.objectContaining({ code: DOMAIN_ERROR.REPORTS_TOPIC_ID }));
+    expect(() => defineReportsTopicId(-1)).toThrow(expect.objectContaining({ code: DOMAIN_ERROR.REPORTS_TOPIC_ID }));
+    expect(() => defineReportsTopicId(1.5)).toThrow(expect.objectContaining({ code: DOMAIN_ERROR.REPORTS_TOPIC_ID }));
+
+    const handle = await openDb();
+    opened.push(handle);
+    const id = '00000000-0000-4000-8000-0000000000aa';
+    await sql`
+      INSERT INTO chats (id, telegram_chat_id, timezone)
+      VALUES (${id}::uuid, ${telegramChatId}::bigint, 'UTC')
+    `.execute(handle.db);
+    const empty = await sql<{ reports_topic_id: string | null }>`
+      SELECT reports_topic_id::text AS reports_topic_id FROM chats
+    `.execute(handle.db);
+    expect(empty.rows).toEqual([{ reports_topic_id: null }]);
+    await expect(
+      sql`UPDATE chats SET reports_topic_id = 0`.execute(handle.db),
+    ).rejects.toThrow(/chats_reports_topic_id_positive|23514/);
+    await expect(
+      sql`UPDATE chats SET reports_topic_id = -3`.execute(handle.db),
+    ).rejects.toThrow(/chats_reports_topic_id_positive|23514/);
+    await sql`UPDATE chats SET reports_topic_id = 42`.execute(handle.db);
+    const stored = await sql<{ reports_topic_id: string }>`
+      SELECT reports_topic_id::text AS reports_topic_id FROM chats
+    `.execute(handle.db);
+    expect(stored.rows).toEqual([{ reports_topic_id: '42' }]);
+  });
+
+  it('E-2 daily_cron живёт на чате: пусто допустимо, пустая строка нет', async () => {
+    expect(defineDailyCron(null)).toBeNull();
+    expect(defineDailyCron('   ')).toBeNull();
+    expect(defineDailyCron(' 09:00 ')).toBe('09:00');
+
+    const handle = await openDb();
+    opened.push(handle);
+    const id = '00000000-0000-4000-8000-0000000000aa';
+    await sql`
+      INSERT INTO chats (id, telegram_chat_id, timezone, daily_cron)
+      VALUES (${id}::uuid, ${telegramChatId}::bigint, 'UTC', NULL)
+    `.execute(handle.db);
+    const empty = await sql<{ daily_cron: string | null }>`SELECT daily_cron FROM chats`.execute(handle.db);
+    expect(empty.rows).toEqual([{ daily_cron: null }]);
+    await expect(sql`UPDATE chats SET daily_cron = '   '`.execute(handle.db)).rejects.toThrow(
+      /chats_daily_cron_not_blank|23514/,
+    );
+    await sql`UPDATE chats SET daily_cron = '09:00'`.execute(handle.db);
+    const stored = await sql<{ daily_cron: string }>`SELECT daily_cron FROM chats`.execute(handle.db);
+    expect(stored.rows).toEqual([{ daily_cron: '09:00' }]);
+  });
+});
+
+describe('E-4 командный топик в участника не пишется', () => {
+  const opened: { close: () => Promise<void> }[] = [];
+
+  afterEach(async () => {
+    await Promise.all(opened.splice(0).map((item) => item.close()));
+  });
+
+  it('E-4 у project_members нет reports_topic_id, у chats нет topic_id', async () => {
+    const handle = await openDb();
+    opened.push(handle);
+    const members = await sql<{ column_name: string }>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'project_members'
+    `.execute(handle.db);
+    const chats = await sql<{ column_name: string }>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'chats'
+    `.execute(handle.db);
+    expect(members.rows.map((row) => row.column_name)).not.toContain('reports_topic_id');
+    expect(chats.rows.map((row) => row.column_name)).not.toContain('topic_id');
+    expect(chats.rows.map((row) => row.column_name)).toContain('reports_topic_id');
+  });
+});
+
+describe('INV-27 время и включение рассылки задаются на чат', () => {
+  const opened: { close: () => Promise<void> }[] = [];
+
+  afterEach(async () => {
+    await Promise.all(opened.splice(0).map((item) => item.close()));
+  });
+
+  it('INV-27 daily_cron и reports_topic_id есть у группы и нет у проекта; новая группа без них', async () => {
+    const handle = await openDb();
+    opened.push(handle);
+    const projects = await sql<{ column_name: string }>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'projects'
+    `.execute(handle.db);
+    const names = projects.rows.map((row) => row.column_name);
+    expect(names).not.toContain('daily_cron');
+    expect(names).not.toContain('reports_topic_id');
+
+    await registerRoot(handle.db);
+    const projectId = await createNamed(handle.db, 'Альфа', 'Europe/Moscow', 'alpha');
+    const bound = await createChatBinding(handle.db, clock).confirm({
+      telegramUserId: String(rootAccount.id),
+      projectId,
+      offer: forumAdmin,
+      idempotencyKey: 'bind-delivery',
+    });
+    expect(bound.status).toBe('bound');
+    if (bound.status !== 'bound') return;
+    expect(bound.chat.reportsTopicId).toBeNull();
+    expect(bound.chat.dailyCron).toBeNull();
+    const stored = await sql<{ reports_topic_id: string | null; daily_cron: string | null }>`
+      SELECT reports_topic_id::text AS reports_topic_id, daily_cron FROM chats
+    `.execute(handle.db);
+    expect(stored.rows).toEqual([{ reports_topic_id: null, daily_cron: null }]);
   });
 });
 
