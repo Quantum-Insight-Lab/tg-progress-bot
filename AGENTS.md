@@ -32,7 +32,7 @@ src/config         ничего не импортирует из src
 | Telegram | один экземпляр grammY в `src/telegram/bot.ts`; приём обновлений — webhook в `src/telegram/webhook.ts`; методы Bot API 10.3 — напрямую, если их нет в типах | есть |
 | Планировщик актов системы | `src/infrastructure/scheduler.ts`: слоты A-28…A-33, A-35, A-36; реализация акта — в своей issue | есть |
 | GitHub | один клиент Octokit в `src/github/client.ts` | появится |
-| Ошибки домена | `DomainError` с кодом причины в `src/domain/shared/errors.ts` | появится |
+| Ошибки домена | `DomainError` с кодом причины в `src/domain/shared/errors.ts` | есть |
 | Логирование | один логгер в `src/infrastructure/logger.ts` | появится |
 | Тесты | Vitest; тест инварианта начинается с его ID, `INV-xx` | есть |
 | Проверки | `npm run ci`: типы, ESLint, dependency-cruiser, сверка генерации, S-7, тесты, `tz:check --gate --pda` с TR-7 и TR-8 по backlog | есть |
