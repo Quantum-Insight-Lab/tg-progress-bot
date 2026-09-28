@@ -2,6 +2,7 @@ import { InlineKeyboard, type Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import { canvasHome, type AssignedTopic, type ExecutorTopicActions, type TopicBoard } from '../domain/projects/executor-topic.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { REPORTS_TOPIC_COLLIDES } from './reports-topic.ts';
 import { FIRST_MESSAGE_TASK, renderFirstEmployeeMessage } from '../projections/first-employee-message.ts';
 
 /** Строка настроек: топик исполнителя. */
@@ -179,6 +180,8 @@ function replyOf(error: unknown): ScreenReply | null {
       return { text: EXECUTOR_TOPIC_BAD_ID };
     case DOMAIN_ERROR.TOPIC_ALREADY:
       return { text: EXECUTOR_TOPIC_ALREADY };
+    case DOMAIN_ERROR.REPORTS_TOPIC_COLLIDES:
+      return { text: REPORTS_TOPIC_COLLIDES };
     default:
       throw error;
   }

@@ -57,6 +57,17 @@ export const DOMAIN_ERROR = {
   TOPIC_ALREADY: 'topic_already',
   TOPIC_DUPLICATE: 'topic_duplicate',
   TOPIC_IDEMPOTENCY_KEY: 'topic_idempotency_key',
+  REPORTS_TOPIC_CHAT: 'reports_topic_chat',
+  REPORTS_TOPIC_ACTOR: 'reports_topic_actor',
+  REPORTS_TOPIC_ROOT: 'reports_topic_root',
+  REPORTS_TOPIC_ACCESS: 'reports_topic_access',
+  REPORTS_TOPIC_PROJECT_MISSING: 'reports_topic_project_missing',
+  REPORTS_TOPIC_PROJECT_AMBIGUOUS: 'reports_topic_project_ambiguous',
+  REPORTS_TOPIC_UNBOUND: 'reports_topic_unbound',
+  REPORTS_TOPIC_ALREADY: 'reports_topic_already',
+  REPORTS_TOPIC_COLLIDES: 'reports_topic_collides',
+  REPORTS_TOPIC_DUPLICATE: 'reports_topic_duplicate',
+  REPORTS_TOPIC_IDEMPOTENCY_KEY: 'reports_topic_idempotency_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

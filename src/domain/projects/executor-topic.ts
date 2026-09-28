@@ -3,6 +3,7 @@ import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
 import { PRIVATE_CHAT } from './create-project.ts';
 import type { ProjectRole } from './member.ts';
+import { distinctReportsTopic } from './reports-topic.ts';
 import type { User } from './user.ts';
 
 /** Кто указывает топик. В событии это роль `root`. */
@@ -61,6 +62,7 @@ export interface ExecutorTopicStore {
   findMember(projectId: string, userId: string): Promise<TopicMember | null>;
   findMembersByName(projectId: string, name: string): Promise<TopicMember[]>;
   setTopic(memberId: string, topicId: number): Promise<void>;
+  reportsTopicId(projectId: string): Promise<number | null>;
 }
 
 export interface TopicCommand {
@@ -262,6 +264,8 @@ export async function assignExecutorTopic(
   if (input.created && member.topicId !== null) throw new DomainError(DOMAIN_ERROR.TOPIC_ALREADY, 'топик уже есть');
   const topicId = executorTopicId(input.topicId);
   const home = canvasHome(telegramChatId, topicId);
+  const reportsTopicId = await store.reportsTopicId(project.id);
+  if (reportsTopicId !== null) distinctReportsTopic(home.topicId, [reportsTopicId]);
   await store.setTopic(member.id, home.topicId);
   const published = await emit(journal, {
     type: EVENT_TYPES.MEMBER_TOPIC_SET,
