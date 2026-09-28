@@ -53,6 +53,8 @@ export interface NewTask {
 
 export interface CreatedTask {
   task: Task;
+  /** Id `task.created`: им правится канвас того же дня. */
+  eventId: string;
 }
 
 /** Порт для адаптера Telegram. Часы, id и транзакция — у реализации. */
@@ -154,5 +156,5 @@ export async function createTask(
   if (published.status === 'duplicate') {
     throw new DomainError(DOMAIN_ERROR.TASK_DUPLICATE, 'task.created уже записан');
   }
-  return { task };
+  return { task, eventId: published.row.id };
 }

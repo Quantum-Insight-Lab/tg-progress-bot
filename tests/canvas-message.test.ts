@@ -3,12 +3,13 @@ import type { Transformer } from 'grammy';
 import {
   CANVAS_LINK_STYLE,
   renderCanvasMessage,
+  renderCanvasShell,
   type CanvasRichMessage,
   type CanvasRichText,
   type CanvasTextButton,
 } from '../src/projections/canvas-message.ts';
 import { createTelegramBot } from '../src/telegram/bot.ts';
-import { sendCanvasMessage } from '../src/telegram/canvas-message.ts';
+import { editCanvasMessage, sendCanvasMessage } from '../src/telegram/canvas-message.ts';
 import { testBotInfo } from './bot-info.ts';
 
 const taskParagraph = renderCanvasMessage([
@@ -117,6 +118,27 @@ describe('B-6 канвас уходит в топик', () => {
     const payload = fieldsOf(calls[0]?.payload);
     expect(payload.chat_id).toBe('-1001');
     expect(payload.message_thread_id).toBe(42);
+  });
+
+  it('INV-23 оболочка канваса без меню задач и без кнопок', () => {
+    const shell = renderCanvasShell();
+    expect(shell.blocks).toHaveLength(1);
+    expect(buttonsOf(shell)).toEqual([]);
+    expect(JSON.stringify(shell)).not.toContain('reply_markup');
+    expect(JSON.stringify(shell)).not.toContain('inline_keyboard');
+    expect(JSON.stringify(shell)).not.toContain('"type":"button"');
+  });
+
+  it('INV-23 правка того же сообщения, без клавиатуры и без второго send', async () => {
+    await editCanvasMessage(bot.api, { chatId: '-1001', messageThreadId: 42 }, 9, taskParagraph);
+    expect(calls.map((call) => call.method)).toEqual(['editMessageText']);
+    const payload = fieldsOf(calls[0]?.payload);
+    expect(payload.chat_id).toBe('-1001');
+    expect(payload.message_id).toBe(9);
+    expect(payload.rich_message).toEqual(taskParagraph);
+    expect(payload).not.toHaveProperty('reply_markup');
+    expect(payload).not.toHaveProperty('text');
+    expect(JSON.stringify(payload)).not.toContain('inline_keyboard');
   });
 
   it('R-598 клавиатуры под сообщением нет', async () => {

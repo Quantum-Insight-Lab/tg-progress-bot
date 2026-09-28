@@ -16,6 +16,8 @@ import { createProjectCreation } from './infrastructure/projects.ts';
 import { createProjectRepository } from './infrastructure/connect-repository.ts';
 import { createInstallationRepositories } from './infrastructure/installation-repositories.ts';
 import { createProjectSettings } from './infrastructure/settings.ts';
+import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
+import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
 import { createTaskActions } from './infrastructure/tasks.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
@@ -32,6 +34,8 @@ import { attachGithubLogin, deliverGithubLoginPrompt } from './telegram/github-l
 import { attachParticipants } from './telegram/members.ts';
 import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
+import { editCanvasMessage, sendCanvasMessage } from './telegram/canvas-message.ts';
+import { renderCanvasShell } from './projections/canvas-message.ts';
 import { attachTaskCommand } from './telegram/task-command.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
 
@@ -101,12 +105,23 @@ let running: RunningProcess | undefined;
 
 /**
  * Один процесс backend: webhook Telegram, планировщик актов системы, Progress Engine.
- * Слоты планировщика пустые — акт регистрирует своя issue.
+ * Слот A-31 выставляет канвас на сегодня. Остальные слоты регистрируют свои issues.
  */
 export async function startProcess(config: ProcessConfig): Promise<RunningProcess> {
   if (running !== undefined) throw new Error('процесс уже запущен');
   const bot = config.botInfo === undefined ? createTelegramBot(config.botToken) : createTelegramBot(config.botToken, config.botInfo);
+  const deliverCanvas = {
+    async send(home: CanvasHome): Promise<number> {
+      return sendCanvasMessage(bot.api, { chatId: home.telegramChatId, messageThreadId: home.topicId }, renderCanvasShell());
+    },
+    async edit(home: CanvasHome, messageId: number): Promise<void> {
+      await editCanvasMessage(bot.api, { chatId: home.telegramChatId, messageThreadId: home.topicId }, messageId, renderCanvasShell());
+    },
+  };
+  let ensureToday: ((now: Date) => Promise<void>) | undefined;
   if (config.db !== undefined) {
+    const canvas = createCanvasPlacement(config.db, config.clock);
+    ensureToday = (now) => canvas.ensureToday(now, deliverCanvas.send);
     const binding = createChatBinding(config.db, config.clock);
     attachAccessGuard(bot, createAccessGate(config.db, config.clock));
     attachStartCommand(bot, createUserRegistration(config.db, config.clock));
@@ -121,16 +136,34 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachParticipants(bot, createMembership(config.db, config.clock), async (telegramUserId, send) => {
       await deliverGithubLoginPrompt(await githubLogin.find(telegramUserId), send);
     });
-    attachExecutorTopic(bot, createExecutorTopics(config.db, config.clock));
+    attachExecutorTopic(bot, createExecutorTopics(config.db, config.clock), {
+      posted(input) {
+        return canvas.showForTopic({ ...input, causationId: null, send: deliverCanvas.send, edit: deliverCanvas.edit }).then(() => undefined);
+      },
+    });
     attachReportsTopic(bot, createReportsTopics(config.db, config.clock));
     attachSchedule(bot, createChatSchedule(config.db, config.clock));
     attachSettings(bot, createProjectSettings(config.db, config.clock));
     attachProjectRepository(bot, projectRepository, installation);
     attachInstallationRepositories(bot, installation);
-    attachTaskCommand(bot, createTaskActions(config.db, config.clock));
+    attachTaskCommand(bot, createTaskActions(config.db, config.clock), {
+      redraw(input) {
+        return canvas
+          .show({
+            projectId: input.projectId,
+            assigneeId: input.assigneeId,
+            destination: CANVAS_DESTINATION_TOPIC,
+            causationId: input.causationId,
+            send: deliverCanvas.send,
+            edit: deliverCanvas.edit,
+          })
+          .then(() => undefined);
+      },
+    });
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);
+  if (ensureToday !== undefined) scheduler.register('A-31', ensureToday);
   const webhook: WebhookServer = await startTelegramWebhook({
     bot,
     secretToken: config.webhookSecret,

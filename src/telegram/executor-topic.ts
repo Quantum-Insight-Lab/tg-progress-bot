@@ -191,6 +191,11 @@ function inPrivate(chatType: string | undefined, from: TelegramAccount | undefin
   return chatType === PRIVATE_CHAT && from !== undefined && !from.is_bot;
 }
 
+/** После топика канвас уходит в него отдельным сообщением. Первое сообщение сотруднику остаётся. */
+export interface CanvasNotice {
+  posted(input: { telegramUserId: string; topicId: number }): Promise<void>;
+}
+
 /** Один текст сотруднику в личку и тем же текстом в его топик. Канвас этим сообщением не становится. */
 async function deliverFirstMessage(channel: TopicChannel, assigned: AssignedTopic): Promise<void> {
   const home = canvasHome(assigned.home.telegramChatId, assigned.home.topicId);
@@ -211,6 +216,7 @@ export async function replyToExecutorTopicMessage(
   idempotencyKey: string,
   actions: ExecutorTopicActions,
   channel: TopicChannel,
+  canvas?: CanvasNotice,
 ): Promise<ScreenReply | null> {
   if (!inPrivate(chatType, from) || from === undefined) return null;
   if (request.kind === 'invalid-topic') return { text: EXECUTOR_TOPIC_BAD_ID };
@@ -228,6 +234,7 @@ export async function replyToExecutorTopicMessage(
       idempotencyKey,
     });
     await deliverFirstMessage(channel, assigned);
+    await canvas?.posted({ telegramUserId: assigned.telegramUserId, topicId: assigned.home.topicId });
     return { text: EXECUTOR_TOPIC_SET };
   } catch (error) {
     return replyOf(error);
@@ -265,6 +272,7 @@ export async function replyToCreateTopic(
   idempotencyKey: string,
   actions: ExecutorTopicActions,
   channel: TopicChannel,
+  canvas?: CanvasNotice,
 ): Promise<ScreenReply | null> {
   if (!inPrivate(chatType, from) || from === undefined) return null;
   try {
@@ -286,6 +294,7 @@ export async function replyToCreateTopic(
       idempotencyKey,
     });
     await deliverFirstMessage(channel, assigned);
+    await canvas?.posted({ telegramUserId: assigned.telegramUserId, topicId: assigned.home.topicId });
     return { text: EXECUTOR_TOPIC_CREATED };
   } catch (error) {
     return replyOf(error);
@@ -313,7 +322,7 @@ function channelOf(bot: Bot): TopicChannel {
 }
 
 /** «Топик исполнителя» в личке: вопрос, номер существующего топика или создание с именем человека. */
-export function attachExecutorTopic(bot: Bot, actions: ExecutorTopicActions): void {
+export function attachExecutorTopic(bot: Bot, actions: ExecutorTopicActions, canvas?: CanvasNotice): void {
   const channel = channelOf(bot);
   bot.use(async (ctx, next) => {
     const text = ctx.message?.text;
@@ -326,7 +335,15 @@ export function attachExecutorTopic(bot: Bot, actions: ExecutorTopicActions): vo
       await next();
       return;
     }
-    const reply = await replyToExecutorTopicMessage(ctx.chat?.type, ctx.from, request, String(ctx.update.update_id), actions, channel);
+    const reply = await replyToExecutorTopicMessage(
+      ctx.chat?.type,
+      ctx.from,
+      request,
+      String(ctx.update.update_id),
+      actions,
+      channel,
+      canvas,
+    );
     if (reply !== null) await send(ctx, reply);
     await next();
   });
@@ -353,6 +370,7 @@ export function attachExecutorTopic(bot: Bot, actions: ExecutorTopicActions): vo
       String(ctx.update.update_id),
       actions,
       channel,
+      canvas,
     );
     if (reply !== null) await send(ctx, reply);
   });
