@@ -2,10 +2,12 @@ import type { Kysely } from 'kysely';
 import type { Clock } from './domain/shared/clock.ts';
 import type { Database } from './infrastructure/database.ts';
 import { createScheduler, startSchedulerLoop, type Scheduler } from './infrastructure/scheduler.ts';
+import { createChatBinding } from './infrastructure/chats.ts';
 import { createProjectCreation } from './infrastructure/projects.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { createTelegramBot, type TelegramBotInfo } from './telegram/bot.ts';
+import { attachChatBinding, sendSupergroupRequest } from './telegram/chat-binding.ts';
 import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
@@ -73,8 +75,10 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   if (running !== undefined) throw new Error('процесс уже запущен');
   const bot = config.botInfo === undefined ? createTelegramBot(config.botToken) : createTelegramBot(config.botToken, config.botInfo);
   if (config.db !== undefined) {
+    const binding = createChatBinding(config.db, config.clock);
     attachStartCommand(bot, createUserRegistration(config.db, config.clock));
-    attachNewProject(bot, createProjectCreation(config.db, config.clock));
+    attachNewProject(bot, createProjectCreation(config.db, config.clock), (reply) => sendSupergroupRequest(reply, binding));
+    attachChatBinding(bot, binding);
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);

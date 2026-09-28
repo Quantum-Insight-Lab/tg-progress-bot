@@ -35,8 +35,15 @@ export interface ProjectsTable {
   created_at: Date;
 }
 
+export interface ChatsTable {
+  id: string;
+  telegram_chat_id: string;
+  timezone: string;
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
   projects: ProjectsTable;
+  chats: ChatsTable;
 }

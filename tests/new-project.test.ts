@@ -8,7 +8,7 @@ import { DOMAIN_ERROR } from '../src/domain/shared/errors.ts';
 import { EVENT_TYPES } from '../src/events/index.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
-import { readEventsMigration, readProjectsMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
+import { readChatsMigration, readEventsMigration, readProjectsMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
 import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
@@ -20,6 +20,7 @@ import {
   projectCreatedReply,
   replyToNewProject,
 } from '../src/telegram/new-project.ts';
+import { SUPERGROUP_REQUEST } from '../src/telegram/chat-binding.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
@@ -45,6 +46,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readEventsMigration());
   await pglite.exec(readUsersMigration());
   await pglite.exec(readProjectsMigration());
+  await pglite.exec(readChatsMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
@@ -395,12 +397,12 @@ describe('«Новый проект» в процессе', () => {
 
     const created = await post(51, rootAccount, { id: rootAccount.id, type: 'private' }, projectText);
     expect(created).toBe(200);
-    expect(sent).toEqual([projectCreatedReply('Альфа')]);
+    expect(sent).toEqual([projectCreatedReply('Альфа'), SUPERGROUP_REQUEST]);
     expect(await countProjects(handle.db)).toBe(1);
 
     const repeat = await post(51, rootAccount, { id: rootAccount.id, type: 'private' }, `${NEW_PROJECT_HEADING}\nДругое\n\nUTC`);
     expect(repeat).toBe(200);
-    expect(sent).toEqual([projectCreatedReply('Альфа')]);
+    expect(sent).toEqual([projectCreatedReply('Альфа'), SUPERGROUP_REQUEST]);
     expect(await countProjects(handle.db)).toBe(1);
     const events = await projectEvents(handle.db);
     expect(events).toHaveLength(1);

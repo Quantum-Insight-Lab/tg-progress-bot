@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import { PRIVATE_CHAT, type ProjectCreation, type ProjectDraft } from '../domain/projects/create-project.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import type { SupergroupReply } from './chat-binding.ts';
 
 /** Шаг онбординга: заголовок сообщения, затем имя, описание и таймзона. */
 export const NEW_PROJECT_HEADING = 'Новый проект';
@@ -73,8 +74,12 @@ export async function replyToNewProject(
   }
 }
 
-/** Сообщение «Новый проект» на единственном экземпляре grammY. */
-export function attachNewProject(bot: Bot, creation: ProjectCreation): void {
+/** Сообщение «Новый проект» на единственном экземпляре grammY. После удачного заведения — следующий шаг онбординга. */
+export function attachNewProject(
+  bot: Bot,
+  creation: ProjectCreation,
+  afterCreated?: (reply: SupergroupReply) => Promise<void>,
+): void {
   bot.use(async (ctx, next) => {
     const text = ctx.message?.text;
     if (text === undefined) {
@@ -88,7 +93,15 @@ export function attachNewProject(bot: Bot, creation: ProjectCreation): void {
     }
     const chatType = ctx.chat?.type;
     const reply = await replyToNewProject(chatType, ctx.from, String(ctx.update.update_id), fields, creation);
-    if (reply !== null) await ctx.reply(reply);
+    if (reply !== null) {
+      await ctx.reply(reply);
+      if (afterCreated !== undefined && reply === projectCreatedReply(fields.name)) {
+        await afterCreated(async (followUp, markup) => {
+          if (markup === undefined) await ctx.reply(followUp);
+          else await ctx.reply(followUp, { reply_markup: markup });
+        });
+      }
+    }
     await next();
   });
 }
