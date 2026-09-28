@@ -33,6 +33,7 @@ import {
   readMemberTopicMigration,
   readProjectMembersMigration,
   readProjectsMigration,
+  readCanvasesMigration,
   readTasksMigration,
   readUsersMigration,
 } from '../src/infrastructure/migrate.ts';
@@ -143,6 +144,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readProjectMembersMigration());
   await pglite.exec(readMemberTopicMigration());
   await pglite.exec(readTasksMigration());
+  await pglite.exec(readCanvasesMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
@@ -575,8 +577,16 @@ describe('бот заводит задачу по /task', () => {
   function captureReplies(target: string[]): Transformer {
     return (async (_prev, method, payload) => {
       if (method === 'sendMessage' && 'text' in payload && typeof payload.text === 'string') target.push(payload.text);
-      if (method === 'sendMessage') {
-        return { ok: true, result: { message_id: target.length, date: 1, chat: { id: 1, type: 'supergroup' } } };
+      if (method === 'sendMessage' || method === 'sendRichMessage') {
+        return {
+          ok: true,
+          result: {
+            message_id: target.length + 1,
+            date: 1,
+            chat: { id: 1, type: 'supergroup' },
+            rich_message: { blocks: [] },
+          },
+        };
       }
       return { ok: true, result: true };
     }) as Transformer;

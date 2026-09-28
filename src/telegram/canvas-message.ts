@@ -10,7 +10,6 @@ export interface CanvasTopic {
 /**
  * B-6. Канвас уходит методом `sendRichMessage` в топик (`message_thread_id`).
  * Клавиатуры под сообщением нет: `reply_markup` в вызов не передаётся.
- * Правка уже отправленного сообщения — отдельный акт.
  */
 export async function sendCanvasMessage(
   api: Pick<Api, 'sendRichMessage'>,
@@ -21,4 +20,17 @@ export async function sendCanvasMessage(
     message_thread_id: topic.messageThreadId,
   });
   return sent.message_id;
+}
+
+/**
+ * B-6. Уже выставленный канвас правится на месте: `editMessageText` с `rich_message`.
+ * Второе сообщение не создаётся. Клавиатуры под сообщением нет.
+ */
+export async function editCanvasMessage(
+  api: Pick<Api, 'editMessageText'>,
+  topic: CanvasTopic,
+  messageId: number,
+  message: CanvasRichMessage,
+): Promise<void> {
+  await api.editMessageText(topic.chatId, messageId, message);
 }

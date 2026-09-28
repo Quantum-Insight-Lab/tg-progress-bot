@@ -139,6 +139,14 @@ export const DOMAIN_ERROR = {
   CANVAS_TOPIC_ID: 'canvas_topic_id',
   CANVAS_MESSAGE_ID: 'canvas_message_id',
   CANVAS_DATE: 'canvas_date',
+  CANVAS_PRIVATE: 'canvas_private',
+  CANVAS_PLACE: 'canvas_place',
+  CANVAS_UNBOUND: 'canvas_unbound',
+  CANVAS_NO_TOPIC: 'canvas_no_topic',
+  CANVAS_PROJECT_MISSING: 'canvas_project_missing',
+  CANVAS_AMBIGUOUS: 'canvas_ambiguous',
+  CANVAS_DUPLICATE: 'canvas_duplicate',
+  CANVAS_CAUSATION: 'canvas_causation',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

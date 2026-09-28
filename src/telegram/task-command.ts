@@ -48,6 +48,11 @@ function replyOf(error: DomainError): string | null {
   }
 }
 
+/** После `task.created` канвас того же дня правится или появляется, если его ещё не было. */
+export interface CanvasRedraw {
+  redraw(input: { projectId: string; assigneeId: string; causationId: string }): Promise<void>;
+}
+
 /**
  * Команда в топике заводит задачу и возвращает ответ.
  * Чужой топик, личка и пустая формулировка задачу не пишут.
@@ -58,6 +63,7 @@ export async function replyToTaskCommand(
   idempotencyKey: string,
   title: string,
   actions: TaskCreation,
+  canvas?: CanvasRedraw,
 ): Promise<string | null> {
   if (from === undefined || from.is_bot) return null;
   try {
@@ -69,6 +75,13 @@ export async function replyToTaskCommand(
       title,
       idempotencyKey,
     });
+    if (canvas !== undefined) {
+      await canvas.redraw({
+        projectId: created.task.projectId,
+        assigneeId: created.task.assigneeId,
+        causationId: created.eventId,
+      });
+    }
     return taskCreatedReply(created.task.number, created.task.title);
   } catch (error) {
     if (!(error instanceof DomainError)) throw error;
@@ -77,7 +90,7 @@ export async function replyToTaskCommand(
 }
 
 /** Команда `/task` на единственном экземпляре grammY. */
-export function attachTaskCommand(bot: Bot, actions: TaskCreation): void {
+export function attachTaskCommand(bot: Bot, actions: TaskCreation, canvas?: CanvasRedraw): void {
   bot.command('task', async (ctx) => {
     const title = typeof ctx.match === 'string' ? ctx.match.trim() : '';
     const chat = ctx.chat;
@@ -91,6 +104,7 @@ export function attachTaskCommand(bot: Bot, actions: TaskCreation): void {
       String(ctx.update.update_id),
       title,
       actions,
+      canvas,
     );
     if (reply !== null) await ctx.reply(reply);
   });

@@ -70,6 +70,14 @@ function paragraphText(pieces: readonly CanvasPiece[]): CanvasRichText {
   return nodes;
 }
 
+/**
+ * Оболочка одного сообщения на день.
+ * Состав блоков сверху вниз приходит отдельными issues. Меню задач и кнопок здесь нет.
+ */
+export function renderCanvasShell(): CanvasRichMessage {
+  return renderCanvasMessage([{ pieces: [{ kind: 'text', text: ' ' }] }]);
+}
+
 /** Абзацы канваса. Кнопка действия лежит в тексте абзаца, отдельным блоком кнопок не выносится. */
 export function renderCanvasMessage(paragraphs: readonly CanvasParagraph[]): CanvasRichMessage {
   return {
