@@ -4,11 +4,15 @@ import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
 import type { User } from './user.ts';
 
-/** Супергруппа, в которой живут проекты. Топик сюда не записывается. */
+/** Супергруппа, в которой живут проекты. Топик исполнителя сюда не записывается. */
 export interface Chat {
   id: string;
   telegramChatId: string;
   timezone: string;
+  /** Командный топик внутри этой группы. Пусто — не выбран. */
+  reportsTopicId: number | null;
+  /** Время ежедневной рассылки на чате. Пусто — не задано. */
+  dailyCron: string | null;
 }
 
 export type ChatKind = 'supergroup' | 'group' | 'channel' | 'private' | 'topic';
@@ -96,14 +100,39 @@ function supergroupId(value: string): string {
   return trimmed;
 }
 
-/** Поля группы. Таймзона обязательна, топик идентификатором чата не бывает. */
-export function defineChat(input: Chat): Chat {
+/**
+ * Номер командного топика внутри группы.
+ * Пусто — топик не выбран. Ноль и дробь топиком не бывают.
+ */
+export function defineReportsTopicId(value: number | null): number | null {
+  if (value === null) return null;
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new DomainError(DOMAIN_ERROR.REPORTS_TOPIC_ID, 'номер командного топика — целое больше нуля');
+  }
+  return value;
+}
+
+/**
+ * Время рассылки на чате.
+ * Пустая строка временем не считается: поле остаётся пустым.
+ */
+export function defineDailyCron(value: string | null): string | null {
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed;
+}
+
+/** Поля группы при привязке. Командный топик и время ещё не выбраны, топик идентификатором чата не бывает. */
+export function defineChat(input: { id: string; telegramChatId: string; timezone: string }): Chat {
   if (blank(input.id)) throw new DomainError(DOMAIN_ERROR.CHAT_ID_BLANK, 'У группы есть id');
   if (blank(input.timezone)) throw new DomainError(DOMAIN_ERROR.CHAT_TIMEZONE_BLANK, 'У группы есть таймзона');
   return {
     id: input.id,
     telegramChatId: supergroupId(input.telegramChatId),
     timezone: input.timezone.trim(),
+    reportsTopicId: defineReportsTopicId(null),
+    dailyCron: defineDailyCron(null),
   };
 }
 

@@ -20,6 +20,13 @@ function asText(value: unknown, label: string): string {
   throw new Error(`${label} повреждён`);
 }
 
+function reportsTopicOf(value: string | null): number | null {
+  if (value === null) return null;
+  const parsed = Number(asText(value, 'reports_topic_id'));
+  if (!Number.isSafeInteger(parsed)) throw new Error('reports_topic_id повреждён');
+  return parsed;
+}
+
 async function findUser(trx: Transaction<Database>, telegramUserId: string): Promise<User | null> {
   const row = await trx
     .selectFrom('users')
@@ -58,7 +65,7 @@ function storeOf(trx: Transaction<Database>): ChatStore {
       await sql`SELECT pg_advisory_xact_lock(hashtext(${`chats:${telegramChatId}`})::bigint)`.execute(trx);
       const row = await trx
         .selectFrom('chats')
-        .select(['id', 'telegram_chat_id', 'timezone'])
+        .select(['id', 'telegram_chat_id', 'timezone', 'reports_topic_id', 'daily_cron'])
         .where('telegram_chat_id', '=', telegramChatId)
         .executeTakeFirst();
       if (row === undefined) return null;
@@ -66,6 +73,8 @@ function storeOf(trx: Transaction<Database>): ChatStore {
         id: row.id,
         telegramChatId: asText(row.telegram_chat_id, 'telegram_chat_id'),
         timezone: row.timezone,
+        reportsTopicId: reportsTopicOf(row.reports_topic_id),
+        dailyCron: row.daily_cron,
       };
       return chat;
     },
@@ -76,6 +85,8 @@ function storeOf(trx: Transaction<Database>): ChatStore {
           id: chat.id,
           telegram_chat_id: chat.telegramChatId,
           timezone: chat.timezone,
+          reports_topic_id: chat.reportsTopicId === null ? null : String(chat.reportsTopicId),
+          daily_cron: chat.dailyCron,
         })
         .execute();
     },

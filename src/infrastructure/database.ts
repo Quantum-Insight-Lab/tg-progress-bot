@@ -40,6 +40,10 @@ export interface ChatsTable {
   id: string;
   telegram_chat_id: string;
   timezone: string;
+  /** Пусто, пока командный топик не выбран. Топик исполнителя этой колонкой не является. */
+  reports_topic_id: ColumnType<string | null, string | null | undefined, string | null>;
+  /** Пусто, пока время рассылки не задано. Включение рассылки — наличие этого значения. */
+  daily_cron: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 export interface ProjectMembersTable {
