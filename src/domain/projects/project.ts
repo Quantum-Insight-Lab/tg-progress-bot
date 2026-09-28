@@ -13,9 +13,9 @@ export interface Project {
 
 /**
  * Своё у проекта: не лежит в строке `projects` и не делится с другим проектом (L-5).
- * Учёт задач и ролей идёт по id проекта.
+ * Учёт задач, ролей и канвасов идёт по id проекта.
  */
-export const PROJECT_OWN = ['tasks', 'roles'] as const;
+export const PROJECT_OWN = ['tasks', 'roles', 'canvases'] as const;
 
 export type ProjectOwn = (typeof PROJECT_OWN)[number];
 
@@ -23,7 +23,7 @@ function blank(value: string): boolean {
   return value.trim().length === 0;
 }
 
-/** Поля проекта. Задачи и роли в строку не входят. */
+/** Поля проекта. Задачи, роли и канвасы в строку не входят. */
 export function defineProject(input: Project): Project {
   if (blank(input.id)) {
     throw new DomainError(DOMAIN_ERROR.PROJECT_ID_BLANK, 'У проекта есть id');

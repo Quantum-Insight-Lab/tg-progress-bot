@@ -166,16 +166,17 @@ describe('E-3 проект — таблица projects', () => {
   });
 });
 
-describe('L-5 задачи и роли у проекта свои', () => {
+describe('L-5 задачи, роли и канвасы у проекта свои', () => {
   const opened: { close: () => Promise<void> }[] = [];
 
   afterEach(async () => {
     await Promise.all(opened.splice(0).map((db) => db.close()));
   });
 
-  it('L-5 задачи и роли не колонки проекта: два проекта — две единицы учёта', async () => {
+  it('L-5 задачи, роли и канвасы не колонки проекта: два проекта — две единицы учёта', async () => {
     const handle = await openProjects();
     opened.push(handle);
+    expect(PROJECT_OWN).toEqual(['tasks', 'roles', 'canvases']);
     const columns = await columnNames(handle.db);
     for (const own of PROJECT_OWN) expect(columns).not.toContain(own);
     expect(columns).not.toContain('repository_id');
