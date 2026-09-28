@@ -71,7 +71,7 @@ async function seed(db: Kysely<Database>): Promise<void> {
 
 async function insertRaw(
   db: Kysely<Database>,
-  row: { id: string; status: string; priority: string },
+  row: { id: string; status: string; priority: string; number: number },
 ): Promise<void> {
   await sql`
     INSERT INTO tasks (
@@ -80,7 +80,7 @@ async function insertRaw(
     VALUES (
       ${row.id}::uuid,
       ${projectId}::uuid,
-      1,
+      ${row.number},
       'Сверстать отчёт',
       ${row.status},
       ${row.priority},
@@ -163,20 +163,20 @@ describe('E-5 статусы, приоритеты и ключ tasks', () => {
     const handle = await openTasks();
     opened.push(handle);
     await seed(handle.db);
-    for (const status of TASK_STATUSES) {
-      const id = `00000000-0000-4000-8000-0000000000c${TASK_STATUSES.indexOf(status)}`;
-      await insertRaw(handle.db, { id, status, priority: TASK_PRIORITY_NORMAL });
+    for (const [index, status] of TASK_STATUSES.entries()) {
+      const id = `00000000-0000-4000-8000-0000000000c${index}`;
+      await insertRaw(handle.db, { id, status, priority: TASK_PRIORITY_NORMAL, number: index + 1 });
     }
-    for (const priority of TASK_PRIORITIES) {
-      const id = `00000000-0000-4000-8000-0000000000d${TASK_PRIORITIES.indexOf(priority)}`;
-      await insertRaw(handle.db, { id, status: TASK_STATUS_PLANNED, priority });
+    for (const [index, priority] of TASK_PRIORITIES.entries()) {
+      const id = `00000000-0000-4000-8000-0000000000d${index}`;
+      await insertRaw(handle.db, { id, status: TASK_STATUS_PLANNED, priority, number: TASK_STATUSES.length + index + 1 });
     }
-    await expect(insertRaw(handle.db, { id: '00000000-0000-4000-8000-0000000000e1', status: 'waiting', priority: 'normal' })).rejects.toThrow(
-      /tasks_status|23514/,
-    );
-    await expect(insertRaw(handle.db, { id: '00000000-0000-4000-8000-0000000000e2', status: 'PLANNED', priority: 'urgent' })).rejects.toThrow(
-      /tasks_priority|23514/,
-    );
+    await expect(
+      insertRaw(handle.db, { id: '00000000-0000-4000-8000-0000000000e1', status: 'waiting', priority: 'normal', number: 20 }),
+    ).rejects.toThrow(/tasks_status|23514/);
+    await expect(
+      insertRaw(handle.db, { id: '00000000-0000-4000-8000-0000000000e2', status: 'PLANNED', priority: 'urgent', number: 21 }),
+    ).rejects.toThrow(/tasks_priority|23514/);
     const count = await sql<{ n: number }>`SELECT CAST(count(*) AS int) AS n FROM tasks`.execute(handle.db);
     expect(Number(count.rows[0]?.n)).toBe(TASK_STATUSES.length + TASK_PRIORITIES.length);
   });

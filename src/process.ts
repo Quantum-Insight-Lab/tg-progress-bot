@@ -16,6 +16,7 @@ import { createProjectCreation } from './infrastructure/projects.ts';
 import { createProjectRepository } from './infrastructure/connect-repository.ts';
 import { createInstallationRepositories } from './infrastructure/installation-repositories.ts';
 import { createProjectSettings } from './infrastructure/settings.ts';
+import { createTaskActions } from './infrastructure/tasks.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { attachAccessGuard } from './telegram/access-guard.ts';
@@ -31,6 +32,7 @@ import { attachGithubLogin, deliverGithubLoginPrompt } from './telegram/github-l
 import { attachParticipants } from './telegram/members.ts';
 import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
+import { attachTaskCommand } from './telegram/task-command.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
 
 const DEFAULT_HOST = '0.0.0.0';
@@ -125,6 +127,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachSettings(bot, createProjectSettings(config.db, config.clock));
     attachProjectRepository(bot, projectRepository, installation);
     attachInstallationRepositories(bot, installation);
+    attachTaskCommand(bot, createTaskActions(config.db, config.clock));
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);
