@@ -23,7 +23,7 @@ import {
 import type { Clock } from '../src/domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../src/domain/shared/errors.ts';
 import { EVENT_TYPES } from '../src/events/index.ts';
-import { ensureTodayCanvases, showCanvas, showCanvasForTopic, type CanvasHome } from '../src/infrastructure/canvas.ts';
+import { ensureTodayCanvases, showCanvas, showCanvasForTopic, type CanvasHome, type CanvasTaskLine } from '../src/infrastructure/canvas.ts';
 import { createChatBinding } from '../src/infrastructure/chats.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
@@ -43,6 +43,8 @@ import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createTaskActions } from '../src/infrastructure/tasks.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { renderFirstEmployeeMessage } from '../src/projections/first-employee-message.ts';
+import { renderCanvas } from '../src/projections/canvas-message.ts';
+import { tasksBlockParagraphs } from '../src/projections/tasks-block.ts';
 import {
   EXECUTOR_TOPIC_CREATED,
   EXECUTOR_TOPIC_EMPTY,
@@ -105,8 +107,8 @@ function canvasOf(date: string, messageId: number): Canvas {
   });
 }
 
-function shown(canvasDate: string): CanvasHome {
-  return { telegramChatId, topicId: 42, projectName: 'Альфа', canvasDate };
+function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = []): CanvasHome {
+  return { telegramChatId, topicId: 42, projectName: 'Альфа', canvasDate, tasks };
 }
 
 function io(): Io {
@@ -377,7 +379,12 @@ describe('канвас выставляется в топик', () => {
     );
     expect(taskReply).toContain('Сделать');
     expect(gate.sent).toHaveLength(1);
-    expect(gate.edited).toEqual([{ home: shown('2026-09-28'), messageId: 11 }]);
+    expect(gate.edited).toEqual([
+      {
+        home: shown('2026-09-28', [{ number: 1, title: 'Сделать', status: TASK_STATUS_IN_PROGRESS, day: 1 }]),
+        messageId: 11,
+      },
+    ]);
     expect(await canvasesOf(fixture.db)).toEqual(posted);
     const edited = await eventTypes(fixture.db, EVENT_TYPES.CANVAS_EDITED);
     expect(edited).toHaveLength(1);
@@ -605,5 +612,124 @@ describe('канвас выставляется в топик', () => {
     await ensureTodayCanvases(fixture.db, nextDay, gate.send);
     expect(gate.sent).toEqual([shown('2026-09-28'), shown('2026-09-29')]);
     expect((await canvasesOf(fixture.db)).map((row) => row.canvasDate)).toEqual(['2026-09-28', '2026-09-29']);
+  });
+
+  it('R-106 задача появляется на канвасе', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await setTopic(fixture.db, fixture.borisId, 42);
+    const gate = io();
+    const redraw = {
+      redraw(input: { projectId: string; assigneeId: string; causationId: string }) {
+        return showCanvas(fixture.db, {
+          projectId: input.projectId,
+          assigneeId: input.assigneeId,
+          destination: CANVAS_DESTINATION_TOPIC,
+          now: noon,
+          causationId: input.causationId,
+          send: gate.send,
+          edit: gate.edit,
+        }).then(() => undefined);
+      },
+    };
+    const reply = await replyToTaskCommand(
+      { type: 'supergroup', id: telegramChatId, topicId: 42 },
+      borisAccount,
+      'appear',
+      'Классификация сигнала',
+      createTaskActions(fixture.db, clock),
+      redraw,
+    );
+    expect(reply).toContain('Классификация сигнала');
+    expect(gate.sent).toEqual([
+      shown('2026-09-28', [{ number: 1, title: 'Классификация сигнала', status: TASK_STATUS_IN_PROGRESS, day: 1 }]),
+    ]);
+    const message = renderCanvas({
+      projectName: 'Альфа',
+      canvasDate: '2026-09-28',
+      sections: { tasks: tasksBlockParagraphs(gate.sent[0]?.tasks ?? []) },
+    });
+    expect(message.blocks.map((block) => block.text)).toEqual([
+      'ПРОЕКТ: Альфа · 28.09',
+      'Задачи',
+      '○ 1 — Классификация сигнала — 1-й день',
+    ]);
+  });
+
+  it('R-141 «Задачи» — то, что человек завёл в этом топике', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await setTopic(fixture.db, fixture.borisId, 42);
+    const vera = await sql<{ id: string }>`
+      SELECT id::text AS id FROM users WHERE telegram_user_id = ${String(veraAccount.id)}::bigint
+    `.execute(fixture.db);
+    const veraId = vera.rows[0]?.id;
+    if (veraId === undefined) throw new Error('Веры нет');
+    await setTopic(fixture.db, veraId, 43);
+    const actions = createTaskActions(fixture.db, clock);
+    await actions.create({
+      telegramUserId: String(borisAccount.id),
+      chat: 'supergroup',
+      telegramChatId,
+      topicId: 42,
+      title: 'Своя',
+      idempotencyKey: 'boris-own',
+    });
+    await actions.create({
+      telegramUserId: String(veraAccount.id),
+      chat: 'supergroup',
+      telegramChatId,
+      topicId: 43,
+      title: 'Чужая',
+      idempotencyKey: 'vera-own',
+    });
+    const gate = io();
+    await showCanvas(fixture.db, {
+      projectId: fixture.alphaId,
+      assigneeId: fixture.borisId,
+      destination: CANVAS_DESTINATION_TOPIC,
+      now: noon,
+      causationId: null,
+      send: gate.send,
+      edit: gate.edit,
+    });
+    expect(gate.sent[0]?.tasks.map((task) => task.title)).toEqual(['Своя']);
+    const lines = renderCanvas({
+      projectName: 'Альфа',
+      canvasDate: '2026-09-28',
+      sections: { tasks: tasksBlockParagraphs(gate.sent[0]?.tasks ?? []) },
+    }).blocks.map((block) => block.text);
+    expect(lines[1]).toBe('Задачи');
+    expect(lines.join('\n')).toContain('Своя');
+    expect(lines.join('\n')).not.toContain('Чужая');
+    expect(lines.join('\n')).not.toContain('#40');
+  });
+
+  it('INV-22 повтор команды не добавляет вторую строку задачи на канвас', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await setTopic(fixture.db, fixture.borisId, 42);
+    const gate = io();
+    const actions = createTaskActions(fixture.db, clock);
+    const redraw = {
+      redraw(input: { projectId: string; assigneeId: string; causationId: string }) {
+        return showCanvas(fixture.db, {
+          projectId: input.projectId,
+          assigneeId: input.assigneeId,
+          destination: CANVAS_DESTINATION_TOPIC,
+          now: noon,
+          causationId: input.causationId,
+          send: gate.send,
+          edit: gate.edit,
+        }).then(() => undefined);
+      },
+    };
+    const place = { type: 'supergroup', id: telegramChatId, topicId: 42 };
+    await replyToTaskCommand(place, borisAccount, 'once', 'Первая', actions, redraw);
+    const again = await replyToTaskCommand(place, borisAccount, 'once', 'Вторая', actions, redraw);
+    expect(again).toBeNull();
+    expect(gate.sent).toHaveLength(1);
+    expect(gate.sent[0]?.tasks).toEqual([{ number: 1, title: 'Первая', status: TASK_STATUS_IN_PROGRESS, day: 1 }]);
+    expect(gate.edited).toEqual([]);
   });
 });
