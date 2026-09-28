@@ -13,7 +13,7 @@ import type { Clock } from '../domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { projectCalendarDate } from '../domain/shared/project-time.ts';
 import { tasksBlock } from '../domain/tasks/github-link.ts';
-import { taskPriority, taskStatus } from '../domain/tasks/status.ts';
+import { taskPriority, taskStatus, tasksStandingInBlock } from '../domain/tasks/status.ts';
 import { taskCanvasDay } from '../domain/tasks/task-day.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
@@ -107,7 +107,10 @@ interface AssigneeTaskRow {
   completed_at: Date | string | null;
 }
 
-/** Задачи, которые этот человек завёл в проекте. Факты GitHub в блок не входят. */
+/**
+ * Задачи этого человека в блоке «Задачи»: `IN_PROGRESS`, `BLOCKED`, `REVIEW`.
+ * Факты GitHub, план, подтверждённое и снятое строку не занимают.
+ */
 async function assigneeTaskLines(
   db: Kysely<Database> | Transaction<Database>,
   projectId: string,
@@ -131,7 +134,7 @@ async function assigneeTaskLines(
       AND assignee_id = ${assigneeId}::uuid
     ORDER BY number
   `.execute(db);
-  const visible = tasksBlock(
+  const visible = tasksStandingInBlock(tasksBlock(
     found.rows.map((row) => ({
       source: 'task' as const,
       task: {
@@ -147,7 +150,7 @@ async function assigneeTaskLines(
         completedAt: row.completed_at === null ? null : instant(row.completed_at).toISOString(),
       },
     })),
-  );
+  ));
   return visible.map((task) => ({
     number: task.number,
     title: task.title,

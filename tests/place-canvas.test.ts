@@ -559,6 +559,91 @@ describe('канвас выставляется в топик', () => {
     expect(CANVAS_SUBJECT).toBe('Canvas');
   });
 
+  it('INV-05 канвас кладёт в «Задачи» только IN_PROGRESS, BLOCKED и REVIEW', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await setTopic(fixture.db, fixture.borisId, 42);
+    const rows = [
+      { number: 1, status: TASK_STATUS_PLANNED, title: 'На потом' },
+      { number: 2, status: TASK_STATUS_DONE, title: 'Уже подтверждена' },
+      { number: 3, status: TASK_STATUS_CANCELLED, title: 'Снятая' },
+      { number: 4, status: TASK_STATUS_IN_PROGRESS, title: 'Классификация сигнала' },
+      { number: 5, status: TASK_STATUS_BLOCKED, title: 'Ждёт ответ' },
+      { number: 6, status: TASK_STATUS_REVIEW, title: 'Черновик карточки' },
+    ];
+    for (const row of rows) {
+      await sql`
+        INSERT INTO tasks (id, project_id, number, title, status, priority, assignee_id, created_at, updated_at, completed_at)
+        VALUES (
+          ${`00000000-0000-4000-8000-0000000000d${String(row.number)}`}::uuid,
+          ${fixture.alphaId}::uuid,
+          ${row.number},
+          ${row.title},
+          ${row.status},
+          'normal',
+          ${fixture.borisId}::uuid,
+          ${noon.toISOString()}::timestamptz,
+          ${noon.toISOString()}::timestamptz,
+          NULL
+        )
+      `.execute(fixture.db);
+    }
+    const gate = io();
+    await showCanvas(fixture.db, {
+      projectId: fixture.alphaId,
+      assigneeId: fixture.borisId,
+      destination: CANVAS_DESTINATION_TOPIC,
+      now: noon,
+      causationId: null,
+      send: gate.send,
+      edit: gate.edit,
+    });
+    expect(gate.sent[0]?.tasks.map((task) => task.status)).toEqual([
+      TASK_STATUS_IN_PROGRESS,
+      TASK_STATUS_BLOCKED,
+      TASK_STATUS_REVIEW,
+    ]);
+    expect(gate.sent[0]?.tasks.map((task) => task.title)).toEqual([
+      'Классификация сигнала',
+      'Ждёт ответ',
+      'Черновик карточки',
+    ]);
+    const text = renderCanvas({
+      projectName: 'Альфа',
+      canvasDate: '2026-09-28',
+      sections: { tasks: tasksBlockParagraphs(gate.sent[0]?.tasks ?? []) },
+    }).blocks.map((block) => visibleCanvas(block.text)).join('\n');
+    expect(text).toContain('○ 4 — Классификация сигнала — 1-й день');
+    expect(text).toContain('○ 5 — Ждёт ответ — 1-й день');
+    expect(text).toContain('✓ 6 — Черновик карточки — на подтверждении');
+    expect(text).not.toContain('На потом');
+    expect(text).not.toContain('Уже подтверждена');
+    expect(text).not.toContain('Снятая');
+    await sql`
+      UPDATE tasks SET status = ${TASK_STATUS_IN_PROGRESS}
+      WHERE number = 6 AND project_id = ${fixture.alphaId}::uuid
+    `.execute(fixture.db);
+    await showCanvas(fixture.db, {
+      projectId: fixture.alphaId,
+      assigneeId: fixture.borisId,
+      destination: CANVAS_DESTINATION_TOPIC,
+      now: noon,
+      causationId: causationA,
+      send: gate.send,
+      edit: gate.edit,
+    });
+    const returned = gate.edited[0]?.home.tasks.find((task) => task.number === 6);
+    expect(returned).toMatchObject({ title: 'Черновик карточки', status: TASK_STATUS_IN_PROGRESS });
+    const redrawn = renderCanvas({
+      projectName: 'Альфа',
+      canvasDate: '2026-09-28',
+      sections: { tasks: tasksBlockParagraphs(gate.edited[0]?.home.tasks ?? []) },
+    }).blocks.map((block) => visibleCanvas(block.text)).join('\n');
+    expect(redrawn).toContain('○ 6 — Черновик карточки — 1-й день');
+    expect(redrawn).not.toContain('на подтверждении');
+    expect(redrawn).not.toContain('✓');
+  });
+
   it('INV-24 смена таймзоны не переписывает выставленный канвас; новые сутки дают другое сообщение', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
