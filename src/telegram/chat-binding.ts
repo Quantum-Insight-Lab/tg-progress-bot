@@ -123,8 +123,15 @@ async function refuse(error: DomainError, notify: (text: string) => Promise<unkn
   throw error;
 }
 
+export type BoundFollowUp = (
+  projectId: string,
+  from: { id: number; is_bot: boolean },
+  idempotencyKey: string,
+  notify: (text: string, markup?: InlineKeyboard) => Promise<unknown>,
+) => Promise<void>;
+
 /** Добавление бота в группу и один тап подтверждения. В саму группу бот не пишет. */
-export function attachChatBinding(bot: Bot, binding: ChatBinding): void {
+export function attachChatBinding(bot: Bot, binding: ChatBinding, afterBound?: BoundFollowUp): void {
   bot.use(async (ctx, next) => {
     const update = ctx.myChatMember;
     if (update === undefined) {
@@ -182,6 +189,12 @@ export function attachChatBinding(bot: Bot, binding: ChatBinding): void {
       });
       if (result.status === 'unchanged') return;
       await notify(boundReply(result.shared));
+      if (afterBound !== undefined) {
+        await afterBound(parsed.projectId, from, String(ctx.update.update_id), (text, markup) => {
+          if (markup === undefined) return ctx.api.sendMessage(from.id, text);
+          return ctx.api.sendMessage(from.id, text, { reply_markup: markup });
+        });
+      }
     } catch (error) {
       if (error instanceof DomainError) {
         await refuse(error, notify);

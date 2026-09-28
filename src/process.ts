@@ -13,6 +13,7 @@ import { createChatSchedule } from './infrastructure/schedule.ts';
 import { createGithubLogin } from './infrastructure/github-login.ts';
 import { createMembership } from './infrastructure/membership.ts';
 import { createProjectCreation } from './infrastructure/projects.ts';
+import { createProjectRepository } from './infrastructure/connect-repository.ts';
 import { createInstallationRepositories } from './infrastructure/installation-repositories.ts';
 import { createProjectSettings } from './infrastructure/settings.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
@@ -23,6 +24,7 @@ import { attachChatBinding, sendSupergroupRequest } from './telegram/chat-bindin
 import { attachExecutorTopic } from './telegram/executor-topic.ts';
 import { attachReportsTopic } from './telegram/reports-topic.ts';
 import { attachSchedule } from './telegram/schedule.ts';
+import { attachProjectRepository, deliverProjectRepositoryStep } from './telegram/connect-repository.ts';
 import { attachInstallationRepositories } from './telegram/installation-repositories.ts';
 import { attachSettings } from './telegram/settings.ts';
 import { attachGithubLogin, deliverGithubLoginPrompt } from './telegram/github-login.ts';
@@ -107,7 +109,11 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachAccessGuard(bot, createAccessGate(config.db, config.clock));
     attachStartCommand(bot, createUserRegistration(config.db, config.clock));
     attachNewProject(bot, createProjectCreation(config.db, config.clock), (reply) => sendSupergroupRequest(reply, binding));
-    attachChatBinding(bot, binding);
+    const installation = createInstallationRepositories(config.db, installationSourceOf(config));
+    const projectRepository = createProjectRepository(config.db, config.clock);
+    attachChatBinding(bot, binding, (projectId, from, idempotencyKey, notify) =>
+      deliverProjectRepositoryStep(from, projectId, idempotencyKey, projectRepository, installation, notify),
+    );
     const githubLogin = createGithubLogin(config.db, config.clock);
     attachGithubLogin(bot, githubLogin);
     attachParticipants(bot, createMembership(config.db, config.clock), async (telegramUserId, send) => {
@@ -117,7 +123,8 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachReportsTopic(bot, createReportsTopics(config.db, config.clock));
     attachSchedule(bot, createChatSchedule(config.db, config.clock));
     attachSettings(bot, createProjectSettings(config.db, config.clock));
-    attachInstallationRepositories(bot, createInstallationRepositories(config.db, installationSourceOf(config)));
+    attachProjectRepository(bot, projectRepository, installation);
+    attachInstallationRepositories(bot, installation);
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);

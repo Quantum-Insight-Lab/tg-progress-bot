@@ -45,3 +45,8 @@ export function readMemberTopicMigration(root = process.cwd()): string {
 export function readRepositoriesMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '009_repositories.sql'), 'utf8');
 }
+
+/** `projects.repository_id`: пусто допустимо, непустое — id из `repositories`, не уникально. */
+export function readProjectRepositoryMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '010_project_repository.sql'), 'utf8');
+}

@@ -74,6 +74,7 @@ export async function createProject(
     description: input.description.trim(),
     timezone: input.timezone.trim(),
     chatId: null,
+    repositoryId: null,
     createdAt: now.toISOString(),
   });
   await store.insert(project);

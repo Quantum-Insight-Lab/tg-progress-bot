@@ -13,6 +13,7 @@ const alpha: Project = {
   description: 'учёт команды',
   timezone: 'Europe/Moscow',
   chatId: null,
+  repositoryId: null,
   createdAt: '2026-09-28T07:33:00.000Z',
 };
 
@@ -22,6 +23,7 @@ const beta: Project = {
   description: '',
   timezone: 'Asia/Yekaterinburg',
   chatId: '00000000-0000-4000-8000-0000000000aa',
+  repositoryId: null,
   createdAt: '2026-09-28T08:00:00.000Z',
 };
 

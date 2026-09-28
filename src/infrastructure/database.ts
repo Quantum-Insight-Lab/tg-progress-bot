@@ -33,6 +33,8 @@ export interface ProjectsTable {
   description: string;
   timezone: string;
   chat_id: string | null;
+  /** Пусто, пока репозиторий не подключён. Один id — у нескольких проектов. */
+  repository_id: ColumnType<string | null, string | null | undefined, string | null>;
   created_at: Date;
 }
 

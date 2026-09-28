@@ -8,6 +8,8 @@ export interface Project {
   timezone: string;
   /** Общая супергруппа. Пусто, пока группа не привязана. */
   chatId: string | null;
+  /** Репозиторий установки. Пусто — не подключён. */
+  repositoryId: string | null;
   createdAt: string;
 }
 
@@ -21,6 +23,17 @@ export type ProjectOwn = (typeof PROJECT_OWN)[number];
 
 function blank(value: string): boolean {
   return value.trim().length === 0;
+}
+
+/** Пусто — репозиторий не подключён. Непустое значение — id GitHub. */
+export function defineRepositoryLink(value: string | null): string | null {
+  if (value === null) return null;
+  const id = value.trim();
+  if (id.length === 0) return null;
+  if (!/^[1-9][0-9]*$/.test(id)) {
+    throw new DomainError(DOMAIN_ERROR.PROJECT_REPOSITORY_ID, 'id репозитория — id GitHub');
+  }
+  return id;
 }
 
 /** Поля проекта. Задачи, роли и канвасы в строку не входят. */
@@ -43,6 +56,7 @@ export function defineProject(input: Project): Project {
     description: input.description,
     timezone: input.timezone,
     chatId: input.chatId,
+    repositoryId: defineRepositoryLink(input.repositoryId),
     createdAt: input.createdAt,
   };
 }
