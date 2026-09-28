@@ -4,6 +4,10 @@ export const DOMAIN_ERROR = {
   BLANK_NAME: 'blank_name',
   TELEGRAM_USER_ID: 'telegram_user_id',
   REGISTRATION_DUPLICATE: 'registration_duplicate',
+  PROJECT_ID_BLANK: 'project_id_blank',
+  PROJECT_NAME_BLANK: 'project_name_blank',
+  PROJECT_TIMEZONE_BLANK: 'project_timezone_blank',
+  PROJECT_CREATED_AT_BLANK: 'project_created_at_blank',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

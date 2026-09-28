@@ -10,3 +10,8 @@ export function readEventsMigration(root = process.cwd()): string {
 export function readUsersMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '002_users.sql'), 'utf8');
 }
+
+/** Таблица проектов: поля и constraint'ы единицы учёта. */
+export function readProjectsMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '003_projects.sql'), 'utf8');
+}
