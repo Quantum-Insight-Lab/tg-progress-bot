@@ -5,7 +5,7 @@ import { defineProject, PROJECT_OWN, type Project } from '../src/domain/projects
 import { DOMAIN_ERROR, DomainError } from '../src/domain/shared/errors.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
-import { readEventsMigration, readProjectsMigration } from '../src/infrastructure/migrate.ts';
+import { readChatsMigration, readEventsMigration, readProjectsMigration } from '../src/infrastructure/migrate.ts';
 
 const alpha: Project = {
   id: '00000000-0000-4000-8000-000000000010',
@@ -29,6 +29,7 @@ async function openProjects(): Promise<{ db: Kysely<Database>; close: () => Prom
   const pglite = new PGlite();
   await pglite.exec(readEventsMigration());
   await pglite.exec(readProjectsMigration());
+  await pglite.exec(readChatsMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
@@ -40,7 +41,16 @@ async function openProjects(): Promise<{ db: Kysely<Database>; close: () => Prom
   };
 }
 
+const TEST_TELEGRAM_CHAT = '-1001000000001';
+
 async function insertProject(db: Kysely<Database>, project: Project): Promise<void> {
+  if (project.chatId !== null) {
+    await sql`
+      INSERT INTO chats (id, telegram_chat_id, timezone)
+      VALUES (${project.chatId}::uuid, ${TEST_TELEGRAM_CHAT}::bigint, ${project.timezone})
+      ON CONFLICT (id) DO NOTHING
+    `.execute(db);
+  }
   await sql`
     INSERT INTO projects (id, name, description, timezone, chat_id, created_at)
     VALUES (

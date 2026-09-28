@@ -12,6 +12,16 @@ export const DOMAIN_ERROR = {
   PROJECT_CHAT: 'project_chat',
   PROJECT_DUPLICATE: 'project_duplicate',
   PROJECT_IDEMPOTENCY_KEY: 'project_idempotency_key',
+  CHAT_ID_BLANK: 'chat_id_blank',
+  CHAT_TIMEZONE_BLANK: 'chat_timezone_blank',
+  CHAT_NOT_SUPERGROUP: 'chat_not_supergroup',
+  CHAT_IS_TOPIC: 'chat_is_topic',
+  CHAT_ADMIN_RIGHTS: 'chat_admin_rights',
+  CHAT_BIND_ACTOR: 'chat_bind_actor',
+  CHAT_PROJECT_MISSING: 'chat_project_missing',
+  CHAT_ALREADY_BOUND: 'chat_already_bound',
+  CHAT_DUPLICATE: 'chat_duplicate',
+  CHAT_IDEMPOTENCY_KEY: 'chat_idempotency_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

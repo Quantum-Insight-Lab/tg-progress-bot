@@ -15,3 +15,8 @@ export function readUsersMigration(root = process.cwd()): string {
 export function readProjectsMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '003_projects.sql'), 'utf8');
 }
+
+/** Таблица супергрупп: поля и constraint'ы группы. */
+export function readChatsMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '004_chats.sql'), 'utf8');
+}
