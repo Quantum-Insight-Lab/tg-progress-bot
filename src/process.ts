@@ -5,6 +5,7 @@ import { createScheduler, startSchedulerLoop, type Scheduler } from './infrastru
 import { createAccessGate } from './infrastructure/access.ts';
 import { createChatBinding } from './infrastructure/chats.ts';
 import { createExecutorTopics } from './infrastructure/executor-topic.ts';
+import { createGithubLogin } from './infrastructure/github-login.ts';
 import { createMembership } from './infrastructure/membership.ts';
 import { createProjectCreation } from './infrastructure/projects.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
@@ -13,6 +14,7 @@ import { attachAccessGuard } from './telegram/access-guard.ts';
 import { createTelegramBot, type TelegramBotInfo } from './telegram/bot.ts';
 import { attachChatBinding, sendSupergroupRequest } from './telegram/chat-binding.ts';
 import { attachExecutorTopic } from './telegram/executor-topic.ts';
+import { attachGithubLogin, deliverGithubLoginPrompt } from './telegram/github-login.ts';
 import { attachParticipants } from './telegram/members.ts';
 import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
@@ -86,7 +88,11 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachStartCommand(bot, createUserRegistration(config.db, config.clock));
     attachNewProject(bot, createProjectCreation(config.db, config.clock), (reply) => sendSupergroupRequest(reply, binding));
     attachChatBinding(bot, binding);
-    attachParticipants(bot, createMembership(config.db, config.clock));
+    const githubLogin = createGithubLogin(config.db, config.clock);
+    attachGithubLogin(bot, githubLogin);
+    attachParticipants(bot, createMembership(config.db, config.clock), async (telegramUserId, send) => {
+      await deliverGithubLoginPrompt(await githubLogin.find(telegramUserId), send);
+    });
     attachExecutorTopic(bot, createExecutorTopics(config.db, config.clock));
   }
   const engine = createProgressEngine();
