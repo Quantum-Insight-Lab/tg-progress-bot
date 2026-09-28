@@ -132,6 +132,8 @@ export const DOMAIN_ERROR = {
   TASK_MARK_ABSENT: 'task_mark_absent',
   TASK_CONFIRM_ACTOR: 'task_confirm_actor',
   TASK_REVIEW_ABSENT: 'task_review_absent',
+  TASK_PLAN_ACTOR: 'task_plan_actor',
+  TASK_PLAN_ABSENT: 'task_plan_absent',
   TASK_OPEN_BLOCKER: 'task_open_blocker',
   TASK_ISSUE_STEP: 'task_issue_step',
   TASK_MEASURE: 'task_measure',

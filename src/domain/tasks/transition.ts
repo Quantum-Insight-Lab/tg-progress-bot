@@ -4,6 +4,7 @@ import {
   TASK_STATUS_BLOCKED,
   TASK_STATUS_DONE,
   TASK_STATUS_IN_PROGRESS,
+  TASK_STATUS_PLANNED,
   TASK_STATUS_REVIEW,
   type TaskStatus,
 } from './status.ts';
@@ -19,6 +20,12 @@ export const TASK_TRANSITION_CONFIRM = 'confirm';
 
 /** Вернуть: руководитель возвращает `REVIEW` в работу. */
 export const TASK_TRANSITION_RETURN = 'return';
+
+/** «В план»: задача уходит в `PLANNED` на том же канвасе. */
+export const TASK_TRANSITION_PLAN = 'plan';
+
+/** «В работу»: задача возвращается из плана в «Задачи». */
+export const TASK_TRANSITION_RESUME = 'resume';
 
 /**
  * Кто нажал «подтвердить» или «вернуть».
@@ -48,6 +55,9 @@ const TASK_TRANSITIONS: readonly TransitionRow[] = [
   { act: TASK_TRANSITION_UNCHECK, from: TASK_STATUS_REVIEW, to: TASK_STATUS_IN_PROGRESS },
   { act: TASK_TRANSITION_CONFIRM, from: TASK_STATUS_REVIEW, to: TASK_STATUS_DONE },
   { act: TASK_TRANSITION_RETURN, from: TASK_STATUS_REVIEW, to: TASK_STATUS_IN_PROGRESS },
+  { act: TASK_TRANSITION_PLAN, from: TASK_STATUS_IN_PROGRESS, to: TASK_STATUS_PLANNED },
+  { act: TASK_TRANSITION_PLAN, from: TASK_STATUS_BLOCKED, to: TASK_STATUS_PLANNED },
+  { act: TASK_TRANSITION_RESUME, from: TASK_STATUS_PLANNED, to: TASK_STATUS_IN_PROGRESS },
 ];
 
 export interface TaskTransition {

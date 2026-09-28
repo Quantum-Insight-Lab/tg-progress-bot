@@ -89,6 +89,51 @@ export function tasksStandingInBlock<T extends { status: TaskStatus }>(tasks: re
 }
 
 /**
+ * Слово приоритета стоит на канвасе: в «Задачах» и в «Плане».
+ * Подтверждённая и снятая задача с канваса ушли — слово там не нажимается.
+ */
+export function prioritySetOnCanvas(status: TaskStatus): boolean {
+  return standsInTasksBlock(status) || status === TASK_STATUS_PLANNED;
+}
+
+/** Следующее слово: `normal` → `high` → `low` → `normal`. */
+export function nextPriority(current: TaskPriority): TaskPriority {
+  if (current === TASK_PRIORITY_NORMAL) return TASK_PRIORITY_HIGH;
+  if (current === TASK_PRIORITY_HIGH) return TASK_PRIORITY_LOW;
+  return TASK_PRIORITY_NORMAL;
+}
+
+function priorityFirst(left: TaskPriority, right: TaskPriority): number {
+  if (left === right) return 0;
+  if (left === TASK_PRIORITY_HIGH) return -1;
+  if (right === TASK_PRIORITY_HIGH) return 1;
+  if (left === TASK_PRIORITY_NORMAL) return -1;
+  return 1;
+}
+
+function earlierFirst(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+/**
+ * План: только `PLANNED`, сначала больший приоритет, внутри него раньше созданная выше.
+ * Другие статусы строку плана не занимают. Входной список не меняется.
+ */
+export function orderPlan<T extends { status: TaskStatus; priority: TaskPriority; createdAt: string }>(tasks: readonly T[]): T[] {
+  const planned: T[] = [];
+  for (const task of tasks) {
+    if (task.status === TASK_STATUS_PLANNED) planned.push(task);
+  }
+  return planned.sort((left, right) => {
+    const byPriority = priorityFirst(left.priority, right.priority);
+    if (byPriority !== 0) return byPriority;
+    return earlierFirst(left.createdAt, right.createdAt);
+  });
+}
+
+/**
  * `BLOCKED`: задача стоит в списке без галочки не меньше `STALE_DAYS` суток проекта.
  * Переход статуса и вопрос исполнителю — отдельные акты.
  */
