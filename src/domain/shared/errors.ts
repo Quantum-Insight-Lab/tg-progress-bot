@@ -134,6 +134,8 @@ export const DOMAIN_ERROR = {
   TASK_REVIEW_ABSENT: 'task_review_absent',
   TASK_PLAN_ACTOR: 'task_plan_actor',
   TASK_PLAN_ABSENT: 'task_plan_absent',
+  TASK_CANCEL_ACTOR: 'task_cancel_actor',
+  TASK_CANCEL_ABSENT: 'task_cancel_absent',
   TASK_OPEN_BLOCKER: 'task_open_blocker',
   TASK_ISSUE_STEP: 'task_issue_step',
   TASK_MEASURE: 'task_measure',

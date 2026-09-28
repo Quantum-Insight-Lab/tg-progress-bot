@@ -13,8 +13,10 @@ import { MEMBER_ROLE } from '../domain/projects/member.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { TASK_STATUS_CANCELLED, TASK_STATUS_DONE } from '../domain/tasks/status.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
+import { cancelRemovedMemberTasks } from './tasks.ts';
 
 function asText(value: unknown, label: string): string {
   if (typeof value === 'string') return value;
@@ -149,10 +151,17 @@ function storeOf(trx: Transaction<Database>): MembershipStore {
     async deleteMember(memberId) {
       await trx.deleteFrom('project_members').where('id', '=', memberId).execute();
     },
-    async unclosedTaskIds() {
-      // Таблицы `tasks` ещё нет — незакрытых задач нет. Когда она появится,
-      // этот порт отдаёт id незакрытых задач участника в проект; `task.cancelled` пишет контекст задач.
-      return [];
+    async unclosedTaskIds(projectId, userId) {
+      const rows = await trx
+        .selectFrom('tasks')
+        .select(['id'])
+        .where('project_id', '=', projectId)
+        .where('assignee_id', '=', userId)
+        .where('status', 'not in', [TASK_STATUS_DONE, TASK_STATUS_CANCELLED])
+        .orderBy('id')
+        .forUpdate()
+        .execute();
+      return rows.map((row) => row.id);
     },
   };
 }
@@ -205,12 +214,25 @@ export function createMembership(db: Kysely<Database>, clock: Clock): Membership
         const actor = await findUser(trx, input.telegramUserId);
         const target = await findUser(trx, input.targetTelegramUserId);
         if (target === null) throw new DomainError(DOMAIN_ERROR.MEMBER_ABSENT, 'человек не найден');
+        const idempotencyKey = input.idempotencyKey.trim();
         const cancelledTaskIds = await removeProjectMember(storeOf(trx), createEventJournal(trx), clock, {
           actor,
           chat: input.chat,
           projectId: input.projectId,
           target,
-          idempotencyKey: input.idempotencyKey,
+          idempotencyKey,
+        });
+        const removed = await trx
+          .selectFrom('events')
+          .select(['id'])
+          .where('idempotency_key', '=', idempotencyKey)
+          .executeTakeFirst();
+        if (removed === undefined) throw new Error('project.member_removed не найден');
+        await cancelRemovedMemberTasks(trx, clock, {
+          causationId: removed.id,
+          projectId: input.projectId,
+          assigneeId: target.id,
+          taskIds: cancelledTaskIds,
         });
         return { name: target.name, cancelledTaskIds };
       });
