@@ -1,5 +1,5 @@
 /**
- * S-3: типы событий генерируются из реестра, ручного объявления типа события нет.
+ * S-3: типы и схемы событий генерируются из реестра, ручного объявления типа события нет.
  *   npm run codegen:events             — перегенерировать src/events/generated/events.ts
  *   npm run codegen:events -- --check  — упасть, если закоммиченный файл разошёлся с реестром
  */
@@ -24,20 +24,34 @@ const PRIMITIVES: Readonly<Record<string, string>> = {
   null: 'null',
 };
 
+const ZOD_PRIMITIVES: Readonly<Record<string, string>> = {
+  string: 'z.string()',
+  int: 'z.number().int()',
+  number: 'z.number()',
+  bool: 'z.boolean()',
+  date: 'z.string()',
+  time: 'z.string()',
+  timestamp: 'z.string()',
+  uuid: 'z.uuid()',
+  object: 'z.record(z.string(), z.unknown())',
+  null: 'z.null()',
+};
+
 const HEADER = '// Сгенерировано из contracts/event-registry.yaml командой npm run codegen:events. Руками не править (S-3).\n';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function scalar(spec: string): string {
+function enumValues(spec: string): string[] | undefined {
   const values = /^enum\[(.+)\]$/.exec(spec)?.[1];
-  if (values !== undefined) {
-    return values
-      .split(',')
-      .map((value) => `'${value.trim()}'`)
-      .join(' | ');
-  }
+  if (values === undefined) return undefined;
+  return values.split(',').map((value) => value.trim());
+}
+
+function scalar(spec: string): string {
+  const values = enumValues(spec);
+  if (values !== undefined) return values.map((value) => `'${value}'`).join(' | ');
   const item = /^(.+)\[\]$/.exec(spec)?.[1];
   if (item !== undefined) return `${scalar(item)}[]`;
   const primitive = PRIMITIVES[spec];
@@ -63,6 +77,38 @@ export function typeOf(spec: unknown, indent = 0): string {
     .join(' | ');
 }
 
+function zodEnum(values: string[]): string {
+  return `z.enum([${values.map((value) => `'${value}'`).join(', ')}])`;
+}
+
+/** Выражение Zod для того же поля. Объект — strict: лишнее поле не проходит. */
+export function zodOf(spec: unknown, indent = 0): string {
+  if (Array.isArray(spec)) {
+    if (spec.length !== 1) throw new Error('список в схеме описывает ровно один элемент');
+    return `z.array(${zodOf(spec[0], indent)})`;
+  }
+  if (isRecord(spec)) {
+    const pad = '  '.repeat(indent + 1);
+    const fields = Object.entries(spec).map(([key, value]) => `${pad}${key}: ${zodOf(value, indent + 1)}`);
+    return `z.strictObject({\n${fields.join(',\n')},\n${'  '.repeat(indent)}})`;
+  }
+  if (typeof spec !== 'string') throw new Error(`неизвестный тип поля: ${JSON.stringify(spec)}`);
+  const parts = spec.split('|').map((part) => zodLeaf(part.trim()));
+  const only = parts[0];
+  if (parts.length === 1 && only !== undefined) return only;
+  return `z.union([${parts.join(', ')}])`;
+}
+
+function zodLeaf(spec: string): string {
+  const values = enumValues(spec);
+  if (values !== undefined) return zodEnum(values);
+  const item = /^(.+)\[\]$/.exec(spec)?.[1];
+  if (item !== undefined) return `z.array(${zodLeaf(item)})`;
+  const primitive = ZOD_PRIMITIVES[spec];
+  if (primitive === undefined) throw new Error(`неизвестный тип поля: ${spec}`);
+  return primitive;
+}
+
 const constName = (type: string): string => type.replace(/[.]/g, '_').toUpperCase();
 const pascal = (type: string): string =>
   type
@@ -84,22 +130,31 @@ export function generate(registryText: string): string {
   });
   return [
     HEADER,
+    "import { z } from 'zod';",
+    '',
     'export const EVENT_TYPES = {',
-    ...events.map((e) => `  ${constName(e.type)}: '${e.type}',`),
+    ...events.map((event) => `  ${constName(event.type)}: '${event.type}',`),
     '} as const;',
     '',
     'export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];',
     '',
     'export const EVENT_VERSIONS = {',
-    ...events.map((e) => `  '${e.type}': ${e.version},`),
+    ...events.map((event) => `  '${event.type}': ${event.version},`),
     '} as const satisfies Record<EventType, number>;',
     '',
     `export interface EventEnvelope ${typeOf(root.envelope)}`,
-    ...events.flatMap((e) => ['', `export interface ${pascal(e.type)}Payload ${typeOf(e.payload)}`]),
+    ...events.flatMap((event) => ['', `export interface ${pascal(event.type)}Payload ${typeOf(event.payload)}`]),
     '',
     'export interface PayloadByType {',
-    ...events.map((e) => `  '${e.type}': ${pascal(e.type)}Payload;`),
+    ...events.map((event) => `  '${event.type}': ${pascal(event.type)}Payload;`),
     '}',
+    '',
+    `export const EventEnvelopeSchema = ${zodOf(root.envelope)};`,
+    ...events.flatMap((event) => ['', `export const ${pascal(event.type)}PayloadSchema = ${zodOf(event.payload)};`]),
+    '',
+    'export const payloadSchemaByType = {',
+    ...events.map((event) => `  '${event.type}': ${pascal(event.type)}PayloadSchema,`),
+    '} as const satisfies { [K in EventType]: z.ZodType<PayloadByType[K]> };',
     '',
   ].join('\n');
 }

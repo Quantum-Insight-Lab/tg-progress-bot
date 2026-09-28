@@ -27,8 +27,8 @@ src/config         ничего не импортирует из src
 | Константы и пороги | `src/config/constants.ts`, значения — карточки [`docs/pda/05`](docs/pda/05-constants.md) | есть |
 | Текущее время | порт `Clock` в `src/domain/shared/clock.ts`, реализация `systemClock` в `src/infrastructure/clock.ts` | есть |
 | Типы событий | `EVENT_TYPES`, `PayloadByType` из `src/events`, генерация `npm run codegen:events` | есть |
-| Публикация события | `emit` из `src/events`, тип — константа `EVENT_TYPES` | появится с журналом |
-| БД | один пул в `src/infrastructure/db.ts`; SQL — Kysely, без ORM и конкатенации строк | появится |
+| Публикация события | `emit` из `src/events`, тип — константа `EVENT_TYPES` | есть |
+| БД | один пул в `src/infrastructure/db.ts`; SQL — Kysely, без ORM и конкатенации строк | есть |
 | Telegram | один экземпляр grammY в `src/telegram/bot.ts`; методы Bot API 10.3 — напрямую, если их нет в типах | появится |
 | GitHub | один клиент Octokit в `src/github/client.ts` | появится |
 | Ошибки домена | `DomainError` с кодом причины в `src/domain/shared/errors.ts` | появится |
