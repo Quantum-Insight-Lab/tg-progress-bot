@@ -29,7 +29,8 @@ src/config         ничего не импортирует из src
 | Типы событий | `EVENT_TYPES`, `PayloadByType` из `src/events`, генерация `npm run codegen:events` | есть |
 | Публикация события | `emit` из `src/events`, тип — константа `EVENT_TYPES` | есть |
 | БД | один пул в `src/infrastructure/db.ts`; SQL — Kysely, без ORM и конкатенации строк | есть |
-| Telegram | один экземпляр grammY в `src/telegram/bot.ts`; методы Bot API 10.3 — напрямую, если их нет в типах | появится |
+| Telegram | один экземпляр grammY в `src/telegram/bot.ts`; приём обновлений — webhook в `src/telegram/webhook.ts`; методы Bot API 10.3 — напрямую, если их нет в типах | есть |
+| Планировщик актов системы | `src/infrastructure/scheduler.ts`: слоты A-28…A-33, A-35, A-36; реализация акта — в своей issue | есть |
 | GitHub | один клиент Octokit в `src/github/client.ts` | появится |
 | Ошибки домена | `DomainError` с кодом причины в `src/domain/shared/errors.ts` | появится |
 | Логирование | один логгер в `src/infrastructure/logger.ts` | появится |
