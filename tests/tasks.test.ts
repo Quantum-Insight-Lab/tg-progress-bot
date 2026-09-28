@@ -70,7 +70,21 @@ async function seed(db: Kysely<Database>): Promise<void> {
   `.execute(db);
 }
 
-async function insertTask(db: Kysely<Database>, task: Task): Promise<void> {
+async function insertTask(
+  db: Kysely<Database>,
+  task: {
+    id: string;
+    projectId: string;
+    number: number;
+    title: string;
+    status: string;
+    priority: string;
+    assigneeId: string;
+    createdAt: string;
+    updatedAt: string;
+    completedAt: string | null;
+  },
+): Promise<void> {
   await sql`
     INSERT INTO tasks (
       id, project_id, number, title, status, priority, assignee_id, created_at, updated_at, completed_at
@@ -249,8 +263,8 @@ describe('E-5 задача — таблица tasks', () => {
     opened.push(handle);
     await seed(handle.db);
     await expect(insertTask(handle.db, { ...openTask, title: '   ' })).rejects.toThrow(/tasks_title_not_blank|23514/);
-    await expect(insertTask(handle.db, { ...openTask, status: ' ' })).rejects.toThrow(/tasks_status_not_blank|23514/);
-    await expect(insertTask(handle.db, { ...openTask, priority: '  ' })).rejects.toThrow(/tasks_priority_not_blank|23514/);
+    await expect(insertTask(handle.db, { ...openTask, status: ' ' })).rejects.toThrow(/tasks_status|23514/);
+    await expect(insertTask(handle.db, { ...openTask, priority: '  ' })).rejects.toThrow(/tasks_priority|23514/);
     const missingCreatedAt = sql`
       INSERT INTO tasks (id, project_id, number, title, status, priority, assignee_id, updated_at)
       VALUES (

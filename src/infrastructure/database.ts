@@ -57,14 +57,14 @@ export interface ProjectMembersTable {
   topic_id: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
-/** Задача (E-5): шаг в Telegram. Статус и приоритет — текст, перечень значений не здесь. */
+/** Задача (E-5): шаг в Telegram. Статус и приоритет — закрытый перечень. Ключ — id. */
 export interface TasksTable {
   id: string;
   project_id: string;
   number: number;
   title: string;
-  status: string;
-  priority: string;
+  status: 'PLANNED' | 'IN_PROGRESS' | 'BLOCKED' | 'REVIEW' | 'DONE' | 'CANCELLED';
+  priority: 'high' | 'normal' | 'low';
   assignee_id: string;
   created_at: Date;
   updated_at: Date;

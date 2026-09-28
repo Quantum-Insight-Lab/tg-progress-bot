@@ -51,7 +51,12 @@ export function readProjectRepositoryMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '010_project_repository.sql'), 'utf8');
 }
 
-/** Таблица задач: поля и constraint'ы шага, который человек ведёт в Telegram. */
+/** Таблица задач: поля, затем допустимые статус и приоритет. */
 export function readTasksMigration(root = process.cwd()): string {
-  return readFileSync(join(root, 'migrations', '011_tasks.sql'), 'utf8');
+  return `${readFileSync(join(root, 'migrations', '011_tasks.sql'), 'utf8')}\n${readTaskStatusMigration(root)}`;
+}
+
+/** Статусы и приоритеты `tasks`: перечень — constraint. Ключ таблицы — `id`. */
+export function readTaskStatusMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '012_task_status_priority.sql'), 'utf8');
 }
