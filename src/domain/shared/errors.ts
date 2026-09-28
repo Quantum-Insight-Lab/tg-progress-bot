@@ -133,6 +133,12 @@ export const DOMAIN_ERROR = {
   TASK_CREATED_AT_BLANK: 'task_created_at_blank',
   TASK_UPDATED_AT_BLANK: 'task_updated_at_blank',
   TASK_COMPLETED_AT_BLANK: 'task_completed_at_blank',
+  CANVAS_ID_BLANK: 'canvas_id_blank',
+  CANVAS_PROJECT_BLANK: 'canvas_project_blank',
+  CANVAS_ASSIGNEE_BLANK: 'canvas_assignee_blank',
+  CANVAS_TOPIC_ID: 'canvas_topic_id',
+  CANVAS_MESSAGE_ID: 'canvas_message_id',
+  CANVAS_DATE: 'canvas_date',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

@@ -71,6 +71,16 @@ export interface TasksTable {
   completed_at: Date | null;
 }
 
+/** Канвас (E-7): одно rich-сообщение на проект, исполнителя и дату. Ключ — id. */
+export interface CanvasesTable {
+  id: string;
+  project_id: string;
+  assignee_id: string;
+  topic_id: string;
+  message_id: string;
+  canvas_date: string;
+}
+
 /** Репозиторий установки GitHub App (E-9). Ключ — id GitHub, не проект. */
 export interface RepositoriesTable {
   id: string;
@@ -85,5 +95,6 @@ export interface Database {
   chats: ChatsTable;
   project_members: ProjectMembersTable;
   tasks: TasksTable;
+  canvases: CanvasesTable;
   repositories: RepositoriesTable;
 }

@@ -13,6 +13,7 @@ import { createChatBinding } from '../src/infrastructure/chats.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import {
+  readCanvasesMigration,
   readChatsMigration,
   readEventsMigration,
   readMemberTopicMigration,
@@ -79,6 +80,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readChatsMigration());
   await pglite.exec(readProjectMembersMigration());
   await pglite.exec(readMemberTopicMigration());
+  await pglite.exec(readCanvasesMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
@@ -541,6 +543,18 @@ describe('INV-24 сутки и застой по таймзоне проекта
 
     const fixture = await seed();
     opened.push(fixture);
+    const canvasId = '00000000-0000-4000-8000-0000000000c1';
+    await sql`
+      INSERT INTO canvases (id, project_id, assignee_id, topic_id, message_id, canvas_date)
+      VALUES (
+        ${canvasId}::uuid,
+        ${fixture.alphaId}::uuid,
+        ${fixture.borisId}::uuid,
+        42,
+        900,
+        ${sentCanvasDate}::date
+      )
+    `.execute(fixture.db);
     const actions = createProjectSettings(fixture.db, clock);
     const beforeProjects = await projects(fixture.db);
     const beforeChats = await chatZones(fixture.db);
@@ -575,9 +589,10 @@ describe('INV-24 сутки и застой по таймзоне проекта
     expect(projectCalendarDate(later, alpha.timezone)).not.toBe(sentCanvasDate);
     expect(staleByProjectZone(earlier, later, alpha.timezone)).toBe(false);
     expect(staleByProjectZone(earlier, later, 'Europe/Moscow')).toBe(true);
-    const tables = await sql<{ table_name: string }>`
-      SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'canvases'
+    const storedCanvas = await sql<{ topic_id: string; message_id: string; canvas_date: string }>`
+      SELECT topic_id::text AS topic_id, message_id::text AS message_id, canvas_date::text AS canvas_date
+      FROM canvases
     `.execute(fixture.db);
-    expect(tables.rows).toHaveLength(0);
+    expect(storedCanvas.rows).toEqual([{ topic_id: '42', message_id: '900', canvas_date: sentCanvasDate }]);
   });
 });
