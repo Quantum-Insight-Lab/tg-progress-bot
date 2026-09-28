@@ -1,9 +1,11 @@
 import { InlineKeyboard, type Bot } from 'grammy';
 import type { InstallationRepositories, Repository } from '../domain/github/repository.ts';
 import type {
+  ChangedRepository,
   ConnectedRepository,
   ProjectLink,
   ProjectRepositoryActions,
+  RepositoryStepView,
   SkipResult,
 } from '../domain/projects/connect-repository.ts';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
@@ -33,6 +35,12 @@ export const PROJECT_REPOSITORY_AMBIGUOUS = 'Уточните проект: им
 
 export const PROJECT_REPOSITORY_ACCESS = 'Нет доступа.';
 
+export const PROJECT_REPOSITORY_ROOT_CHANGES = 'Сменяет только корень.';
+
+export const PROJECT_REPOSITORY_CHANGE_ACTOR_REPLY = 'Репозиторий меняет только корень.';
+
+export const PROJECT_REPOSITORY_NOT_CONNECTED = 'Репозиторий ещё не подключён.';
+
 const BUTTON_TEXT_LIMIT = 64;
 
 const CALLBACK_DATA_LIMIT = 64;
@@ -49,6 +57,10 @@ export interface ScreenReply {
 
 export function projectRepositoryConnectedReply(owner: string, name: string): string {
   return `Репозиторий подключён: ${owner}/${name}.`;
+}
+
+export function projectRepositoryChangedReply(owner: string, name: string): string {
+  return `Репозиторий сменён: ${owner}/${name}.`;
 }
 
 export function projectRepositoryCurrent(owner: string, name: string): string {
@@ -75,6 +87,12 @@ export function skipRepositoryData(projectId: string): string {
   return `rs:${projectId}`;
 }
 
+export function changeRepositoryData(projectId: string, repositoryId: string): string | null {
+  const data = `rx:${projectId}:${repositoryId}`;
+  if (Buffer.byteLength(data) > CALLBACK_DATA_LIMIT) return null;
+  return data;
+}
+
 export function parseConnectRepositoryData(data: string): { projectId: string; repositoryId: string } | null {
   const match = /^rc:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):([1-9][0-9]*)$/.exec(data);
   const projectId = match?.[1];
@@ -88,6 +106,14 @@ export function parseSkipRepositoryData(data: string): { projectId: string } | n
   const projectId = match?.[1];
   if (projectId === undefined) return null;
   return { projectId };
+}
+
+export function parseChangeRepositoryData(data: string): { projectId: string; repositoryId: string } | null {
+  const match = /^rx:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):([1-9][0-9]*)$/.exec(data);
+  const projectId = match?.[1];
+  const repositoryId = match?.[2];
+  if (projectId === undefined || repositoryId === undefined) return null;
+  return { projectId, repositoryId };
 }
 
 function buttonLabel(name: string): string {
@@ -106,6 +132,22 @@ export function projectRepositoryKeyboard(projectId: string, repositories: reado
   return keyboard;
 }
 
+/** Выбор другого репозитория установки. Текущий и пропуск в смену не входят. */
+export function projectRepositoryChangeKeyboard(
+  projectId: string,
+  repositories: readonly Repository[],
+  currentId: string,
+): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  for (const repository of repositories) {
+    if (repository.id === currentId) continue;
+    const data = changeRepositoryData(projectId, repository.id);
+    if (data === null) continue;
+    keyboard.text(buttonLabel(`${repository.owner}/${repository.name}`), data).row();
+  }
+  return keyboard;
+}
+
 function stepText(project: ProjectLink, empty: boolean): string {
   const lines = [PROJECT_REPOSITORY_HEADING, project.name, ''];
   if (project.repository !== null) {
@@ -114,6 +156,21 @@ function stepText(project: ProjectLink, empty: boolean): string {
   }
   lines.push(empty ? PROJECT_REPOSITORY_EMPTY : PROJECT_REPOSITORY_STEP);
   return lines.join('\n');
+}
+
+function changeStepText(project: ProjectLink): string {
+  if (project.repository === null) return stepText(project, false);
+  return [
+    PROJECT_REPOSITORY_HEADING,
+    project.name,
+    '',
+    projectRepositoryCurrent(project.repository.owner, project.repository.name),
+    PROJECT_REPOSITORY_ROOT_CHANGES,
+  ].join('\n');
+}
+
+function hasChoices(keyboard: InlineKeyboard): boolean {
+  return keyboard.inline_keyboard.some((row) => row.length > 0);
 }
 
 function replyOf(error: unknown): string | null {
@@ -136,6 +193,12 @@ function replyOf(error: unknown): string | null {
       return PROJECT_REPOSITORY_UNKNOWN;
     case DOMAIN_ERROR.PROJECT_REPOSITORY_ALREADY:
       return PROJECT_REPOSITORY_ALREADY;
+    case DOMAIN_ERROR.PROJECT_REPOSITORY_CHANGE_ACTOR:
+      return PROJECT_REPOSITORY_CHANGE_ACTOR_REPLY;
+    case DOMAIN_ERROR.PROJECT_REPOSITORY_NOT_CONNECTED:
+      return PROJECT_REPOSITORY_NOT_CONNECTED;
+    case DOMAIN_ERROR.PROJECT_REPOSITORY_CHANGE_DUPLICATE:
+      return null;
     default:
       throw error;
   }
@@ -144,6 +207,11 @@ function replyOf(error: unknown): string | null {
 function connectedText(result: ConnectedRepository): string {
   if (result.status === 'unchanged') return projectRepositoryCurrent(result.repository.owner, result.repository.name);
   return projectRepositoryConnectedReply(result.repository.owner, result.repository.name);
+}
+
+function changedText(result: ChangedRepository): string {
+  if (result.status === 'unchanged') return projectRepositoryCurrent(result.repository.owner, result.repository.name);
+  return projectRepositoryChangedReply(result.repository.owner, result.repository.name);
 }
 
 function skippedText(result: SkipResult): string {
@@ -168,6 +236,22 @@ async function installationList(
   }
 }
 
+async function changeScreen(
+  project: RepositoryStepView,
+  telegramUserId: string,
+  chat: string,
+  idempotencyKey: string,
+  installation: InstallationRepositories,
+): Promise<ScreenReply | null> {
+  if (project.repository === null || !project.canChange) return null;
+  const listed = await installationList(installation, telegramUserId, chat, idempotencyKey);
+  const text = changeStepText(project);
+  if (listed.failure !== null) return { text: [text, '', listed.failure].join('\n') };
+  const markup = projectRepositoryChangeKeyboard(project.id, listed.repositories, project.repository.id);
+  if (!hasChoices(markup)) return { text };
+  return { text, markup };
+}
+
 /** Шаг в личке: список установки или уже подключённый репозиторий. */
 export async function openProjectRepositoryStep(
   chatType: string | undefined,
@@ -180,7 +264,11 @@ export async function openProjectRepositoryStep(
   if (chatType !== PRIVATE_CHAT || from === undefined || from.is_bot) return null;
   try {
     const project = await actions.open({ telegramUserId: String(from.id), projectName, chat: chatType });
-    if (project.repository !== null) return { text: stepText(project, false) };
+    if (project.repository !== null) {
+      const change = await changeScreen(project, String(from.id), chatType, idempotencyKey, installation);
+      if (change !== null) return change;
+      return { text: stepText(project, false) };
+    }
     const listed = await installationList(installation, String(from.id), chatType, idempotencyKey);
     if (listed.failure !== null) {
       return {
@@ -227,7 +315,11 @@ async function openProjectRepositoryById(
       projectId,
       chat: PRIVATE_CHAT,
     });
-    if (project.repository !== null) return { text: stepText(project, false) };
+    if (project.repository !== null) {
+      const change = await changeScreen(project, String(from.id), PRIVATE_CHAT, idempotencyKey, installation);
+      if (change !== null) return change;
+      return { text: stepText(project, false) };
+    }
     const listed = await installationList(installation, String(from.id), PRIVATE_CHAT, idempotencyKey);
     if (listed.failure !== null) {
       return {
@@ -264,6 +356,29 @@ export async function replyToConnectRepository(
       idempotencyKey,
     });
     return connectedText(result);
+  } catch (error) {
+    return replyOf(error);
+  }
+}
+
+export async function replyToChangeRepository(
+  chatType: string | undefined,
+  from: TelegramAccount | undefined,
+  idempotencyKey: string,
+  projectId: string,
+  repositoryId: string,
+  actions: ProjectRepositoryActions,
+): Promise<string | null> {
+  if (chatType !== PRIVATE_CHAT || from === undefined || from.is_bot) return null;
+  try {
+    const result = await actions.change({
+      telegramUserId: String(from.id),
+      projectId,
+      repositoryId,
+      chat: chatType,
+      idempotencyKey,
+    });
+    return changedText(result);
   } catch (error) {
     return replyOf(error);
   }
@@ -330,6 +445,22 @@ export function attachProjectRepository(
     const from = ctx.from;
     if (parsed === null || from.is_bot) return;
     const reply = await replyToConnectRepository(
+      ctx.chat?.type,
+      from,
+      String(ctx.update.update_id),
+      parsed.projectId,
+      parsed.repositoryId,
+      actions,
+    );
+    if (reply !== null) await ctx.reply(reply);
+  });
+
+  bot.callbackQuery(/^rx:/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const parsed = parseChangeRepositoryData(ctx.callbackQuery.data);
+    const from = ctx.from;
+    if (parsed === null || from.is_bot) return;
+    const reply = await replyToChangeRepository(
       ctx.chat?.type,
       from,
       String(ctx.update.update_id),

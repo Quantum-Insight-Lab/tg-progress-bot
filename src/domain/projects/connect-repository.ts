@@ -9,6 +9,9 @@ import type { User } from './user.ts';
 /** В событии репозиторий подключает руководитель. */
 export const PROJECT_REPOSITORY_ACTOR_ROLE = LEAD_ROLE;
 
+/** В событии `project.repository_changed` действует корень. */
+export const PROJECT_REPOSITORY_CHANGE_ACTOR_ROLE = 'root';
+
 const PROJECT_SUBJECT = 'Project';
 
 export interface KnownRepository {
@@ -22,6 +25,11 @@ export interface ProjectLink {
   id: string;
   name: string;
   repository: KnownRepository | null;
+}
+
+/** Экран шага: ссылка и может ли корень её сменить. */
+export interface RepositoryStepView extends ProjectLink {
+  canChange: boolean;
 }
 
 /** Порт ссылки `projects.repository_id` внутри уже открытой транзакции. */
@@ -53,6 +61,11 @@ export interface ConnectProjectRepository extends OpenRepositoryById {
   idempotencyKey: string;
 }
 
+export interface ChangeProjectRepository extends OpenRepositoryById {
+  repositoryId: string;
+  idempotencyKey: string;
+}
+
 export interface SkipProjectRepository extends OpenRepositoryById {
   idempotencyKey: string;
 }
@@ -61,6 +74,13 @@ export interface ConnectedRepository {
   status: 'connected' | 'unchanged';
   projectId: string;
   repository: KnownRepository;
+}
+
+export interface ChangedRepository {
+  status: 'changed' | 'unchanged';
+  projectId: string;
+  repository: KnownRepository;
+  previousRepositoryId: string;
 }
 
 export interface SkippedRepository {
@@ -79,8 +99,8 @@ export type SkipResult = SkippedRepository | KeptRepository;
 
 /** Порт для адаптера Telegram. Часы и транзакция — у реализации. */
 export interface ProjectRepositoryActions {
-  open(input: { telegramUserId: string; projectName: string; chat: string }): Promise<ProjectLink>;
-  openById(input: { telegramUserId: string; projectId: string; chat: string }): Promise<ProjectLink>;
+  open(input: { telegramUserId: string; projectName: string; chat: string }): Promise<RepositoryStepView>;
+  openById(input: { telegramUserId: string; projectId: string; chat: string }): Promise<RepositoryStepView>;
   connect(input: {
     telegramUserId: string;
     projectId: string;
@@ -88,6 +108,13 @@ export interface ProjectRepositoryActions {
     chat: string;
     idempotencyKey: string;
   }): Promise<ConnectedRepository>;
+  change(input: {
+    telegramUserId: string;
+    projectId: string;
+    repositoryId: string;
+    chat: string;
+    idempotencyKey: string;
+  }): Promise<ChangedRepository>;
   skip(input: { telegramUserId: string; projectId: string; chat: string; idempotencyKey: string }): Promise<SkipResult>;
 }
 
@@ -97,6 +124,16 @@ export interface ProjectRepositoryActions {
  */
 export function projectRepositoryShareKey(repositoryId: string | null): string | null {
   return defineRepositoryLink(repositoryId);
+}
+
+/** GitHub-картина проекта — id его репозитория. Другого ключа у картины нет. */
+export function projectGithubPicture(repositoryId: string | null): string | null {
+  return projectRepositoryShareKey(repositoryId);
+}
+
+/** Линейка прогресса считается по тому же репозиторию, что и картина. */
+export function projectProgressLine(repositoryId: string | null): string | null {
+  return projectRepositoryShareKey(repositoryId);
 }
 
 function idempotencyKeyOf(value: string): string {
@@ -155,21 +192,93 @@ async function locked(store: ProjectRepositoryStore, projectId: string): Promise
   return requireProject(store, projectId);
 }
 
+function stepView(actor: User, project: ProjectLink): RepositoryStepView {
+  return { ...project, canChange: actor.isRoot && project.repository !== null };
+}
+
 /** Экран шага: какой репозиторий уже подключён. Список установки собирает адаптер. */
-export async function describeProjectRepository(store: ProjectRepositoryStore, input: OpenRepositoryStep): Promise<ProjectLink> {
+export async function describeProjectRepository(
+  store: ProjectRepositoryStore,
+  input: OpenRepositoryStep,
+): Promise<RepositoryStepView> {
   const project = await oneProject(store, input.projectName);
-  await authorize(store, input.actor, input.chat, project.id);
-  return project;
+  const actor = await authorize(store, input.actor, input.chat, project.id);
+  return stepView(actor, project);
 }
 
 /** Тот же экран по id проекта: так шаг открывается сразу после привязки группы. */
 export async function describeProjectRepositoryById(
   store: ProjectRepositoryStore,
   input: OpenRepositoryById,
-): Promise<ProjectLink> {
+): Promise<RepositoryStepView> {
   const project = await requireProject(store, input.projectId);
-  await authorize(store, input.actor, input.chat, project.id);
-  return project;
+  const actor = await authorize(store, input.actor, input.chat, project.id);
+  return stepView(actor, project);
+}
+
+async function requireRootChanger(store: ProjectRepositoryStore, actor: User | null, chat: string): Promise<User> {
+  if (chat !== PRIVATE_CHAT) {
+    throw new DomainError(DOMAIN_ERROR.PROJECT_REPOSITORY_CHAT, 'репозиторий меняют в личке');
+  }
+  if (actor === null || !actor.isRoot) {
+    const member = actor !== null && (await store.hasMembership(actor.id));
+    if (!member) throw new DomainError(DOMAIN_ERROR.PROJECT_REPOSITORY_ACCESS, 'нет доступа');
+    throw new DomainError(DOMAIN_ERROR.PROJECT_REPOSITORY_CHANGE_ACTOR, 'репозиторий меняет только корень');
+  }
+  return actor;
+}
+
+/**
+ * Сменяет уже подключённый репозиторий и публикует `project.repository_changed`.
+ * Картина и линейка читаются с нового id. Задачи и люди этим актом не пишутся.
+ * Тот же id второй раз состояние не меняет и второго события не пишет.
+ * Повтор ключа откатывает запись.
+ */
+export async function changeProjectRepository(
+  store: ProjectRepositoryStore,
+  journal: EventJournal,
+  clock: Clock,
+  input: ChangeProjectRepository,
+): Promise<ChangedRepository> {
+  const idempotencyKey = idempotencyKeyOf(input.idempotencyKey);
+  const repositoryId = defineRepositoryLink(input.repositoryId);
+  if (repositoryId === null) {
+    throw new DomainError(DOMAIN_ERROR.PROJECT_REPOSITORY_ID, 'id репозитория — id GitHub');
+  }
+  const project = await requireProject(store, input.projectId);
+  const actor = await requireRootChanger(store, input.actor, input.chat);
+  const known = await store.findRepository(repositoryId);
+  if (known === null) {
+    throw new DomainError(DOMAIN_ERROR.PROJECT_REPOSITORY_UNKNOWN, 'этого репозитория нет в установке');
+  }
+  const fresh = await locked(store, project.id);
+  if (fresh.repository === null) {
+    throw new DomainError(DOMAIN_ERROR.PROJECT_REPOSITORY_NOT_CONNECTED, 'репозиторий ещё не подключён');
+  }
+  if (fresh.repository.id === known.id) {
+    return { status: 'unchanged', projectId: fresh.id, repository: fresh.repository, previousRepositoryId: fresh.repository.id };
+  }
+  const previousRepositoryId = fresh.repository.id;
+  await store.setRepository(fresh.id, known.id);
+  const published = await emit(journal, {
+    type: EVENT_TYPES.PROJECT_REPOSITORY_CHANGED,
+    source: 'telegram',
+    idempotencyKey,
+    payload: {
+      project_id: fresh.id,
+      repository_id: known.id,
+      previous_repository_id: previousRepositoryId,
+    },
+    actor: { id: actor.id, role: PROJECT_REPOSITORY_CHANGE_ACTOR_ROLE },
+    subject: { entity: PROJECT_SUBJECT, id: fresh.id },
+    occurredAt: clock.now(),
+    causationId: null,
+    correlationId: null,
+  });
+  if (published.status === 'duplicate') {
+    throw new DomainError(DOMAIN_ERROR.PROJECT_REPOSITORY_CHANGE_DUPLICATE, 'project.repository_changed уже записан');
+  }
+  return { status: 'changed', projectId: fresh.id, repository: known, previousRepositoryId };
 }
 
 /**

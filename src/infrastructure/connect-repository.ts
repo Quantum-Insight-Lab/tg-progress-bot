@@ -1,13 +1,16 @@
 import { sql, type Kysely, type Transaction } from 'kysely';
 import {
+  changeProjectRepository,
   connectProjectRepository,
   describeProjectRepository,
   describeProjectRepositoryById,
   skipProjectRepository,
+  type ChangedRepository,
   type ConnectedRepository,
   type KnownRepository,
   type ProjectLink,
   type ProjectRepositoryActions,
+  type RepositoryStepView,
   type ProjectRepositoryStore,
   type SkipResult,
 } from '../domain/projects/connect-repository.ts';
@@ -118,13 +121,13 @@ function storeOf(trx: Transaction<Database>): ProjectRepositoryStore {
 /** Подключение репозитория: ссылка и `project.repository_connected` коммитятся одной транзакцией. */
 export function createProjectRepository(db: Kysely<Database>, clock: Clock): ProjectRepositoryActions {
   return {
-    open(input): Promise<ProjectLink> {
+    open(input): Promise<RepositoryStepView> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
         return describeProjectRepository(storeOf(trx), { actor, projectName: input.projectName, chat: input.chat });
       });
     },
-    openById(input): Promise<ProjectLink> {
+    openById(input): Promise<RepositoryStepView> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
         return describeProjectRepositoryById(storeOf(trx), { actor, projectId: input.projectId, chat: input.chat });
@@ -134,6 +137,18 @@ export function createProjectRepository(db: Kysely<Database>, clock: Clock): Pro
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
         return connectProjectRepository(storeOf(trx), createEventJournal(trx), clock, {
+          actor,
+          projectId: input.projectId,
+          repositoryId: input.repositoryId,
+          chat: input.chat,
+          idempotencyKey: input.idempotencyKey,
+        });
+      });
+    },
+    change(input): Promise<ChangedRepository> {
+      return db.transaction().execute(async (trx) => {
+        const actor = await findUser(trx, input.telegramUserId);
+        return changeProjectRepository(storeOf(trx), createEventJournal(trx), clock, {
           actor,
           projectId: input.projectId,
           repositoryId: input.repositoryId,
