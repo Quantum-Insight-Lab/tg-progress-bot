@@ -44,7 +44,7 @@ export function leadsTasks(role: ProjectRole): true {
   }
 }
 
-/** Поля участника. Топик исполнителя в строку этой версии не входит. */
+/** Поля участника при добавлении. Топик исполнителя задаёт отдельный акт, не эта функция. */
 export function defineProjectMember(input: {
   id: string;
   projectId: string;
