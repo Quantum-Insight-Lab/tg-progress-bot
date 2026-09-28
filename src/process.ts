@@ -6,6 +6,7 @@ import { createAccessGate } from './infrastructure/access.ts';
 import { createChatBinding } from './infrastructure/chats.ts';
 import { createExecutorTopics } from './infrastructure/executor-topic.ts';
 import { createReportsTopics } from './infrastructure/reports-topic.ts';
+import { createChatSchedule } from './infrastructure/schedule.ts';
 import { createGithubLogin } from './infrastructure/github-login.ts';
 import { createMembership } from './infrastructure/membership.ts';
 import { createProjectCreation } from './infrastructure/projects.ts';
@@ -16,6 +17,7 @@ import { createTelegramBot, type TelegramBotInfo } from './telegram/bot.ts';
 import { attachChatBinding, sendSupergroupRequest } from './telegram/chat-binding.ts';
 import { attachExecutorTopic } from './telegram/executor-topic.ts';
 import { attachReportsTopic } from './telegram/reports-topic.ts';
+import { attachSchedule } from './telegram/schedule.ts';
 import { attachGithubLogin, deliverGithubLoginPrompt } from './telegram/github-login.ts';
 import { attachParticipants } from './telegram/members.ts';
 import { attachNewProject } from './telegram/new-project.ts';
@@ -97,6 +99,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     });
     attachExecutorTopic(bot, createExecutorTopics(config.db, config.clock));
     attachReportsTopic(bot, createReportsTopics(config.db, config.clock));
+    attachSchedule(bot, createChatSchedule(config.db, config.clock));
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);

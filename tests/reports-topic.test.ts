@@ -45,6 +45,7 @@ import {
   specifyReportsTemplate,
   type ReportsChannel,
 } from '../src/telegram/reports-topic.ts';
+import { afterReportsTopic } from '../src/telegram/schedule.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -271,7 +272,7 @@ describe('INV-27 командный топик общий у группы и о�
       'specify-vera',
       actions,
     );
-    expect(set?.text).toBe(REPORTS_TOPIC_SET);
+    expect(set?.text).toBe(afterReportsTopic(REPORTS_TOPIC_SET));
     expect(await storedReports(fixture.db)).toMatchObject({ topicId: '42', chats: 1, projectChats: 1 });
     expect(await memberTopics(fixture.db)).toEqual([
       { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
@@ -302,7 +303,7 @@ describe('INV-27 командный топик общий у группы и о�
       'specify-root',
       actions,
     );
-    expect(changed?.text).toBe(REPORTS_TOPIC_SET);
+    expect(changed?.text).toBe(afterReportsTopic(REPORTS_TOPIC_SET));
     expect((await storedReports(fixture.db)).topicId).toBe('8');
     const events = await reportsEvents(fixture.db);
     expect(events).toHaveLength(2);
@@ -318,7 +319,7 @@ describe('INV-27 командный топик общий у группы и о�
     const actions = createReportsTopics(fixture.db, clock);
     const gate = channel(() => 15);
     const created = await replyToCreateReportsTopic('private', rootAccount, fixture.alphaId, 'create-reports', actions, gate.api);
-    expect(created?.text).toBe(REPORTS_TOPIC_CREATED);
+    expect(created?.text).toBe(afterReportsTopic(REPORTS_TOPIC_CREATED));
     expect(gate.opened).toEqual([{ chat: telegramChatId, name: REPORTS_TOPIC_NAME }]);
     expect((await storedReports(fixture.db)).topicId).toBe('15');
     expect(await reportsEvents(fixture.db)).toEqual([
@@ -456,7 +457,7 @@ describe('INV-22 повтор командного топика не приме�
       'same-key',
       actions,
     );
-    expect(first?.text).toBe(REPORTS_TOPIC_SET);
+    expect(first?.text).toBe(afterReportsTopic(REPORTS_TOPIC_SET));
     const second = await replyToReportsTopicMessage(
       'private',
       rootAccount,
@@ -497,7 +498,7 @@ describe('INV-22 повтор командного топика не приме�
     const actions = createReportsTopics(fixture.db, clock);
     const gate = channel(() => 21);
     const first = await replyToCreateReportsTopic('private', rootAccount, fixture.alphaId, 'create-once', actions, gate.api);
-    expect(first?.text).toBe(REPORTS_TOPIC_CREATED);
+    expect(first?.text).toBe(afterReportsTopic(REPORTS_TOPIC_CREATED));
     const second = await replyToCreateReportsTopic('private', rootAccount, fixture.alphaId, 'create-once', actions, gate.api);
     expect(second).toBeNull();
     expect(gate.opened).toEqual([{ chat: telegramChatId, name: REPORTS_TOPIC_NAME }]);
