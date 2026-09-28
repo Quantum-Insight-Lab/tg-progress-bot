@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { Kysely, Transaction } from 'kysely';
+import { sql, type Kysely, type Transaction } from 'kysely';
+import { LEAD_ROLE } from '../domain/projects/member.ts';
 import {
   pressTaskMark,
   type TaskMarkDraft,
@@ -7,6 +8,13 @@ import {
   type TaskMarkResult,
   type TaskMarkStore,
 } from '../domain/tasks/check-task.ts';
+import {
+  pressTaskReview,
+  type TaskReviewing,
+  type TaskReviewPress,
+  type TaskReviewResult,
+  type TaskReviewStore,
+} from '../domain/tasks/review-task.ts';
 import {
   createTask as decideCreate,
   type CreatedTask,
@@ -121,44 +129,111 @@ function markStore(trx: Transaction<Database>): TaskMarkStore {
     async sender(telegramUserId) {
       return findSender(trx, telegramUserId);
     },
-    async tasksInTopic(telegramChatId, topicId, taskNumber) {
-      const rows = await trx
-        .selectFrom('tasks')
-        .innerJoin('projects', 'projects.id', 'tasks.project_id')
-        .innerJoin('chats', 'chats.id', 'projects.chat_id')
-        .innerJoin('project_members', (join) =>
-          join
-            .onRef('project_members.project_id', '=', 'tasks.project_id')
-            .onRef('project_members.user_id', '=', 'tasks.assignee_id'),
-        )
-        .select([
-          'tasks.id',
-          'tasks.project_id',
-          'tasks.number',
-          'tasks.title',
-          'tasks.status',
-          'tasks.priority',
-          'tasks.assignee_id',
-          'tasks.created_at',
-          'tasks.updated_at',
-          'tasks.completed_at',
-        ])
-        .where('chats.telegram_chat_id', '=', telegramChatId)
-        .where('project_members.topic_id', '=', String(topicId))
-        .where('tasks.number', '=', taskNumber)
-        .orderBy('tasks.id')
-        .forUpdate()
-        .execute();
-      return rows.map((row) => taskFromRow(row));
+    tasksInTopic(telegramChatId, topicId, taskNumber) {
+      return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
     },
     async saveStatus(task, from) {
-      const updated = await trx
-        .updateTable('tasks')
-        .set({ status: task.status, updated_at: new Date(task.updatedAt) })
-        .where('id', '=', task.id)
-        .where('status', '=', from)
+      return writeStatus(trx, task, from);
+    },
+  };
+}
+
+async function writeStatus(trx: Transaction<Database>, task: Task, from: Task['status']): Promise<boolean> {
+  const updated = await trx
+    .updateTable('tasks')
+    .set({
+      status: task.status,
+      updated_at: new Date(task.updatedAt),
+      completed_at: task.completedAt === null ? null : new Date(task.completedAt),
+    })
+    .where('id', '=', task.id)
+    .where('status', '=', from)
+    .executeTakeFirst();
+  return updated.numUpdatedRows > 0n;
+}
+
+function lockTasksInTopic(trx: Transaction<Database>, telegramChatId: string, topicId: number, taskNumber: number): Promise<Task[]> {
+  return trx
+    .selectFrom('tasks')
+    .innerJoin('projects', 'projects.id', 'tasks.project_id')
+    .innerJoin('chats', 'chats.id', 'projects.chat_id')
+    .innerJoin('project_members', (join) =>
+      join
+        .onRef('project_members.project_id', '=', 'tasks.project_id')
+        .onRef('project_members.user_id', '=', 'tasks.assignee_id'),
+    )
+    .select([
+      'tasks.id',
+      'tasks.project_id',
+      'tasks.number',
+      'tasks.title',
+      'tasks.status',
+      'tasks.priority',
+      'tasks.assignee_id',
+      'tasks.created_at',
+      'tasks.updated_at',
+      'tasks.completed_at',
+    ])
+    .where('chats.telegram_chat_id', '=', telegramChatId)
+    .where('project_members.topic_id', '=', String(topicId))
+    .where('tasks.number', '=', taskNumber)
+    .orderBy('tasks.id')
+    .forUpdate()
+    .execute()
+    .then((rows) => rows.map((row) => taskFromRow(row)));
+}
+
+function reviewStore(trx: Transaction<Database>): TaskReviewStore {
+  return {
+    async sender(telegramUserId) {
+      return findSender(trx, telegramUserId);
+    },
+    tasksInTopic(telegramChatId, topicId, taskNumber) {
+      return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
+    },
+    async membership(projectId, userId) {
+      const row = await trx
+        .selectFrom('project_members')
+        .select(['role'])
+        .where('project_id', '=', projectId)
+        .where('user_id', '=', userId)
         .executeTakeFirst();
-      return updated.numUpdatedRows > 0n;
+      if (row === undefined) return null;
+      return { role: row.role };
+    },
+    async leadCount(projectId) {
+      const result = await sql<{ n: number | string }>`
+        SELECT CAST(count(*) AS int) AS n
+        FROM project_members
+        WHERE project_id = ${projectId}::uuid AND role = ${LEAD_ROLE}
+      `.execute(trx);
+      return Number(result.rows[0]?.n ?? 0);
+    },
+    async openBlocker(taskId) {
+      // Строку `blockers` пишет акт блокера. Пока её нет, открытого блокера нет.
+      void taskId;
+      return false;
+    },
+    async seen(idempotencyKey) {
+      const row = await trx
+        .selectFrom('events')
+        .select(['id'])
+        .where('idempotency_key', '=', idempotencyKey)
+        .executeTakeFirst();
+      if (row === undefined) return null;
+      return { eventId: row.id };
+    },
+    saveStatus(task, from) {
+      return writeStatus(trx, task, from);
+    },
+  };
+}
+
+/** «Подтвердить» и «вернуть»: статус и событие коммитятся одной транзакцией. */
+export function createTaskReviewActions(db: Kysely<Database>, clock: Clock): TaskReviewing {
+  return {
+    press(input: TaskReviewPress): Promise<TaskReviewResult> {
+      return db.transaction().execute((trx) => pressTaskReview(reviewStore(trx), createEventJournal(trx), clock, input));
     },
   };
 }
