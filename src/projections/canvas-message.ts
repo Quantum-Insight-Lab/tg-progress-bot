@@ -1,5 +1,7 @@
 /**
- * P-1. Форма канваса: одно rich message из абзацев.
+ * P-1. Канвас целиком: одно rich message, блоки сверху вниз.
+ * P-2. Шапка: имя проекта и дата суток проекта.
+ * Поздние проекции заполняют свои блоки. Пустой блок строку не занимает.
  * Действие задачи — кнопка внутри абзаца, стиль ссылки. Ряда кнопок нет.
  */
 
@@ -71,11 +73,60 @@ function paragraphText(pieces: readonly CanvasPiece[]): CanvasRichText {
 }
 
 /**
- * Оболочка одного сообщения на день.
- * Состав блоков сверху вниз приходит отдельными issues. Меню задач и кнопок здесь нет.
+ * Состав сверху вниз. Шапка первая.
+ * Расхождение стоит сразу под строкой GitHub, динамика — следом.
  */
-export function renderCanvasShell(): CanvasRichMessage {
-  return renderCanvasMessage([{ pieces: [{ kind: 'text', text: ' ' }] }]);
+export const CANVAS_SECTION_ORDER = [
+  'header',
+  'backlog',
+  'person',
+  'done',
+  'inProgress',
+  'next',
+  'tasks',
+  'plan',
+  'blockers',
+  'github',
+  'divergence',
+  'dynamics',
+] as const;
+
+export type CanvasSectionId = (typeof CANVAS_SECTION_ORDER)[number];
+
+export type CanvasBodySection = Exclude<CanvasSectionId, 'header'>;
+
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Шапка: «ПРОЕКТ: имя · ДД.ММ». Дата — уже посчитанные сутки проекта. */
+export function canvasHeaderLine(projectName: string, canvasDate: string): string {
+  const name = projectName.trim();
+  if (name.length === 0) throw new Error('у шапки канваса есть имя проекта');
+  const match = CALENDAR_DATE.exec(canvasDate.trim());
+  const day = match?.[3];
+  const month = match?.[2];
+  if (day === undefined || month === undefined) throw new Error('дата шапки — календарный день проекта');
+  return `ПРОЕКТ: ${name} · ${day}.${month}`;
+}
+
+/**
+ * Канвас на сутки: шапка и переданные блоки в порядке состава.
+ * Блок без абзацев не печатается. Меню задач здесь нет.
+ */
+export function renderCanvas(input: {
+  projectName: string;
+  canvasDate: string;
+  sections?: Partial<Record<CanvasBodySection, readonly CanvasParagraph[]>>;
+}): CanvasRichMessage {
+  const paragraphs: CanvasParagraph[] = [
+    { pieces: [{ kind: 'text', text: canvasHeaderLine(input.projectName, input.canvasDate) }] },
+  ];
+  for (const id of CANVAS_SECTION_ORDER) {
+    if (id === 'header') continue;
+    const block = input.sections?.[id];
+    if (block === undefined || block.length === 0) continue;
+    paragraphs.push(...block);
+  }
+  return renderCanvasMessage(paragraphs);
 }
 
 /** Абзацы канваса. Кнопка действия лежит в тексте абзаца, отдельным блоком кнопок не выносится. */

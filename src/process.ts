@@ -35,7 +35,7 @@ import { attachParticipants } from './telegram/members.ts';
 import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
 import { editCanvasMessage, sendCanvasMessage } from './telegram/canvas-message.ts';
-import { renderCanvasShell } from './projections/canvas-message.ts';
+import { renderCanvas } from './projections/canvas-message.ts';
 import { attachTaskCommand } from './telegram/task-command.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
 
@@ -112,10 +112,19 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   const bot = config.botInfo === undefined ? createTelegramBot(config.botToken) : createTelegramBot(config.botToken, config.botInfo);
   const deliverCanvas = {
     async send(home: CanvasHome): Promise<number> {
-      return sendCanvasMessage(bot.api, { chatId: home.telegramChatId, messageThreadId: home.topicId }, renderCanvasShell());
+      return sendCanvasMessage(
+        bot.api,
+        { chatId: home.telegramChatId, messageThreadId: home.topicId },
+        renderCanvas({ projectName: home.projectName, canvasDate: home.canvasDate }),
+      );
     },
     async edit(home: CanvasHome, messageId: number): Promise<void> {
-      await editCanvasMessage(bot.api, { chatId: home.telegramChatId, messageThreadId: home.topicId }, messageId, renderCanvasShell());
+      await editCanvasMessage(
+        bot.api,
+        { chatId: home.telegramChatId, messageThreadId: home.topicId },
+        messageId,
+        renderCanvas({ projectName: home.projectName, canvasDate: home.canvasDate }),
+      );
     },
   };
   let ensureToday: ((now: Date) => Promise<void>) | undefined;

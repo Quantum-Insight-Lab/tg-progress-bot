@@ -18,6 +18,8 @@ import { createEventJournal } from './event-journal.ts';
 export interface CanvasHome {
   telegramChatId: string;
   topicId: number;
+  projectName: string;
+  canvasDate: string;
 }
 
 export interface ShownCanvas {
@@ -53,6 +55,7 @@ interface MemberRow {
   user_id: string;
   topic_id: string;
   timezone: string;
+  project_name: string;
   telegram_chat_id: string;
 }
 
@@ -135,18 +138,26 @@ async function slotFor(
  * Нет строки — новое сообщение и `canvas.posted`. Есть — правка того же `message_id` и `canvas.edited`.
  */
 export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): Promise<ShownCanvas> {
-  const preview = await sql<{ timezone: string }>`
-    SELECT timezone FROM projects WHERE id = ${input.projectId}::uuid
+  const preview = await sql<{ timezone: string; name: string }>`
+    SELECT timezone, name FROM projects WHERE id = ${input.projectId}::uuid
   `.execute(db);
-  const timezone = preview.rows[0]?.timezone;
-  if (timezone === undefined) throw new DomainError(DOMAIN_ERROR.CANVAS_PROJECT_MISSING, 'проекта или исполнителя нет');
-  const canvasDate = projectCalendarDate(input.now, timezone);
+  const project = preview.rows[0];
+  if (project === undefined) throw new DomainError(DOMAIN_ERROR.CANVAS_PROJECT_MISSING, 'проекта или исполнителя нет');
+  const canvasDate = projectCalendarDate(input.now, project.timezone);
   const slot = await slotFor(db, input.projectId, input.assigneeId, canvasDate);
   const move = decideCanvasMove(input.destination, slot, input.now);
   if (move.kind === 'edit') {
     const causationId = requireEditCausation(input.causationId);
     const telegramChatId = slot.telegramChatId ?? '';
-    await input.edit({ telegramChatId, topicId: move.canvas.topicId }, move.canvas.messageId);
+    await input.edit(
+      {
+        telegramChatId,
+        topicId: move.canvas.topicId,
+        projectName: project.name,
+        canvasDate: move.canvas.canvasDate,
+      },
+      move.canvas.messageId,
+    );
     const canvas = await db.transaction().execute((trx) =>
       recordEditedCanvas(createEventJournal(trx), {
         canvas: move.canvas,
@@ -156,7 +167,12 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
     );
     return { action: 'edit', canvas };
   }
-  const messageId = await input.send({ telegramChatId: move.telegramChatId, topicId: move.topicId });
+  const messageId = await input.send({
+    telegramChatId: move.telegramChatId,
+    topicId: move.topicId,
+    projectName: project.name,
+    canvasDate: move.canvasDate,
+  });
   const canvas = await db.transaction().execute((trx) =>
     recordPostedCanvas(
       {
@@ -242,6 +258,7 @@ export async function ensureTodayCanvases(
            project_members.user_id::text AS user_id,
            project_members.topic_id::text AS topic_id,
            projects.timezone AS timezone,
+           projects.name AS project_name,
            chats.telegram_chat_id::text AS telegram_chat_id
     FROM project_members
     JOIN projects ON projects.id = project_members.project_id
@@ -256,7 +273,12 @@ export async function ensureTodayCanvases(
       const existing = await readCanvas(db, member.project_id, member.user_id, canvasDate);
       if (existing !== null) continue;
       const topicId = whole(member.topic_id, 'topic_id');
-      const messageId = await send({ telegramChatId: member.telegram_chat_id, topicId });
+      const messageId = await send({
+        telegramChatId: member.telegram_chat_id,
+        topicId,
+        projectName: member.project_name,
+        canvasDate,
+      });
       await db.transaction().execute((trx) =>
         recordPostedCanvas(
           {
