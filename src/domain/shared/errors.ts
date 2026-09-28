@@ -157,6 +157,12 @@ export const DOMAIN_ERROR = {
   CANVAS_AMBIGUOUS: 'canvas_ambiguous',
   CANVAS_DUPLICATE: 'canvas_duplicate',
   CANVAS_CAUSATION: 'canvas_causation',
+  CANVAS_ITEM_ID_BLANK: 'canvas_item_id_blank',
+  CANVAS_ITEM_CANVAS_BLANK: 'canvas_item_canvas_blank',
+  CANVAS_ITEM_TASK_BLANK: 'canvas_item_task_blank',
+  CANVAS_ITEM_POSITION: 'canvas_item_position',
+  CANVAS_ITEM_CARRIED_BLANK: 'canvas_item_carried_blank',
+  CANVAS_ITEM_BUTTONS: 'canvas_item_buttons',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

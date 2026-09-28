@@ -81,6 +81,18 @@ export interface CanvasesTable {
   canvas_date: string;
 }
 
+/**
+ * Пункт канваса (E-8): задача на канвасе и её место.
+ * Кнопки в строку не складываются. Перенос пуст, пока пункт не перенесён.
+ */
+export interface CanvasItemsTable {
+  id: string;
+  canvas_id: string;
+  task_id: string;
+  position: number;
+  carried_from_canvas_id: string | null;
+}
+
 /** Репозиторий установки GitHub App (E-9). Ключ — id GitHub, не проект. */
 export interface RepositoriesTable {
   id: string;
@@ -96,5 +108,6 @@ export interface Database {
   project_members: ProjectMembersTable;
   tasks: TasksTable;
   canvases: CanvasesTable;
+  canvas_items: CanvasItemsTable;
   repositories: RepositoriesTable;
 }

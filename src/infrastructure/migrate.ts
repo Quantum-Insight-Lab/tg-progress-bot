@@ -70,3 +70,8 @@ export function readTaskNumberMigration(root = process.cwd()): string {
 export function readCanvasesMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '014_canvases.sql'), 'utf8');
 }
+
+/** Таблица пунктов канваса: задача, место и канвас переноса. Кнопок в строке нет. */
+export function readCanvasItemsMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '015_canvas_items.sql'), 'utf8');
+}
