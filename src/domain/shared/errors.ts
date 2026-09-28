@@ -1,6 +1,9 @@
 /** Код причины, по которой домен отклонил команду. */
 export const DOMAIN_ERROR = {
   USERS_ALREADY_EXIST: 'users_already_exist',
+  BLANK_NAME: 'blank_name',
+  TELEGRAM_USER_ID: 'telegram_user_id',
+  REGISTRATION_DUPLICATE: 'registration_duplicate',
   PROJECT_ID_BLANK: 'project_id_blank',
   PROJECT_NAME_BLANK: 'project_name_blank',
   PROJECT_TIMEZONE_BLANK: 'project_timezone_blank',

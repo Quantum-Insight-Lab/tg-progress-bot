@@ -1,7 +1,8 @@
 import { systemClock } from './infrastructure/clock.ts';
+import { getDb } from './infrastructure/db.ts';
 import { readProcessConfig, startProcess } from './process.ts';
 
-const running = await startProcess(readProcessConfig(process.env, systemClock));
+const running = await startProcess({ ...readProcessConfig(process.env, systemClock), db: getDb() });
 
 function listen(signal: NodeJS.Signals, listener: NodeJS.SignalsListener): void {
   process.on(signal, listener);
