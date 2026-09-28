@@ -44,7 +44,7 @@ describe('Публикация backlog', () => {
   });
 
   it('порядок создания: блокирующая issue раньше заблокированной', () => {
-    const make = (id: string, blockedBy: string[]) => ({ id, blockedBy, file: '', title: id, labels: [], closed: false, atoms: [], elements: [] });
+    const make = (id: string, blockedBy: string[]) => ({ id, blockedBy, file: '', title: id, labels: [], closed: false, atoms: [], elements: [], pda: '', alreadyThereFirst: true });
     expect(creationOrder([make('I-03', ['I-10']), make('I-10', ['I-02']), make('I-02', [])]).map((i) => i.id)).toEqual(['I-02', 'I-10', 'I-03']);
   });
 });
