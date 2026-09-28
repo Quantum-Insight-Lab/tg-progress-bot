@@ -79,6 +79,25 @@ export function standsInTasksBlock(status: TaskStatus): boolean {
   return oneOf(status, TASKS_BLOCK_STATUSES) !== undefined;
 }
 
+/**
+ * На следующий день переносятся незакрытые: `IN_PROGRESS`, `BLOCKED`, `REVIEW`, `PLANNED`.
+ * `CANCELLED` и `DONE` не переносятся.
+ */
+const CARRIED_STATUSES = [TASK_STATUS_IN_PROGRESS, TASK_STATUS_BLOCKED, TASK_STATUS_REVIEW, TASK_STATUS_PLANNED] as const;
+
+export function carriedToNextCanvas(status: TaskStatus): boolean {
+  return oneOf(status, CARRIED_STATUSES) !== undefined;
+}
+
+/** Перенос дня берёт только незакрытые. Снятая и подтверждённая на новый канвас не попадают. */
+export function tasksCarriedToNextCanvas<T extends { status: TaskStatus }>(tasks: readonly T[]): T[] {
+  const carried: T[] = [];
+  for (const task of tasks) {
+    if (carriedToNextCanvas(task.status)) carried.push(task);
+  }
+  return carried;
+}
+
 /** Задачи блока «Задачи» в исходном порядке. Остальные статусы строку не занимают. */
 export function tasksStandingInBlock<T extends { status: TaskStatus }>(tasks: readonly T[]): T[] {
   const standing: T[] = [];

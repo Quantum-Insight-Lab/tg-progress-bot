@@ -10,7 +10,13 @@ import { EVENT_TYPES, type EventJournal, type EventRow } from '../src/events/ind
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import { createMembership } from '../src/infrastructure/membership.ts';
-import { readEventsMigration, readProjectMembersMigration, readProjectsMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
+import {
+  readEventsMigration,
+  readProjectMembersMigration,
+  readProjectsMigration,
+  readTasksMigration,
+  readUsersMigration,
+} from '../src/infrastructure/migrate.ts';
 import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import {
@@ -62,6 +68,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readUsersMigration());
   await pglite.exec(readProjectsMigration());
   await pglite.exec(readProjectMembersMigration());
+  await pglite.exec(readTasksMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });

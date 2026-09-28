@@ -2,6 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import { LEAD_ROLE } from '../domain/projects/member.ts';
 import {
+  cancelTasksOfRemovedMember,
+  pressTaskCancel,
+  type RemovedMemberTasks,
+  type TaskCancelPress,
+  type TaskCancelResult,
+  type TaskCancelStore,
+  type TaskCancelling,
+  type TaskRemovalStore,
+} from '../domain/tasks/cancel-task.ts';
+import {
   pressTaskMark,
   type TaskMarkDraft,
   type TaskMarking,
@@ -274,6 +284,98 @@ function planStore(trx: Transaction<Database>): TaskPlanStore {
       return writePriority(trx, task, from);
     },
   };
+}
+
+function seenEvent(trx: Transaction<Database>, idempotencyKey: string): Promise<{ eventId: string } | null> {
+  return trx
+    .selectFrom('events')
+    .select(['id'])
+    .where('idempotency_key', '=', idempotencyKey)
+    .executeTakeFirst()
+    .then((row) => (row === undefined ? null : { eventId: row.id }));
+}
+
+function cancelStore(trx: Transaction<Database>): TaskCancelStore {
+  return {
+    async sender(telegramUserId) {
+      return findSender(trx, telegramUserId);
+    },
+    tasksInTopic(telegramChatId, topicId, taskNumber) {
+      return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
+    },
+    async membership(projectId, userId) {
+      const row = await trx
+        .selectFrom('project_members')
+        .select(['role'])
+        .where('project_id', '=', projectId)
+        .where('user_id', '=', userId)
+        .executeTakeFirst();
+      if (row === undefined) return null;
+      return { role: row.role };
+    },
+    seen(idempotencyKey) {
+      return seenEvent(trx, idempotencyKey);
+    },
+    saveStatus(task, from) {
+      return writeStatus(trx, task, from);
+    },
+  };
+}
+
+function removalStore(trx: Transaction<Database>): TaskRemovalStore {
+  return {
+    async tasksOfAssignee(projectId, assigneeId, taskIds) {
+      if (taskIds.length === 0) return [];
+      const rows = await trx
+        .selectFrom('tasks')
+        .select([
+          'tasks.id',
+          'tasks.project_id',
+          'tasks.number',
+          'tasks.title',
+          'tasks.status',
+          'tasks.priority',
+          'tasks.assignee_id',
+          'tasks.created_at',
+          'tasks.updated_at',
+          'tasks.completed_at',
+        ])
+        .where('project_id', '=', projectId)
+        .where('assignee_id', '=', assigneeId)
+        .where('id', 'in', [...taskIds])
+        .orderBy('id')
+        .forUpdate()
+        .execute();
+      return rows.map((row) => taskFromRow(row));
+    },
+    seen(idempotencyKey) {
+      return seenEvent(trx, idempotencyKey);
+    },
+    saveStatus(task, from) {
+      return writeStatus(trx, task, from);
+    },
+  };
+}
+
+/** «Отменить»: статус `CANCELLED` и `task.cancelled` коммитятся одной транзакцией. */
+export function createTaskCancelActions(db: Kysely<Database>, clock: Clock): TaskCancelling {
+  return {
+    press(input: TaskCancelPress): Promise<TaskCancelResult> {
+      return db.transaction().execute((trx) => pressTaskCancel(cancelStore(trx), createEventJournal(trx), clock, input));
+    },
+  };
+}
+
+/**
+ * Снятие незакрытых задач удалённого участника в уже открытой транзакции удаления.
+ * Пишет `task.cancelled` по каждому id из `project.member_removed`.
+ */
+export function cancelRemovedMemberTasks(
+  trx: Transaction<Database>,
+  clock: Clock,
+  input: RemovedMemberTasks,
+): Promise<void> {
+  return cancelTasksOfRemovedMember(removalStore(trx), createEventJournal(trx), clock, input).then(() => undefined);
 }
 
 /** «В план», «в работу» и слово приоритета: правка и событие коммитятся одной транзакцией. */

@@ -2,6 +2,7 @@ import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
 import { TASK_ASSIGNEE_LEAD } from './create-task.ts';
 import {
   TASK_STATUS_BLOCKED,
+  TASK_STATUS_CANCELLED,
   TASK_STATUS_DONE,
   TASK_STATUS_IN_PROGRESS,
   TASK_STATUS_PLANNED,
@@ -26,6 +27,9 @@ export const TASK_TRANSITION_PLAN = 'plan';
 
 /** «В работу»: задача возвращается из плана в «Задачи». */
 export const TASK_TRANSITION_RESUME = 'resume';
+
+/** «Отменить»: задача переходит в `CANCELLED`, пока она не `DONE`. */
+export const TASK_TRANSITION_CANCEL = 'cancel';
 
 /**
  * Кто нажал «подтвердить» или «вернуть».
@@ -58,6 +62,10 @@ const TASK_TRANSITIONS: readonly TransitionRow[] = [
   { act: TASK_TRANSITION_PLAN, from: TASK_STATUS_IN_PROGRESS, to: TASK_STATUS_PLANNED },
   { act: TASK_TRANSITION_PLAN, from: TASK_STATUS_BLOCKED, to: TASK_STATUS_PLANNED },
   { act: TASK_TRANSITION_RESUME, from: TASK_STATUS_PLANNED, to: TASK_STATUS_IN_PROGRESS },
+  { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_PLANNED, to: TASK_STATUS_CANCELLED },
+  { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_IN_PROGRESS, to: TASK_STATUS_CANCELLED },
+  { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_BLOCKED, to: TASK_STATUS_CANCELLED },
+  { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_REVIEW, to: TASK_STATUS_CANCELLED },
 ];
 
 export interface TaskTransition {
