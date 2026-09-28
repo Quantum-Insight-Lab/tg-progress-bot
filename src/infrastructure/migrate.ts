@@ -20,3 +20,8 @@ export function readProjectsMigration(root = process.cwd()): string {
 export function readChatsMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '004_chats.sql'), 'utf8');
 }
+
+/** Таблица участников: поля и constraint'ы роли. */
+export function readProjectMembersMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '005_project_members.sql'), 'utf8');
+}

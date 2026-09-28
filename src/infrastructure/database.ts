@@ -41,9 +41,17 @@ export interface ChatsTable {
   timezone: string;
 }
 
+export interface ProjectMembersTable {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role: 'member' | 'lead';
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
   projects: ProjectsTable;
   chats: ChatsTable;
+  project_members: ProjectMembersTable;
 }
