@@ -36,6 +36,8 @@ export const DOMAIN_ERROR = {
   MEMBER_ABSENT: 'member_absent',
   MEMBER_DUPLICATE: 'member_duplicate',
   MEMBER_IDEMPOTENCY_KEY: 'member_idempotency_key',
+  ACCESS_IDEMPOTENCY_KEY: 'access_idempotency_key',
+  ACCESS_UPDATE_KIND: 'access_update_kind',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
