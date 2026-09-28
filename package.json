@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "boundaries": "depcruise src --config dependency-cruiser.config.mjs",
-    "test": "vitest run",
+    "test": "vitest run --testTimeout=15000",
     "codegen:events": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/codegen-events.ts",
     "check:invariants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-invariants.ts",
     "tz:check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts",

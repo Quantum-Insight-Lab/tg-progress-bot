@@ -80,6 +80,17 @@ export const DOMAIN_ERROR = {
   SCHEDULE_TIMEZONE_BLANK: 'schedule_timezone_blank',
   SCHEDULE_DUPLICATE: 'schedule_duplicate',
   SCHEDULE_IDEMPOTENCY_KEY: 'schedule_idempotency_key',
+  SETTINGS_CHAT: 'settings_chat',
+  SETTINGS_ACTOR: 'settings_actor',
+  SETTINGS_ACCESS: 'settings_access',
+  SETTINGS_PROJECT_MISSING: 'settings_project_missing',
+  SETTINGS_PROJECT_AMBIGUOUS: 'settings_project_ambiguous',
+  SETTINGS_TIMEZONE: 'settings_timezone',
+  SETTINGS_CHAT_UNKNOWN: 'settings_chat_unknown',
+  SETTINGS_MEMBER_ABSENT: 'settings_member_absent',
+  SETTINGS_MEMBER_AMBIGUOUS: 'settings_member_ambiguous',
+  SETTINGS_DUPLICATE: 'settings_duplicate',
+  SETTINGS_IDEMPOTENCY_KEY: 'settings_idempotency_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
