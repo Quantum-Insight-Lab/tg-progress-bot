@@ -18,12 +18,13 @@ import { taskCanvasDay } from '../domain/tasks/task-day.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
-/** Первая строка задачи на канвасе этого исполнителя. */
+/** Задача на канвасе этого исполнителя: первая строка абзаца и приоритет для второй. */
 export interface CanvasTaskLine {
   number: number;
   title: string;
   status: string;
   day: number;
+  priority: string;
 }
 
 export interface CanvasHome {
@@ -152,6 +153,7 @@ async function assigneeTaskLines(
     title: task.title,
     status: task.status,
     day: taskCanvasDay(projectCalendarDate(instant(task.createdAt), timezone), canvasDate),
+    priority: task.priority,
   }));
 }
 

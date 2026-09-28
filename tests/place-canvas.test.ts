@@ -13,6 +13,7 @@ import {
   type CanvasSlotState,
 } from '../src/domain/tasks/place-canvas.ts';
 import {
+  TASK_PRIORITY_NORMAL,
   TASK_STATUS_BLOCKED,
   TASK_STATUS_CANCELLED,
   TASK_STATUS_DONE,
@@ -43,7 +44,7 @@ import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createTaskActions } from '../src/infrastructure/tasks.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { renderFirstEmployeeMessage } from '../src/projections/first-employee-message.ts';
-import { renderCanvas } from '../src/projections/canvas-message.ts';
+import { renderCanvas, type CanvasRichText } from '../src/projections/canvas-message.ts';
 import { tasksBlockParagraphs } from '../src/projections/tasks-block.ts';
 import {
   EXECUTOR_TOPIC_CREATED,
@@ -109,6 +110,16 @@ function canvasOf(date: string, messageId: number): Canvas {
 
 function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = []): CanvasHome {
   return { telegramChatId, topicId: 42, projectName: 'Альфа', canvasDate, tasks };
+}
+
+function openTask(title: string): CanvasTaskLine {
+  return { number: 1, title, status: TASK_STATUS_IN_PROGRESS, day: 1, priority: TASK_PRIORITY_NORMAL };
+}
+
+function visibleCanvas(text: CanvasRichText): string {
+  if (typeof text === 'string') return text;
+  if (Array.isArray(text)) return text.map(visibleCanvas).join('');
+  return text.button.text;
 }
 
 function io(): Io {
@@ -381,7 +392,7 @@ describe('канвас выставляется в топик', () => {
     expect(gate.sent).toHaveLength(1);
     expect(gate.edited).toEqual([
       {
-        home: shown('2026-09-28', [{ number: 1, title: 'Сделать', status: TASK_STATUS_IN_PROGRESS, day: 1 }]),
+        home: shown('2026-09-28', [openTask('Сделать')]),
         messageId: 11,
       },
     ]);
@@ -642,17 +653,17 @@ describe('канвас выставляется в топик', () => {
     );
     expect(reply).toContain('Классификация сигнала');
     expect(gate.sent).toEqual([
-      shown('2026-09-28', [{ number: 1, title: 'Классификация сигнала', status: TASK_STATUS_IN_PROGRESS, day: 1 }]),
+      shown('2026-09-28', [openTask('Классификация сигнала')]),
     ]);
     const message = renderCanvas({
       projectName: 'Альфа',
       canvasDate: '2026-09-28',
       sections: { tasks: tasksBlockParagraphs(gate.sent[0]?.tasks ?? []) },
     });
-    expect(message.blocks.map((block) => block.text)).toEqual([
+    expect(message.blocks.map((block) => visibleCanvas(block.text))).toEqual([
       'ПРОЕКТ: Альфа · 28.09',
       'Задачи',
-      '○ 1 — Классификация сигнала — 1-й день',
+      '○ 1 — Классификация сигнала — 1-й день\nnormal · в план · отменить',
     ]);
   });
 
@@ -729,7 +740,7 @@ describe('канвас выставляется в топик', () => {
     const again = await replyToTaskCommand(place, borisAccount, 'once', 'Вторая', actions, redraw);
     expect(again).toBeNull();
     expect(gate.sent).toHaveLength(1);
-    expect(gate.sent[0]?.tasks).toEqual([{ number: 1, title: 'Первая', status: TASK_STATUS_IN_PROGRESS, day: 1 }]);
+    expect(gate.sent[0]?.tasks).toEqual([openTask('Первая')]);
     expect(gate.edited).toEqual([]);
   });
 });
