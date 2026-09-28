@@ -27,6 +27,7 @@ import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
 import { ACCESS_DENIED_REPLY, GUARDED_HANDLERS, type GuardedHandler } from '../src/telegram/access-guard.ts';
 import { NEW_PROJECT_HEADING } from '../src/telegram/new-project.ts';
+import { EXECUTOR_TOPIC_HEADING } from '../src/telegram/executor-topic.ts';
 import { PARTICIPANTS_HEADING, PARTICIPANTS_ROOT_ONLY } from '../src/telegram/members.ts';
 import { START_REPLY_PENDING } from '../src/telegram/start.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
@@ -177,6 +178,8 @@ function bodyFor(handler: GuardedHandler, updateId: number, account: { id: numbe
       return callbackBody(updateId, account);
     case 'participants':
       return messageBody(updateId, account, `${PARTICIPANTS_HEADING}\nАльфа`);
+    case 'executor-topic':
+      return messageBody(updateId, account, `${EXECUTOR_TOPIC_HEADING}\nАльфа`);
     default: {
       const unreachable: never = handler;
       throw new Error(unreachable);

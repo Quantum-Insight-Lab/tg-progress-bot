@@ -38,6 +38,18 @@ export const DOMAIN_ERROR = {
   MEMBER_IDEMPOTENCY_KEY: 'member_idempotency_key',
   ACCESS_IDEMPOTENCY_KEY: 'access_idempotency_key',
   ACCESS_UPDATE_KIND: 'access_update_kind',
+  TOPIC_CHAT: 'topic_chat',
+  TOPIC_ACTOR: 'topic_actor',
+  TOPIC_ACCESS: 'topic_access',
+  TOPIC_PROJECT_MISSING: 'topic_project_missing',
+  TOPIC_PROJECT_AMBIGUOUS: 'topic_project_ambiguous',
+  TOPIC_UNBOUND: 'topic_unbound',
+  TOPIC_ABSENT: 'topic_absent',
+  TOPIC_AMBIGUOUS: 'topic_ambiguous',
+  TOPIC_ID: 'topic_id',
+  TOPIC_ALREADY: 'topic_already',
+  TOPIC_DUPLICATE: 'topic_duplicate',
+  TOPIC_IDEMPOTENCY_KEY: 'topic_idempotency_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

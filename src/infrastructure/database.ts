@@ -46,6 +46,8 @@ export interface ProjectMembersTable {
   project_id: string;
   user_id: string;
   role: 'member' | 'lead';
+  /** Пусто, пока топик не указан. Вставка участника колонку не заполняет. */
+  topic_id: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 export interface Database {
