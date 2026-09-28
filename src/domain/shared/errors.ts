@@ -26,6 +26,16 @@ export const DOMAIN_ERROR = {
   PROJECT_MEMBER_PROJECT_BLANK: 'project_member_project_blank',
   PROJECT_MEMBER_USER_BLANK: 'project_member_user_blank',
   PROJECT_ROLE: 'project_role',
+  MEMBER_CHAT: 'member_chat',
+  MEMBER_ACTOR: 'member_actor',
+  MEMBER_ACCESS: 'member_access',
+  MEMBER_PROJECT_MISSING: 'member_project_missing',
+  MEMBER_PROJECT_AMBIGUOUS: 'member_project_ambiguous',
+  MEMBER_NOT_CANDIDATE: 'member_not_candidate',
+  MEMBER_ALREADY: 'member_already',
+  MEMBER_ABSENT: 'member_absent',
+  MEMBER_DUPLICATE: 'member_duplicate',
+  MEMBER_IDEMPOTENCY_KEY: 'member_idempotency_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
