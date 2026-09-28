@@ -2,8 +2,10 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Transformer } from 'grammy';
 import {
   CANVAS_LINK_STYLE,
+  CANVAS_SECTION_ORDER,
+  renderCanvas,
   renderCanvasMessage,
-  renderCanvasShell,
+  type CanvasParagraph,
   type CanvasRichMessage,
   type CanvasRichText,
   type CanvasTextButton,
@@ -121,12 +123,14 @@ describe('B-6 канвас уходит в топик', () => {
   });
 
   it('INV-23 оболочка канваса без меню задач и без кнопок', () => {
-    const shell = renderCanvasShell();
+    const shell = renderCanvas({ projectName: 'Альфа', canvasDate: '2026-09-28' });
     expect(shell.blocks).toHaveLength(1);
     expect(buttonsOf(shell)).toEqual([]);
     expect(JSON.stringify(shell)).not.toContain('reply_markup');
     expect(JSON.stringify(shell)).not.toContain('inline_keyboard');
     expect(JSON.stringify(shell)).not.toContain('"type":"button"');
+    expect(JSON.stringify(shell)).not.toContain('в план');
+    expect(JSON.stringify(shell)).not.toContain('подтвердить');
   });
 
   it('INV-23 правка того же сообщения, без клавиатуры и без второго send', async () => {
@@ -148,5 +152,127 @@ describe('B-6 канвас уходит в топик', () => {
     expect(JSON.stringify(payload)).not.toContain('reply_markup');
     expect(JSON.stringify(payload)).not.toContain('inline_keyboard');
     expect(calls.some((call) => call.method === 'sendMessage')).toBe(false);
+  });
+});
+
+function paragraph(text: string): CanvasParagraph {
+  return { pieces: [{ kind: 'text', text }] };
+}
+
+function linesOf(message: CanvasRichMessage): string[] {
+  return message.blocks.map((block) => {
+    if (typeof block.text !== 'string') throw new Error('абзац состава — текст');
+    return block.text;
+  });
+}
+
+const header = 'ПРОЕКТ: Общественный сенсор · 17.09';
+
+/** Блоки переданы снизу вверх: порядок строк задаёт состав, не порядок полей. */
+const composed = renderCanvas({
+  projectName: '  Общественный сенсор  ',
+  canvasDate: '2026-09-17',
+  sections: {
+    dynamics: [paragraph('динамика')],
+    divergence: [paragraph('расхождение')],
+    github: [paragraph('github')],
+    blockers: [paragraph('мешает')],
+    plan: [paragraph('следующий шаг: план')],
+    tasks: [paragraph('прямо сейчас: задачи')],
+    next: [paragraph('следующий шаг: далее')],
+    inProgress: [paragraph('прямо сейчас: в работе')],
+    done: [paragraph('уже сделано: срез')],
+    person: [paragraph('человек')],
+    backlog: [paragraph('уже сделано: доля')],
+  },
+});
+
+const composedLines = linesOf(composed);
+
+describe('P-1 P-2 состав канваса и шапка', () => {
+  it('R-107 ПРОЕКТ: Общественный сенсор', () => {
+    expect(composedLines[0]).toBe(header);
+    expect(composedLines[0]).toContain('ПРОЕКТ: Общественный сенсор');
+  });
+
+  it('R-108 17.09', () => {
+    expect(composedLines[0]).toBe(header);
+    expect(composedLines[0]).toContain('17.09');
+    expect(composedLines[0]).not.toContain('2026');
+    expect(linesOf(renderCanvas({ projectName: 'Общественный сенсор', canvasDate: '2026-09-07' }))[0]).toBe(
+      'ПРОЕКТ: Общественный сенсор · 07.09',
+    );
+  });
+
+  it('R-087 что уже сделано', () => {
+    const share = composedLines.indexOf('уже сделано: доля');
+    const slice = composedLines.indexOf('уже сделано: срез');
+    const now = composedLines.indexOf('прямо сейчас: в работе');
+    expect(share).toBeGreaterThan(0);
+    expect(slice).toBeGreaterThan(share);
+    expect(now).toBeGreaterThan(slice);
+  });
+
+  it('R-088 что делается прямо сейчас', () => {
+    const issues = composedLines.indexOf('прямо сейчас: в работе');
+    const tasks = composedLines.indexOf('прямо сейчас: задачи');
+    expect(issues).toBeGreaterThan(composedLines.indexOf('уже сделано: срез'));
+    expect(tasks).toBeGreaterThan(issues);
+    expect(tasks).toBeLessThan(composedLines.indexOf('мешает'));
+  });
+
+  it('R-089 что мешает', () => {
+    const blockers = composedLines.indexOf('мешает');
+    expect(blockers).toBeGreaterThan(composedLines.indexOf('следующий шаг: план'));
+    expect(blockers).toBeLessThan(composedLines.indexOf('github'));
+  });
+
+  it('R-090 какой следующий шаг', () => {
+    const ahead = composedLines.indexOf('следующий шаг: далее');
+    const plan = composedLines.indexOf('следующий шаг: план');
+    expect(ahead).toBeGreaterThan(composedLines.indexOf('прямо сейчас: в работе'));
+    expect(plan).toBeGreaterThan(ahead);
+    expect(plan).toBeLessThan(composedLines.indexOf('мешает'));
+  });
+
+  it('R-475 состав сверху вниз', () => {
+    expect(CANVAS_SECTION_ORDER).toEqual([
+      'header',
+      'backlog',
+      'person',
+      'done',
+      'inProgress',
+      'next',
+      'tasks',
+      'plan',
+      'blockers',
+      'github',
+      'divergence',
+      'dynamics',
+    ]);
+    expect(composedLines).toEqual([
+      header,
+      'уже сделано: доля',
+      'человек',
+      'уже сделано: срез',
+      'прямо сейчас: в работе',
+      'следующий шаг: далее',
+      'прямо сейчас: задачи',
+      'следующий шаг: план',
+      'мешает',
+      'github',
+      'расхождение',
+      'динамика',
+    ]);
+    const gap = renderCanvas({
+      projectName: 'Общественный сенсор',
+      canvasDate: '2026-09-17',
+      sections: {
+        plan: [],
+        github: [paragraph('github')],
+        done: [paragraph('уже сделано: срез')],
+      },
+    });
+    expect(linesOf(gap)).toEqual([header, 'уже сделано: срез', 'github']);
   });
 });

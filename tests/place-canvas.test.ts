@@ -105,6 +105,10 @@ function canvasOf(date: string, messageId: number): Canvas {
   });
 }
 
+function shown(canvasDate: string): CanvasHome {
+  return { telegramChatId, topicId: 42, projectName: 'Альфа', canvasDate };
+}
+
 function io(): Io {
   const sent: CanvasHome[] = [];
   const edited: { home: CanvasHome; messageId: number }[] = [];
@@ -329,7 +333,7 @@ describe('канвас выставляется в топик', () => {
     const employee = renderFirstEmployeeMessage({ projectName: 'Альфа', topicId: 42, githubLogin: null });
     expect(told).toEqual([`42:${employee}`]);
     expect(directed).toEqual([`${borisAccount.id}:${employee}`]);
-    expect(gate.sent).toEqual([{ telegramChatId, topicId: 42 }]);
+    expect(gate.sent).toEqual([shown('2026-09-28')]);
     expect(gate.edited).toEqual([]);
     expect(directed.join('\n')).not.toContain('меню');
     const posted = await canvasesOf(fixture.db);
@@ -373,7 +377,7 @@ describe('канвас выставляется в топик', () => {
     );
     expect(taskReply).toContain('Сделать');
     expect(gate.sent).toHaveLength(1);
-    expect(gate.edited).toEqual([{ home: { telegramChatId, topicId: 42 }, messageId: 11 }]);
+    expect(gate.edited).toEqual([{ home: shown('2026-09-28'), messageId: 11 }]);
     expect(await canvasesOf(fixture.db)).toEqual(posted);
     const edited = await eventTypes(fixture.db, EVENT_TYPES.CANVAS_EDITED);
     expect(edited).toHaveLength(1);
@@ -562,6 +566,10 @@ describe('канвас выставляется в топик', () => {
     const shifted = await showCanvas(fixture.db, { ...input, now: noon, causationId: null });
     expect(shifted.action).toBe('post');
     expect(shifted.canvas.canvasDate).toBe('2026-09-29');
+    expect(gate.sent.map((item) => item.canvasDate)).toEqual(['2026-09-28', '2026-09-29']);
+    expect(gate.edited.map((item) => item.home.canvasDate)).toEqual(['2026-09-28']);
+    expect(gate.sent.every((item) => item.projectName === 'Альфа')).toBe(true);
+    expect(gate.edited.every((item) => item.home.projectName === 'Альфа')).toBe(true);
     const rows = await canvasesOf(fixture.db);
     expect(rows).toEqual([
       {
@@ -587,7 +595,7 @@ describe('канвас выставляется в топик', () => {
     await setTopic(fixture.db, fixture.borisId, 42);
     const gate = io();
     await ensureTodayCanvases(fixture.db, noon, gate.send);
-    expect(gate.sent).toEqual([{ telegramChatId, topicId: 42 }]);
+    expect(gate.sent).toEqual([shown('2026-09-28')]);
     const once = await canvasesOf(fixture.db);
     await ensureTodayCanvases(fixture.db, noon, gate.send);
     expect(gate.sent).toHaveLength(1);
@@ -595,7 +603,7 @@ describe('канвас выставляется в топик', () => {
     expect(await eventTypes(fixture.db, EVENT_TYPES.CANVAS_EDITED)).toEqual([]);
     const nextDay = new Date('2026-09-28T21:00:00.000Z');
     await ensureTodayCanvases(fixture.db, nextDay, gate.send);
-    expect(gate.sent).toHaveLength(2);
+    expect(gate.sent).toEqual([shown('2026-09-28'), shown('2026-09-29')]);
     expect((await canvasesOf(fixture.db)).map((row) => row.canvasDate)).toEqual(['2026-09-28', '2026-09-29']);
   });
 });
