@@ -23,13 +23,14 @@ function asText(value: unknown, label: string): string {
 async function findUser(trx: Transaction<Database>, telegramUserId: string): Promise<User | null> {
   const row = await trx
     .selectFrom('users')
-    .select(['id', 'telegram_user_id', 'name', 'is_root'])
+    .select(['id', 'telegram_user_id', 'github_login', 'name', 'is_root'])
     .where('telegram_user_id', '=', telegramUserId)
     .executeTakeFirst();
   if (row === undefined) return null;
   return {
     id: row.id,
     telegramUserId: asText(row.telegram_user_id, 'telegram_user_id'),
+    githubLogin: row.github_login,
     name: row.name,
     isRoot: row.is_root,
   };

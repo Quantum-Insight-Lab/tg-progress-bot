@@ -133,8 +133,24 @@ describe('INV-17 корень один — первый /start', () => {
     const root = rows.rows[0];
     const second = rows.rows[1];
     if (root === undefined || second === undefined) throw new Error('строки пользователей');
-    expect(isFirstLead({ id: 'root', telegramUserId: root.telegram_user_id, name: root.name, isRoot: root.is_root })).toBe(true);
-    expect(isFirstLead({ id: 'second', telegramUserId: second.telegram_user_id, name: second.name, isRoot: second.is_root })).toBe(false);
+    expect(
+      isFirstLead({
+        id: 'root',
+        telegramUserId: root.telegram_user_id,
+        githubLogin: null,
+        name: root.name,
+        isRoot: root.is_root,
+      }),
+    ).toBe(true);
+    expect(
+      isFirstLead({
+        id: 'second',
+        telegramUserId: second.telegram_user_id,
+        githubLogin: null,
+        name: second.name,
+        isRoot: second.is_root,
+      }),
+    ).toBe(false);
 
     const events = await storedEvents(handle.db);
     expect(events.map((event) => event.idempotencyKey)).toEqual(['1001', '1002']);

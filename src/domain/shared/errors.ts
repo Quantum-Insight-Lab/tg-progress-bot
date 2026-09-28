@@ -1,6 +1,8 @@
 /** Код причины, по которой домен отклонил команду. */
 export const DOMAIN_ERROR = {
   USERS_ALREADY_EXIST: 'users_already_exist',
+  USER_NOT_FOUND: 'user_not_found',
+  GITHUB_LOGIN_TAKEN: 'github_login_taken',
   BLANK_NAME: 'blank_name',
   TELEGRAM_USER_ID: 'telegram_user_id',
   REGISTRATION_DUPLICATE: 'registration_duplicate',

@@ -22,10 +22,17 @@ function asText(value: unknown, label: string): string {
   throw new Error(`${label} повреждён`);
 }
 
-function userOf(row: { id: string; telegram_user_id: string; name: string; is_root: boolean }): User {
+function userOf(row: {
+  id: string;
+  telegram_user_id: string;
+  github_login: string | null;
+  name: string;
+  is_root: boolean;
+}): User {
   return {
     id: row.id,
     telegramUserId: asText(row.telegram_user_id, 'telegram_user_id'),
+    githubLogin: row.github_login,
     name: row.name,
     isRoot: row.is_root,
   };
@@ -34,7 +41,7 @@ function userOf(row: { id: string; telegram_user_id: string; name: string; is_ro
 async function findUser(trx: Transaction<Database>, telegramUserId: string): Promise<User | null> {
   const row = await trx
     .selectFrom('users')
-    .select(['id', 'telegram_user_id', 'name', 'is_root'])
+    .select(['id', 'telegram_user_id', 'github_login', 'name', 'is_root'])
     .where('telegram_user_id', '=', telegramUserId)
     .executeTakeFirst();
   if (row === undefined) return null;
@@ -86,7 +93,7 @@ function storeOf(trx: Transaction<Database>): MembershipStore {
             ),
           ),
         )
-        .select(['users.id', 'users.telegram_user_id', 'users.name', 'users.is_root'])
+        .select(['users.id', 'users.telegram_user_id', 'users.github_login', 'users.name', 'users.is_root'])
         .orderBy('users.name')
         .orderBy('users.id')
         .execute();
