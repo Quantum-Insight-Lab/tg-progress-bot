@@ -70,6 +70,25 @@ export function taskPriority(value: string): TaskPriority {
 }
 
 /**
+ * В блоке «Задачи» стоят `IN_PROGRESS`, `BLOCKED` и `REVIEW`.
+ * `PLANNED` остаётся в «Плане». Подтверждённая и снятая с канваса уходят.
+ */
+const TASKS_BLOCK_STATUSES = [TASK_STATUS_IN_PROGRESS, TASK_STATUS_BLOCKED, TASK_STATUS_REVIEW] as const;
+
+export function standsInTasksBlock(status: TaskStatus): boolean {
+  return oneOf(status, TASKS_BLOCK_STATUSES) !== undefined;
+}
+
+/** Задачи блока «Задачи» в исходном порядке. Остальные статусы строку не занимают. */
+export function tasksStandingInBlock<T extends { status: TaskStatus }>(tasks: readonly T[]): T[] {
+  const standing: T[] = [];
+  for (const task of tasks) {
+    if (standsInTasksBlock(task.status)) standing.push(task);
+  }
+  return standing;
+}
+
+/**
  * `BLOCKED`: задача стоит в списке без галочки не меньше `STALE_DAYS` суток проекта.
  * Переход статуса и вопрос исполнителю — отдельные акты.
  */

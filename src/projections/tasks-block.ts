@@ -35,7 +35,7 @@ export const TASK_RETURN_LABEL = 'вернуть';
 /** «отменить» — последняя кнопка второй строки. */
 export const TASK_CANCEL_LABEL = 'отменить';
 
-/** Промежуток между словом приоритета и кнопками, как в макете. */
+/** Промежуток между кнопками второй строки, как в макете. */
 const TASK_LINE_GAP = ' · ';
 
 const TASK_CANVAS_ACTIONS = {
@@ -47,8 +47,13 @@ const TASK_CANVAS_ACTIONS = {
 
 type TaskCanvasAction = keyof typeof TASK_CANVAS_ACTIONS;
 
+/** Слово текущего приоритета — кнопка на второй строке. */
+export const TASK_PRIORITY_ACTION = 'priority';
+
+type TaskCanvasCallback = TaskCanvasAction | typeof TASK_PRIORITY_ACTION;
+
 /** Callback кнопки второй строки: акт разберёт нажатие, здесь только адрес задачи на канвасе. */
-export function taskCanvasActionData(action: TaskCanvasAction, taskNumber: number): string {
+export function taskCanvasActionData(action: TaskCanvasCallback, taskNumber: number): string {
   return `task:${action}:${String(taskNumber)}`;
 }
 
@@ -73,12 +78,16 @@ function taskAction(action: TaskCanvasAction, taskNumber: number): CanvasPiece {
 }
 
 /**
- * Вторая строка того же абзаца: слово приоритета, затем «в план» или «подтвердить»,
- * у подтверждения ещё «вернуть», и «отменить». Кнопки — внутри абзаца.
+ * Вторая строка того же абзаца: слово текущего приоритета — кнопка,
+ * затем «в план» или «подтвердить», у подтверждения ещё «вернуть», и «отменить».
+ * Кнопки — внутри абзаца. Номера issue и PR на строку не попадают.
  */
 export function taskSecondLinePieces(task: TaskFirstLine): CanvasPiece[] {
   const review = task.status === REVIEW;
-  const pieces: CanvasPiece[] = [{ kind: 'text', text: `${task.priority}${TASK_LINE_GAP}` }];
+  const pieces: CanvasPiece[] = [
+    { kind: 'action', label: task.priority, callbackData: taskCanvasActionData(TASK_PRIORITY_ACTION, task.number) },
+    { kind: 'text', text: TASK_LINE_GAP },
+  ];
   if (review) {
     pieces.push(taskAction('confirm', task.number));
     pieces.push({ kind: 'text', text: TASK_LINE_GAP });
