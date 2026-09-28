@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Kysely, Transaction } from 'kysely';
 import {
+  pressTaskMark,
+  type TaskMarkDraft,
+  type TaskMarking,
+  type TaskMarkResult,
+  type TaskMarkStore,
+} from '../domain/tasks/check-task.ts';
+import {
   createTask as decideCreate,
   type CreatedTask,
   type TaskCreation,
@@ -8,6 +15,7 @@ import {
   type TaskStore,
   type TopicOwner,
 } from '../domain/tasks/create-task.ts';
+import { defineTask, type Task } from '../domain/tasks/task.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
@@ -65,6 +73,101 @@ function storeOf(trx: Transaction<Database>): TaskStore {
           completed_at: task.completedAt === null ? null : new Date(task.completedAt),
         })
         .execute();
+    },
+  };
+}
+
+function iso(value: Date | string): string {
+  if (value instanceof Date) return value.toISOString();
+  return new Date(value).toISOString();
+}
+
+function wholeNumber(value: number | string): number {
+  if (typeof value === 'number' && Number.isInteger(value)) return value;
+  if (typeof value === 'string' && /^-?\d+$/.test(value)) return Number(value);
+  throw new Error('номер задачи повреждён');
+}
+
+interface TaskRow {
+  id: string;
+  project_id: string;
+  number: number | string;
+  title: string;
+  status: string;
+  priority: string;
+  assignee_id: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+  completed_at: Date | string | null;
+}
+
+function taskFromRow(row: TaskRow): Task {
+  return defineTask({
+    id: row.id,
+    projectId: row.project_id,
+    number: wholeNumber(row.number),
+    title: row.title,
+    status: row.status,
+    priority: row.priority,
+    assigneeId: row.assignee_id,
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+    completedAt: row.completed_at === null ? null : iso(row.completed_at),
+  });
+}
+
+function markStore(trx: Transaction<Database>): TaskMarkStore {
+  return {
+    async sender(telegramUserId) {
+      return findSender(trx, telegramUserId);
+    },
+    async tasksInTopic(telegramChatId, topicId, taskNumber) {
+      const rows = await trx
+        .selectFrom('tasks')
+        .innerJoin('projects', 'projects.id', 'tasks.project_id')
+        .innerJoin('chats', 'chats.id', 'projects.chat_id')
+        .innerJoin('project_members', (join) =>
+          join
+            .onRef('project_members.project_id', '=', 'tasks.project_id')
+            .onRef('project_members.user_id', '=', 'tasks.assignee_id'),
+        )
+        .select([
+          'tasks.id',
+          'tasks.project_id',
+          'tasks.number',
+          'tasks.title',
+          'tasks.status',
+          'tasks.priority',
+          'tasks.assignee_id',
+          'tasks.created_at',
+          'tasks.updated_at',
+          'tasks.completed_at',
+        ])
+        .where('chats.telegram_chat_id', '=', telegramChatId)
+        .where('project_members.topic_id', '=', String(topicId))
+        .where('tasks.number', '=', taskNumber)
+        .orderBy('tasks.id')
+        .forUpdate()
+        .execute();
+      return rows.map((row) => taskFromRow(row));
+    },
+    async saveStatus(task, from) {
+      const updated = await trx
+        .updateTable('tasks')
+        .set({ status: task.status, updated_at: new Date(task.updatedAt) })
+        .where('id', '=', task.id)
+        .where('status', '=', from)
+        .executeTakeFirst();
+      return updated.numUpdatedRows > 0n;
+    },
+  };
+}
+
+/** Нажатие кружка: статус и `task.checked` или `task.unchecked` коммитятся одной транзакцией. */
+export function createTaskMarkActions(db: Kysely<Database>, clock: Clock): TaskMarking {
+  return {
+    press(input: TaskMarkDraft): Promise<TaskMarkResult> {
+      return db.transaction().execute((trx) => pressTaskMark(markStore(trx), createEventJournal(trx), clock, input));
     },
   };
 }
