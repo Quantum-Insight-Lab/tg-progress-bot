@@ -41,6 +41,23 @@ export function projectCalendarDate(instant: Date, timezone: string): string {
   return `${String(year)}-${monthText}-${dayText}`;
 }
 
+const CALENDAR_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function utcMidnight(isoDate: string): number {
+  const match = CALENDAR_DAY.exec(isoDate.trim());
+  if (match === null) throw new DomainError(DOMAIN_ERROR.CANVAS_DATE, 'Дата канваса — календарный день');
+  const captured = match.slice(1);
+  const year = Number(captured[0]);
+  const month = Number(captured[1]);
+  const day = Number(captured[1 + 1]);
+  return Date.UTC(year, month - 1, day);
+}
+
+/** Сколько календарных суток между двумя датами `YYYY-MM-DD`. Отрицательное — вторая раньше. */
+export function calendarDaysBetween(earlier: string, later: string): number {
+  return (utcMidnight(later) - utcMidnight(earlier)) / millisecondsInDay();
+}
+
 /** Сколько календарных суток проекта между двумя моментами. Отрицательное — второй момент раньше. */
 export function projectDaysBetween(earlier: Date, later: Date, timezone: string): number {
   const zone = timezone.trim();

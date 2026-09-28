@@ -36,6 +36,7 @@ import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
 import { editCanvasMessage, sendCanvasMessage } from './telegram/canvas-message.ts';
 import { renderCanvas } from './projections/canvas-message.ts';
+import { tasksBlockParagraphs } from './projections/tasks-block.ts';
 import { attachTaskCommand } from './telegram/task-command.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
 
@@ -115,7 +116,11 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
       return sendCanvasMessage(
         bot.api,
         { chatId: home.telegramChatId, messageThreadId: home.topicId },
-        renderCanvas({ projectName: home.projectName, canvasDate: home.canvasDate }),
+        renderCanvas({
+          projectName: home.projectName,
+          canvasDate: home.canvasDate,
+          sections: { tasks: tasksBlockParagraphs(home.tasks) },
+        }),
       );
     },
     async edit(home: CanvasHome, messageId: number): Promise<void> {
@@ -123,7 +128,11 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
         bot.api,
         { chatId: home.telegramChatId, messageThreadId: home.topicId },
         messageId,
-        renderCanvas({ projectName: home.projectName, canvasDate: home.canvasDate }),
+        renderCanvas({
+          projectName: home.projectName,
+          canvasDate: home.canvasDate,
+          sections: { tasks: tasksBlockParagraphs(home.tasks) },
+        }),
       );
     },
   };

@@ -12,14 +12,26 @@ import type { Canvas } from '../domain/tasks/canvas.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { projectCalendarDate } from '../domain/shared/project-time.ts';
+import { tasksBlock } from '../domain/tasks/github-link.ts';
+import { taskPriority, taskStatus } from '../domain/tasks/status.ts';
+import { taskCanvasDay } from '../domain/tasks/task-day.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
+
+/** Первая строка задачи на канвасе этого исполнителя. */
+export interface CanvasTaskLine {
+  number: number;
+  title: string;
+  status: string;
+  day: number;
+}
 
 export interface CanvasHome {
   telegramChatId: string;
   topicId: number;
   projectName: string;
   canvasDate: string;
+  tasks: readonly CanvasTaskLine[];
 }
 
 export interface ShownCanvas {
@@ -68,6 +80,79 @@ function whole(value: string, label: string): number {
 
 function day(value: string): string {
   return value.slice(0, 10);
+}
+
+function instant(value: Date | string): Date {
+  if (value instanceof Date) return value;
+  return new Date(value);
+}
+
+function taskNumber(value: number | string): number {
+  if (typeof value === 'number' && Number.isInteger(value)) return value;
+  if (typeof value === 'string' && /^[1-9]\d*$/.test(value)) return Number(value);
+  throw new Error('номер задачи повреждён');
+}
+
+interface AssigneeTaskRow {
+  id: string;
+  project_id: string;
+  number: number | string;
+  title: string;
+  status: string;
+  priority: string;
+  assignee_id: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+  completed_at: Date | string | null;
+}
+
+/** Задачи, которые этот человек завёл в проекте. Факты GitHub в блок не входят. */
+async function assigneeTaskLines(
+  db: Kysely<Database> | Transaction<Database>,
+  projectId: string,
+  assigneeId: string,
+  canvasDate: string,
+  timezone: string,
+): Promise<CanvasTaskLine[]> {
+  const found = await sql<AssigneeTaskRow>`
+    SELECT id::text AS id,
+           project_id::text AS project_id,
+           number,
+           title,
+           status,
+           priority,
+           assignee_id::text AS assignee_id,
+           created_at,
+           updated_at,
+           completed_at
+    FROM tasks
+    WHERE project_id = ${projectId}::uuid
+      AND assignee_id = ${assigneeId}::uuid
+    ORDER BY number
+  `.execute(db);
+  const visible = tasksBlock(
+    found.rows.map((row) => ({
+      source: 'task' as const,
+      task: {
+        id: row.id,
+        projectId: row.project_id,
+        number: taskNumber(row.number),
+        title: row.title,
+        status: taskStatus(row.status),
+        priority: taskPriority(row.priority),
+        assigneeId: row.assignee_id,
+        createdAt: instant(row.created_at).toISOString(),
+        updatedAt: instant(row.updated_at).toISOString(),
+        completedAt: row.completed_at === null ? null : instant(row.completed_at).toISOString(),
+      },
+    })),
+  );
+  return visible.map((task) => ({
+    number: task.number,
+    title: task.title,
+    status: task.status,
+    day: taskCanvasDay(projectCalendarDate(instant(task.createdAt), timezone), canvasDate),
+  }));
 }
 
 function canvasOf(row: CanvasRow, projectId: string, assigneeId: string): Canvas {
@@ -146,6 +231,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
   const canvasDate = projectCalendarDate(input.now, project.timezone);
   const slot = await slotFor(db, input.projectId, input.assigneeId, canvasDate);
   const move = decideCanvasMove(input.destination, slot, input.now);
+  const tasks = await assigneeTaskLines(db, input.projectId, input.assigneeId, canvasDate, project.timezone);
   if (move.kind === 'edit') {
     const causationId = requireEditCausation(input.causationId);
     const telegramChatId = slot.telegramChatId ?? '';
@@ -155,6 +241,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
         topicId: move.canvas.topicId,
         projectName: project.name,
         canvasDate: move.canvas.canvasDate,
+        tasks,
       },
       move.canvas.messageId,
     );
@@ -172,6 +259,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
     topicId: move.topicId,
     projectName: project.name,
     canvasDate: move.canvasDate,
+    tasks,
   });
   const canvas = await db.transaction().execute((trx) =>
     recordPostedCanvas(
@@ -273,11 +361,13 @@ export async function ensureTodayCanvases(
       const existing = await readCanvas(db, member.project_id, member.user_id, canvasDate);
       if (existing !== null) continue;
       const topicId = whole(member.topic_id, 'topic_id');
+      const tasks = await assigneeTaskLines(db, member.project_id, member.user_id, canvasDate, member.timezone);
       const messageId = await send({
         telegramChatId: member.telegram_chat_id,
         topicId,
         projectName: member.project_name,
         canvasDate,
+        tasks,
       });
       await db.transaction().execute((trx) =>
         recordPostedCanvas(
