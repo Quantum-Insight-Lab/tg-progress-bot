@@ -13,6 +13,8 @@ import {
   type CanvasSlotState,
 } from '../src/domain/tasks/place-canvas.ts';
 import {
+  TASK_PRIORITY_HIGH,
+  TASK_PRIORITY_LOW,
   TASK_PRIORITY_NORMAL,
   TASK_STATUS_BLOCKED,
   TASK_STATUS_CANCELLED,
@@ -45,6 +47,7 @@ import { createTaskActions } from '../src/infrastructure/tasks.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { renderFirstEmployeeMessage } from '../src/projections/first-employee-message.ts';
 import { renderCanvas, type CanvasRichText } from '../src/projections/canvas-message.ts';
+import { planBlockParagraphs } from '../src/projections/plan-block.ts';
 import { tasksBlockParagraphs } from '../src/projections/tasks-block.ts';
 import {
   EXECUTOR_TOPIC_CREATED,
@@ -108,8 +111,8 @@ function canvasOf(date: string, messageId: number): Canvas {
   });
 }
 
-function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = []): CanvasHome {
-  return { telegramChatId, topicId: 42, projectName: 'Альфа', canvasDate, tasks };
+function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = [], plan: readonly CanvasTaskLine[] = []): CanvasHome {
+  return { telegramChatId, topicId: 42, projectName: 'Альфа', canvasDate, tasks, plan };
 }
 
 function openTask(title: string): CanvasTaskLine {
@@ -642,6 +645,85 @@ describe('канвас выставляется в топик', () => {
     expect(redrawn).toContain('○ 6 — Черновик карточки — 1-й день');
     expect(redrawn).not.toContain('на подтверждении');
     expect(redrawn).not.toContain('✓');
+  });
+
+  it('INV-08 R-495 план канваса — PLANNED исполнителя по приоритету, затем по дате', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await setTopic(fixture.db, fixture.borisId, 42);
+    const vera = await sql<{ id: string }>`
+      SELECT id::text AS id FROM users WHERE telegram_user_id = ${veraAccount.id}
+    `.execute(fixture.db);
+    const veraId = vera.rows[0]?.id;
+    if (veraId === undefined) throw new Error('Веры нет');
+    const rows = [
+      { number: 1, title: 'высокий поздний', status: TASK_STATUS_PLANNED, priority: TASK_PRIORITY_HIGH, created: '2026-09-28T10:00:00.000Z', assignee: fixture.borisId },
+      { number: 2, title: 'обычный', status: TASK_STATUS_PLANNED, priority: TASK_PRIORITY_NORMAL, created: '2026-09-28T09:00:00.000Z', assignee: fixture.borisId },
+      { number: 3, title: 'высокий ранний', status: TASK_STATUS_PLANNED, priority: TASK_PRIORITY_HIGH, created: '2026-09-28T08:00:00.000Z', assignee: fixture.borisId },
+      { number: 4, title: 'низкий', status: TASK_STATUS_PLANNED, priority: TASK_PRIORITY_LOW, created: '2026-09-28T07:00:00.000Z', assignee: fixture.borisId },
+      { number: 5, title: 'Классификация сигнала', status: TASK_STATUS_IN_PROGRESS, priority: TASK_PRIORITY_NORMAL, created: '2026-09-28T06:00:00.000Z', assignee: fixture.borisId },
+      { number: 6, title: 'Уже подтверждена', status: TASK_STATUS_DONE, priority: TASK_PRIORITY_HIGH, created: '2026-09-28T05:00:00.000Z', assignee: fixture.borisId },
+      { number: 7, title: 'Чужой план', status: TASK_STATUS_PLANNED, priority: TASK_PRIORITY_HIGH, created: '2026-09-28T04:00:00.000Z', assignee: veraId },
+    ];
+    for (const row of rows) {
+      await sql`
+        INSERT INTO tasks (id, project_id, number, title, status, priority, assignee_id, created_at, updated_at, completed_at)
+        VALUES (
+          ${`00000000-0000-4000-8000-0000000000f${String(row.number)}`}::uuid,
+          ${fixture.alphaId}::uuid,
+          ${row.number},
+          ${row.title},
+          ${row.status},
+          ${row.priority},
+          ${row.assignee}::uuid,
+          ${row.created}::timestamptz,
+          ${row.created}::timestamptz,
+          NULL
+        )
+      `.execute(fixture.db);
+    }
+    const gate = io();
+    await showCanvas(fixture.db, {
+      projectId: fixture.alphaId,
+      assigneeId: fixture.borisId,
+      destination: CANVAS_DESTINATION_TOPIC,
+      now: noon,
+      causationId: null,
+      send: gate.send,
+      edit: gate.edit,
+    });
+    expect(gate.sent[0]?.tasks.map((task) => task.title)).toEqual(['Классификация сигнала']);
+    expect(gate.sent[0]?.plan.map((task) => task.title)).toEqual([
+      'высокий ранний',
+      'высокий поздний',
+      'обычный',
+      'низкий',
+    ]);
+    expect(gate.sent[0]?.plan.map((task) => task.status)).toEqual([
+      TASK_STATUS_PLANNED,
+      TASK_STATUS_PLANNED,
+      TASK_STATUS_PLANNED,
+      TASK_STATUS_PLANNED,
+    ]);
+    const text = renderCanvas({
+      projectName: 'Альфа',
+      canvasDate: '2026-09-28',
+      sections: {
+        tasks: tasksBlockParagraphs(gate.sent[0]?.tasks ?? []),
+        plan: planBlockParagraphs(gate.sent[0]?.plan ?? []),
+      },
+    }).blocks.map((block) => visibleCanvas(block.text)).join('\n');
+    expect(text).toContain('План');
+    expect(text).toContain('3 — высокий ранний — 1-й день');
+    expect(text).toContain('1 — высокий поздний — 1-й день');
+    expect(text.indexOf('высокий ранний')).toBeLessThan(text.indexOf('высокий поздний'));
+    expect(text.indexOf('высокий поздний')).toBeLessThan(text.indexOf('обычный'));
+    expect(text.indexOf('обычный')).toBeLessThan(text.indexOf('\n4 — низкий'));
+    expect(text).toContain('high · в работу · отменить');
+    expect(text).not.toContain('Чужой план');
+    expect(text).not.toContain('Уже подтверждена');
+    expect(text).not.toContain('○ 3 —');
+    expect(text).not.toContain('✓');
   });
 
   it('INV-24 смена таймзоны не переписывает выставленный канвас; новые сутки дают другое сообщение', async () => {

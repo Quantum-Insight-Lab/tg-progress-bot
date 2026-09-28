@@ -36,6 +36,7 @@ import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
 import { editCanvasMessage, sendCanvasMessage } from './telegram/canvas-message.ts';
 import { renderCanvas } from './projections/canvas-message.ts';
+import { planBlockParagraphs } from './projections/plan-block.ts';
 import { tasksBlockParagraphs } from './projections/tasks-block.ts';
 import { attachTaskCommand } from './telegram/task-command.ts';
 import { attachTaskMark } from './telegram/task-mark.ts';
@@ -122,7 +123,10 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
         renderCanvas({
           projectName: home.projectName,
           canvasDate: home.canvasDate,
-          sections: { tasks: tasksBlockParagraphs(home.tasks) },
+          sections: {
+            tasks: tasksBlockParagraphs(home.tasks),
+            plan: planBlockParagraphs(home.plan),
+          },
         }),
       );
     },
@@ -134,7 +138,10 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
         renderCanvas({
           projectName: home.projectName,
           canvasDate: home.canvasDate,
-          sections: { tasks: tasksBlockParagraphs(home.tasks) },
+          sections: {
+            tasks: tasksBlockParagraphs(home.tasks),
+            plan: planBlockParagraphs(home.plan),
+          },
         }),
       );
     },

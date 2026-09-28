@@ -680,7 +680,16 @@ describe('бот принимает план и приоритет по callback
     expect((await tasksOf(fixture.db))[0]?.status).toBe(TASK_STATUS_PLANNED);
     const afterPlan = calls.filter((call) => call.method === 'editMessageText');
     expect(afterPlan).toHaveLength(2);
-    expect(JSON.stringify(afterPlan[1]?.payload)).not.toContain('Классификация сигнала');
+    const plannedPayload = JSON.stringify(afterPlan[1]?.payload);
+    expect(plannedPayload).toContain('План');
+    expect(plannedPayload).toContain('Классификация сигнала');
+    expect(plannedPayload).toContain('task:resume:1');
+    expect(plannedPayload).toContain('в работу');
+    expect(plannedPayload).toContain('task:priority:1');
+    expect(plannedPayload).toContain('high');
+    expect(plannedPayload).not.toContain('task:mark:1');
+    expect(plannedPayload).not.toContain('task:plan:1');
+    expect(plannedPayload).not.toContain('○');
     expect(calls.filter((call) => call.method === 'sendRichMessage')).toHaveLength(1);
 
     const foreign = await httpStatus(
@@ -709,6 +718,8 @@ describe('бот принимает план и приоритет по callback
     expect(afterResume).toHaveLength(3);
     expect(JSON.stringify(afterResume[2]?.payload)).toContain('Классификация сигнала');
     expect(JSON.stringify(afterResume[2]?.payload)).toContain('task:plan:1');
+    expect(JSON.stringify(afterResume[2]?.payload)).not.toContain('План');
+    expect(JSON.stringify(afterResume[2]?.payload)).not.toContain('task:resume:1');
     expect(calls.filter((call) => call.method === 'sendRichMessage')).toHaveLength(1);
     expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true);
     const events = await planEvents(fixture.db);
