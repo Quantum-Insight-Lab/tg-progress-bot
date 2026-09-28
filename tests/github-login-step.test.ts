@@ -322,10 +322,12 @@ describe('INV-20 шаг логина можно пропустить, логин
       WHERE project_members.user_id = ${fixture.borisId}::uuid
       ORDER BY project_members.project_id::text
     `.execute(fixture.db);
-    expect(rows.rows).toEqual([
+    const byProject = [...rows.rows].sort((left, right) => left.project_id.localeCompare(right.project_id));
+    const expected = [
       { project_id: fixture.alphaId, github_login: 'ada' },
       { project_id: fixture.betaId, github_login: 'ada' },
-    ]);
+    ].sort((left, right) => left.project_id.localeCompare(right.project_id));
+    expect(byProject).toEqual(expected);
     const stored = await sql<{ n: number }>`
       SELECT CAST(count(*) AS int) AS n FROM users WHERE github_login = 'ada'
     `.execute(fixture.db);
