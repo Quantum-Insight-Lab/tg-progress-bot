@@ -8,7 +8,7 @@ import { DOMAIN_ERROR } from '../src/domain/shared/errors.ts';
 import { EVENT_TYPES } from '../src/events/index.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
-import { readChatsMigration, readEventsMigration, readProjectsMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
+import { readChatsMigration, readEventsMigration, readProjectMembersMigration, readProjectsMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
 import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
@@ -47,6 +47,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readUsersMigration());
   await pglite.exec(readProjectsMigration());
   await pglite.exec(readChatsMigration());
+  await pglite.exec(readProjectMembersMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });

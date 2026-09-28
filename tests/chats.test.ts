@@ -14,11 +14,12 @@ import { EVENT_TYPES } from '../src/events/index.ts';
 import { createChatBinding } from '../src/infrastructure/chats.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
-import { readChatsMigration, readEventsMigration, readProjectsMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
+import { readChatsMigration, readEventsMigration, readProjectMembersMigration, readProjectsMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
 import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
-import { SUPERGROUP_BOUND, SUPERGROUP_CONFIRM_REFUSAL, SUPERGROUP_REQUEST, SUPERGROUP_SHARED } from '../src/telegram/chat-binding.ts';
+import { ACCESS_DENIED_REPLY } from '../src/telegram/access-guard.ts';
+import { SUPERGROUP_BOUND, SUPERGROUP_REQUEST, SUPERGROUP_SHARED } from '../src/telegram/chat-binding.ts';
 import { NEW_PROJECT_HEADING } from '../src/telegram/new-project.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
@@ -53,6 +54,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readUsersMigration());
   await pglite.exec(readProjectsMigration());
   await pglite.exec(readChatsMigration());
+  await pglite.exec(readProjectMembersMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
@@ -494,7 +496,7 @@ describe('привязка супергруппы в боте', () => {
 
     const stranger = await post(callbackBody(54, secondAccount, data));
     expect(stranger).toBe(200);
-    expect(sent.at(-1)?.text).toBe(SUPERGROUP_CONFIRM_REFUSAL);
+    expect(sent.at(-1)?.text).toBe(ACCESS_DENIED_REPLY);
     expect(sent.at(-1)?.text).not.toContain('Альфа');
     expect(await countChats(handle.db)).toBe(0);
 

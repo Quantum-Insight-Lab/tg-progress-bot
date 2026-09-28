@@ -2,11 +2,13 @@ import type { Kysely } from 'kysely';
 import type { Clock } from './domain/shared/clock.ts';
 import type { Database } from './infrastructure/database.ts';
 import { createScheduler, startSchedulerLoop, type Scheduler } from './infrastructure/scheduler.ts';
+import { createAccessGate } from './infrastructure/access.ts';
 import { createChatBinding } from './infrastructure/chats.ts';
 import { createMembership } from './infrastructure/membership.ts';
 import { createProjectCreation } from './infrastructure/projects.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
+import { attachAccessGuard } from './telegram/access-guard.ts';
 import { createTelegramBot, type TelegramBotInfo } from './telegram/bot.ts';
 import { attachChatBinding, sendSupergroupRequest } from './telegram/chat-binding.ts';
 import { attachParticipants } from './telegram/members.ts';
@@ -24,7 +26,7 @@ export interface ProcessConfig {
   schedulerIntervalMs: number;
   webhookPath: string;
   clock: Clock;
-  /** Пул для `/start`. Без него команда не подключается. */
+  /** Пул для команд бота. Без него обработчики не подключаются. */
   db?: Kysely<Database>;
   /** Задаётся в тестах, чтобы не вызывать `getMe`. Боевой вход поле не ставит. */
   botInfo?: TelegramBotInfo;
@@ -78,6 +80,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   const bot = config.botInfo === undefined ? createTelegramBot(config.botToken) : createTelegramBot(config.botToken, config.botInfo);
   if (config.db !== undefined) {
     const binding = createChatBinding(config.db, config.clock);
+    attachAccessGuard(bot, createAccessGate(config.db, config.clock));
     attachStartCommand(bot, createUserRegistration(config.db, config.clock));
     attachNewProject(bot, createProjectCreation(config.db, config.clock), (reply) => sendSupergroupRequest(reply, binding));
     attachChatBinding(bot, binding);
