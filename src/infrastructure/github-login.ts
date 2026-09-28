@@ -1,11 +1,16 @@
 import { sql, type Kysely, type Transaction } from 'kysely';
 import {
   assertGithubLoginAvailable,
+  setOwnGithubLogin,
+  type GithubLoginActions,
+  type GithubLoginStore,
   withCurrentGithubLogin,
 } from '../domain/projects/github-login.ts';
 import type { User } from '../domain/projects/user.ts';
+import type { Clock } from '../domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { Database } from './database.ts';
+import { createEventJournal } from './event-journal.ts';
 
 function asText(value: unknown, label: string): string {
   if (typeof value === 'string') return value;
@@ -35,6 +40,17 @@ function takenError(error: unknown): boolean {
   if (error instanceof Error && error.message.includes('users_github_login_unique')) return true;
   if ('cause' in error) return takenError(error.cause);
   return false;
+}
+
+async function findByTelegram(trx: Transaction<Database>, telegramUserId: string): Promise<User | null> {
+  const row = await trx
+    .selectFrom('users')
+    .select(['id', 'telegram_user_id', 'github_login', 'name', 'is_root'])
+    .where('telegram_user_id', '=', telegramUserId)
+    .forUpdate()
+    .executeTakeFirst();
+  if (row === undefined) return null;
+  return userOf(row);
 }
 
 async function findUser(trx: Transaction<Database>, userId: string): Promise<User | null> {
@@ -68,14 +84,58 @@ export async function recordGithubLogin(db: Kysely<Database>, userId: string, lo
     if (updated.githubLogin !== null) {
       assertGithubLoginAvailable(await ownerId(trx, updated.githubLogin), user.id);
     }
-    try {
-      await trx.updateTable('users').set({ github_login: updated.githubLogin }).where('id', '=', user.id).execute();
-    } catch (error) {
-      if (takenError(error)) {
-        throw new DomainError(DOMAIN_ERROR.GITHUB_LOGIN_TAKEN, 'Один логин GitHub принадлежит одному пользователю бота');
-      }
-      throw error;
-    }
+    await writeLogin(trx, user.id, updated.githubLogin);
     return updated;
   });
+}
+
+async function writeLogin(trx: Transaction<Database>, userId: string, login: string | null): Promise<void> {
+  try {
+    await trx.updateTable('users').set({ github_login: login }).where('id', '=', userId).execute();
+  } catch (error) {
+    if (takenError(error)) {
+      throw new DomainError(DOMAIN_ERROR.GITHUB_LOGIN_TAKEN, 'Один логин GitHub принадлежит одному пользователю бота');
+    }
+    throw error;
+  }
+}
+
+function storeOf(trx: Transaction<Database>): GithubLoginStore {
+  return {
+    ownerId(login) {
+      return ownerId(trx, login);
+    },
+    save(userId, login) {
+      return writeLogin(trx, userId, login);
+    },
+  };
+}
+
+/** Свой логин GitHub: поле и `user.github_login_set` коммитятся одной транзакцией. */
+export function createGithubLogin(db: Kysely<Database>, clock: Clock): GithubLoginActions {
+  return {
+    async find(telegramUserId) {
+      const row = await db
+        .selectFrom('users')
+        .select(['id', 'telegram_user_id', 'github_login', 'name', 'is_root'])
+        .where('telegram_user_id', '=', telegramUserId)
+        .executeTakeFirst();
+      if (row === undefined) return null;
+      return userOf(row);
+    },
+    set(input) {
+      return db.transaction().execute(async (trx) => {
+        const actor = await findByTelegram(trx, input.telegramUserId);
+        if (actor === null) throw new DomainError(DOMAIN_ERROR.USER_NOT_FOUND, 'Пользователь не найден');
+        return setOwnGithubLogin(storeOf(trx), createEventJournal(trx), clock, {
+          actor,
+          userId: actor.id,
+          chat: input.chat,
+          login: input.login,
+          skip: input.skip,
+          idempotencyKey: input.idempotencyKey,
+        });
+      });
+    },
+  };
 }

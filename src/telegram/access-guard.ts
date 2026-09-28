@@ -8,7 +8,7 @@ export const ACCESS_DENIED_REPLY = 'Нет доступа.';
  * Обработчики, которые стоят за единственным guard.
  * Новый обработчик добавляется сюда и подключается в процессе после guard.
  */
-export const GUARDED_HANDLERS = ['start', 'new-project', 'chat-binding', 'participants', 'executor-topic'] as const;
+export const GUARDED_HANDLERS = ['start', 'new-project', 'chat-binding', 'participants', 'executor-topic', 'github-login'] as const;
 
 export type GuardedHandler = (typeof GUARDED_HANDLERS)[number];
 

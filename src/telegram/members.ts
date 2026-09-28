@@ -50,6 +50,10 @@ export function addedReply(name: string): string {
   return `${name} добавлен как member.`;
 }
 
+export function isMemberAddedReply(text: string): boolean {
+  return text.endsWith(' добавлен как member.');
+}
+
 export function removeConfirmText(name: string): string {
   return `Удалить из проекта: ${name}. Незакрытые задачи будут сняты.`;
 }
@@ -275,7 +279,11 @@ function send(ctx: { reply: (text: string, extra?: { reply_markup: InlineKeyboar
 }
 
 /** «Участники» в личке: список, добавление одним тапом, удаление после подтверждения. */
-export function attachParticipants(bot: Bot, actions: MembershipActions): void {
+export function attachParticipants(
+  bot: Bot,
+  actions: MembershipActions,
+  onAdded?: (telegramUserId: string, send: (text: string, markup: InlineKeyboard) => Promise<unknown>) => Promise<void>,
+): void {
   bot.use(async (ctx, next) => {
     const text = ctx.message?.text;
     if (text === undefined) {
@@ -299,6 +307,9 @@ export function attachParticipants(bot: Bot, actions: MembershipActions): void {
     if (parsed === null || parsed.action !== 'add' || from.is_bot) return;
     const reply = await replyToAddMember(ctx.chat?.type, from, parsed.projectId, parsed.telegramUserId, String(ctx.update.update_id), actions);
     if (reply !== null) await send(ctx, reply);
+    if (onAdded !== undefined && reply !== null && isMemberAddedReply(reply.text)) {
+      await onAdded(parsed.telegramUserId, (text, markup) => ctx.api.sendMessage(parsed.telegramUserId, text, { reply_markup: markup }));
+    }
   });
 
   bot.callbackQuery(/^md:/, async (ctx) => {
