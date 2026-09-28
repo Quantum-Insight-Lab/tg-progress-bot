@@ -1,16 +1,18 @@
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { taskPriority, taskStatus, type TaskPriority, type TaskStatus } from './status.ts';
 
 /**
  * Задача — шаг, который человек ведёт в Telegram.
  * Поля строки: номер внутри проекта, название, проект, приоритет, исполнитель, статус, даты.
+ * Ключ — id. Статус и приоритет — из закрытого перечня.
  */
 export interface Task {
   id: string;
   projectId: string;
   number: number;
   title: string;
-  status: string;
-  priority: string;
+  status: TaskStatus;
+  priority: TaskPriority;
   assigneeId: string;
   createdAt: string;
   updatedAt: string;
@@ -22,8 +24,19 @@ function blank(value: string): boolean {
   return value.trim().length === 0;
 }
 
-/** Поля задачи. Перечень статусов и приоритетов задаёт отдельный закон. */
-export function defineTask(input: Task): Task {
+/** Поля задачи. Статус и приоритет сверяются с перечнем. */
+export function defineTask(input: {
+  id: string;
+  projectId: string;
+  number: number;
+  title: string;
+  status: string;
+  priority: string;
+  assigneeId: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}): Task {
   if (blank(input.id)) {
     throw new DomainError(DOMAIN_ERROR.TASK_ID_BLANK, 'У задачи есть id');
   }
@@ -42,6 +55,8 @@ export function defineTask(input: Task): Task {
   if (blank(input.priority)) {
     throw new DomainError(DOMAIN_ERROR.TASK_PRIORITY_BLANK, 'У задачи есть приоритет');
   }
+  const status = taskStatus(input.status);
+  const priority = taskPriority(input.priority);
   if (blank(input.assigneeId)) {
     throw new DomainError(DOMAIN_ERROR.TASK_ASSIGNEE_BLANK, 'У задачи есть исполнитель');
   }
@@ -59,8 +74,8 @@ export function defineTask(input: Task): Task {
     projectId: input.projectId,
     number: input.number,
     title: input.title,
-    status: input.status,
-    priority: input.priority,
+    status,
+    priority,
     assigneeId: input.assigneeId,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
