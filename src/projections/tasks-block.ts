@@ -53,7 +53,10 @@ export const TASK_PRIORITY_ACTION = 'priority';
 /** Кружок или галочка на первой строке. Нажатие ставит или снимает галочку. */
 export const TASK_MARK_ACTION = 'mark';
 
-type TaskCanvasCallback = TaskCanvasAction | typeof TASK_PRIORITY_ACTION | typeof TASK_MARK_ACTION;
+/** «В работу»: возврат из плана. Кнопку рисует блок «План». */
+export const TASK_RESUME_ACTION = 'resume';
+
+type TaskCanvasCallback = TaskCanvasAction | typeof TASK_PRIORITY_ACTION | typeof TASK_MARK_ACTION | typeof TASK_RESUME_ACTION;
 
 /** Callback кнопки второй строки: акт разберёт нажатие, здесь только адрес задачи на канвасе. */
 export function taskCanvasActionData(action: TaskCanvasCallback, taskNumber: number): string {

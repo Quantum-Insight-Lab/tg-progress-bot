@@ -9,6 +9,13 @@ import {
   type TaskMarkStore,
 } from '../domain/tasks/check-task.ts';
 import {
+  pressTaskPlan,
+  type TaskPlanPress,
+  type TaskPlanning,
+  type TaskPlanResult,
+  type TaskPlanStore,
+} from '../domain/tasks/plan-task.ts';
+import {
   pressTaskReview,
   type TaskReviewing,
   type TaskReviewPress,
@@ -23,6 +30,7 @@ import {
   type TaskStore,
   type TopicOwner,
 } from '../domain/tasks/create-task.ts';
+import type { TaskPriority } from '../domain/tasks/status.ts';
 import { defineTask, type Task } from '../domain/tasks/task.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import type { Database } from './database.ts';
@@ -138,6 +146,19 @@ function markStore(trx: Transaction<Database>): TaskMarkStore {
   };
 }
 
+async function writePriority(trx: Transaction<Database>, task: Task, from: TaskPriority): Promise<boolean> {
+  const updated = await trx
+    .updateTable('tasks')
+    .set({
+      priority: task.priority,
+      updated_at: new Date(task.updatedAt),
+    })
+    .where('id', '=', task.id)
+    .where('priority', '=', from)
+    .executeTakeFirst();
+  return updated.numUpdatedRows > 0n;
+}
+
 async function writeStatus(trx: Transaction<Database>, task: Task, from: Task['status']): Promise<boolean> {
   const updated = await trx
     .updateTable('tasks')
@@ -225,6 +246,41 @@ function reviewStore(trx: Transaction<Database>): TaskReviewStore {
     },
     saveStatus(task, from) {
       return writeStatus(trx, task, from);
+    },
+  };
+}
+
+function planStore(trx: Transaction<Database>): TaskPlanStore {
+  return {
+    async sender(telegramUserId) {
+      return findSender(trx, telegramUserId);
+    },
+    tasksInTopic(telegramChatId, topicId, taskNumber) {
+      return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
+    },
+    async seen(idempotencyKey) {
+      const row = await trx
+        .selectFrom('events')
+        .select(['id'])
+        .where('idempotency_key', '=', idempotencyKey)
+        .executeTakeFirst();
+      if (row === undefined) return null;
+      return { eventId: row.id };
+    },
+    saveStatus(task, from) {
+      return writeStatus(trx, task, from);
+    },
+    savePriority(task, from) {
+      return writePriority(trx, task, from);
+    },
+  };
+}
+
+/** «В план», «в работу» и слово приоритета: правка и событие коммитятся одной транзакцией. */
+export function createTaskPlanActions(db: Kysely<Database>, clock: Clock): TaskPlanning {
+  return {
+    press(input: TaskPlanPress): Promise<TaskPlanResult> {
+      return db.transaction().execute((trx) => pressTaskPlan(planStore(trx), createEventJournal(trx), clock, input));
     },
   };
 }
