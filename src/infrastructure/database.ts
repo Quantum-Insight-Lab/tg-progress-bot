@@ -19,6 +19,14 @@ export interface EventsTable {
   subject_id: AppendOnly<string>;
 }
 
+export interface UsersTable {
+  id: string;
+  telegram_user_id: string;
+  name: string;
+  is_root: boolean;
+}
+
 export interface Database {
   events: EventsTable;
+  users: UsersTable;
 }
