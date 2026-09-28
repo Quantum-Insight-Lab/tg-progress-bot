@@ -80,6 +80,7 @@ function memberOf(row: {
   role: ProjectRole;
   name: string;
   telegram_user_id: string;
+  github_login: string | null;
   topic_id: string | null;
 }): TopicMember {
   return {
@@ -89,6 +90,7 @@ function memberOf(row: {
     role: row.role,
     name: row.name,
     telegramUserId: asText(row.telegram_user_id, 'telegram_user_id'),
+    githubLogin: row.github_login,
     topicId: topicOf(row.topic_id),
   };
 }
@@ -101,6 +103,7 @@ const memberColumns = [
   'project_members.topic_id',
   'users.name',
   'users.telegram_user_id',
+  'users.github_login',
 ] as const;
 
 function storeOf(trx: Transaction<Database>): ExecutorTopicStore {

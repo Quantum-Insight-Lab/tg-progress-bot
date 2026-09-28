@@ -22,6 +22,7 @@ import {
 } from '../src/infrastructure/migrate.ts';
 import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
+import { renderFirstEmployeeMessage } from '../src/projections/first-employee-message.ts';
 import {
   EXECUTOR_TOPIC_ALREADY,
   EXECUTOR_TOPIC_CREATED,
@@ -70,16 +71,27 @@ interface Told {
   text: string;
 }
 
+interface Directed {
+  telegramUserId: string;
+  text: string;
+}
+
 interface Opened {
   chat: string;
   name: string;
 }
 
-function channel(nextId: () => number): { api: TopicChannel; told: Told[]; opened: Opened[] } {
+function employeeText(topicId: number, githubLogin: string | null = null): string {
+  return renderFirstEmployeeMessage({ projectName: 'Альфа', topicId, githubLogin });
+}
+
+function channel(nextId: () => number): { api: TopicChannel; told: Told[]; directed: Directed[]; opened: Opened[] } {
   const told: Told[] = [];
+  const directed: Directed[] = [];
   const opened: Opened[] = [];
   return {
     told,
+    directed,
     opened,
     api: {
       async create(chat, name) {
@@ -88,6 +100,9 @@ function channel(nextId: () => number): { api: TopicChannel; told: Told[]; opene
       },
       async tell(chat, topicId, text) {
         told.push({ chat, topicId, text });
+      },
+      async direct(telegramUserId, text) {
+        directed.push({ telegramUserId, text });
       },
     },
   };
@@ -250,6 +265,7 @@ describe('INV-23 канвас живёт в одном топике исполн
     expect(created?.text).toBe(EXECUTOR_TOPIC_EMPTY);
     expect(gate.opened).toEqual([]);
     expect(gate.told).toEqual([]);
+    expect(gate.directed).toEqual([]);
     expect(await topicsOf(fixture.db)).toEqual([
       { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
       { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
@@ -297,7 +313,8 @@ describe('INV-23 канвас живёт в одном топике исполн
     expect(specified?.text).toBe(EXECUTOR_TOPIC_SET);
     expect(specified?.text).not.toBe(TASK_IN_TOPIC);
     expect(gate.opened).toEqual([]);
-    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 42, text: TASK_IN_TOPIC }]);
+    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 42, text: employeeText(42) }]);
+    expect(gate.directed).toEqual([{ telegramUserId: String(borisAccount.id), text: employeeText(42) }]);
     expect(await topicsOf(fixture.db)).toContainEqual({ userId: fixture.borisId, role: MEMBER_ROLE, topicId: '42' });
     const events = await topicEvents(fixture.db);
     expect(events).toHaveLength(1);
@@ -328,7 +345,8 @@ describe('INV-23 канвас живёт в одном топике исполн
     );
     expect(lead?.text).toBe(EXECUTOR_TOPIC_CREATED);
     expect(gate.opened).toEqual([{ chat: telegramChatId, name: 'Вера' }]);
-    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 11, text: TASK_IN_TOPIC }]);
+    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 11, text: employeeText(11) }]);
+    expect(gate.directed).toEqual([{ telegramUserId: String(veraAccount.id), text: employeeText(11) }]);
     expect(await topicsOf(fixture.db)).toContainEqual({ userId: fixture.veraId, role: LEAD_ROLE, topicId: '11' });
 
     const again = await replyToCreateTopic(
@@ -388,6 +406,7 @@ describe('INV-23 канвас живёт в одном топике исполн
     expect(reply?.text).toBe(EXECUTOR_TOPIC_ROOT_ONLY);
     expect(reply?.text).not.toContain('Вера');
     expect(gate.told).toEqual([]);
+    expect(gate.directed).toEqual([]);
     expect(await topicEvents(fixture.db)).toEqual([]);
   });
 });
@@ -422,7 +441,8 @@ describe('INV-22 повтор указания топика не применя�
       gate.api,
     );
     expect(second).toBeNull();
-    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 42, text: TASK_IN_TOPIC }]);
+    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 42, text: employeeText(42) }]);
+    expect(gate.directed).toEqual([{ telegramUserId: String(borisAccount.id), text: employeeText(42) }]);
     expect(await topicsOf(fixture.db)).toContainEqual({ userId: fixture.borisId, role: MEMBER_ROLE, topicId: '42' });
     expect(await topicEvents(fixture.db)).toHaveLength(1);
 
@@ -466,7 +486,126 @@ describe('INV-22 повтор указания топика не применя�
     expect(second).toBeNull();
     expect(gate.opened).toEqual([{ chat: telegramChatId, name: 'Борис' }]);
     expect(gate.told).toHaveLength(1);
+    expect(gate.directed).toHaveLength(1);
     expect(await topicEvents(fixture.db)).toHaveLength(1);
     expect(await topicsOf(fixture.db)).toContainEqual({ userId: fixture.borisId, role: MEMBER_ROLE, topicId: '21' });
+  });
+});
+
+describe('первое сообщение сотруднику', () => {
+  const opened: { close: () => Promise<void> }[] = [];
+
+  afterEach(async () => {
+    await Promise.all(opened.splice(0).map((item) => item.close()));
+  });
+
+  it('R-102 человек открывает свой топик в группе проекта', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    const actions = createExecutorTopics(fixture.db, clock);
+    const gate = channel(() => 42);
+    await replyToExecutorTopicMessage(
+      'private',
+      rootAccount,
+      { kind: 'specify', projectName: 'Альфа', memberName: 'Борис', topicId: 42 },
+      'open-topic',
+      actions,
+      gate.api,
+    );
+    const text = employeeText(42);
+    expect(text).toContain('Откройте топик 42 в группе проекта «Альфа»');
+    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 42, text }]);
+    expect(await topicsOf(fixture.db)).toContainEqual({ userId: fixture.borisId, role: MEMBER_ROLE, topicId: '42' });
+  });
+
+  it('R-572 одним текстом в личку и R-573 тем же текстом в его топик', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    const actions = createExecutorTopics(fixture.db, clock);
+    const gate = channel(() => 42);
+    const reply = await replyToExecutorTopicMessage(
+      'private',
+      rootAccount,
+      { kind: 'specify', projectName: 'Альфа', memberName: 'Борис', topicId: 42 },
+      'same-text',
+      actions,
+      gate.api,
+    );
+    const text = employeeText(42);
+    expect(reply?.text).toBe(EXECUTOR_TOPIC_SET);
+    expect(gate.directed).toEqual([{ telegramUserId: String(borisAccount.id), text }]);
+    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 42, text }]);
+    expect(gate.directed[0]?.text).toBe(gate.told[0]?.text);
+  });
+
+  it('INV-23 личка не дублирует канвас и не показывает меню задач', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    const actions = createExecutorTopics(fixture.db, clock);
+    const gate = channel(() => 42);
+    await replyToCreateTopic('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'canvas-home', actions, gate.api);
+    const text = employeeText(42);
+    expect(gate.told).toEqual([{ chat: telegramChatId, topicId: 42, text }]);
+    expect(gate.directed).toEqual([{ telegramUserId: String(borisAccount.id), text }]);
+    expect(gate.directed[0]?.telegramUserId).not.toBe(telegramChatId);
+    expect(text).not.toContain('в план');
+    expect(text).not.toContain('подтвердить');
+    expect(text).not.toContain('отменить');
+    expect(text).toContain(TASK_IN_TOPIC);
+    expect(gate.told).toHaveLength(1);
+  });
+
+  it('R-577 место в бэклоге при логине и R-578 без логина этой строки нет', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await sql`UPDATE users SET github_login = 'boris' WHERE id = ${fixture.borisId}::uuid`.execute(fixture.db);
+    const actions = createExecutorTopics(fixture.db, clock);
+    const withLogin = channel(() => 42);
+    await replyToExecutorTopicMessage(
+      'private',
+      rootAccount,
+      { kind: 'specify', projectName: 'Альфа', memberName: 'Борис', topicId: 42 },
+      'with-login',
+      actions,
+      withLogin.api,
+    );
+    const loggedIn = employeeText(42, 'boris');
+    expect(withLogin.directed[0]?.text).toBe(loggedIn);
+    expect(withLogin.told[0]?.text).toBe(loggedIn);
+    expect(loggedIn).toContain('Место в бэклоге — issues, где вы assignee.');
+
+    const without = channel(() => 7);
+    await replyToCreateTopic('private', rootAccount, fixture.alphaId, String(veraAccount.id), 'vera-no-login', actions, without.api);
+    const plain = employeeText(7);
+    expect(without.directed[0]?.text).toBe(plain);
+    expect(without.told[0]?.text).toBe(plain);
+    expect(plain).not.toContain('Место в бэклоге');
+  });
+
+  it('INV-22 повтор ключа не шлёт первое сообщение второй раз', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    const actions = createExecutorTopics(fixture.db, clock);
+    const gate = channel(() => 42);
+    await replyToExecutorTopicMessage(
+      'private',
+      rootAccount,
+      { kind: 'specify', projectName: 'Альфа', memberName: 'Борис', topicId: 42 },
+      'once-message',
+      actions,
+      gate.api,
+    );
+    const again = await replyToExecutorTopicMessage(
+      'private',
+      rootAccount,
+      { kind: 'specify', projectName: 'Альфа', memberName: 'Борис', topicId: 42 },
+      'once-message',
+      actions,
+      gate.api,
+    );
+    expect(again).toBeNull();
+    expect(gate.directed).toHaveLength(1);
+    expect(gate.told).toHaveLength(1);
+    expect(await topicEvents(fixture.db)).toHaveLength(1);
   });
 });

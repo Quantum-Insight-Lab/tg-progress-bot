@@ -26,6 +26,8 @@ export interface TopicMember {
   role: ProjectRole;
   name: string;
   telegramUserId: string;
+  /** Пусто — сопоставления с GitHub нет, строка бэклога в первом сообщении не нужна. */
+  githubLogin: string | null;
   topicId: number | null;
 }
 
@@ -45,6 +47,9 @@ export interface AssignedTopic {
   name: string;
   created: boolean;
   home: CanvasHome;
+  projectName: string;
+  telegramUserId: string;
+  githubLogin: string | null;
 }
 
 /** Порт `project_members.topic_id` внутри уже открытой транзакции. */
@@ -277,7 +282,14 @@ export async function assignExecutorTopic(
   if (published.status === 'duplicate') {
     throw new DomainError(DOMAIN_ERROR.TOPIC_DUPLICATE, 'member.topic_set уже записан');
   }
-  return { name: member.name, created: input.created, home };
+  return {
+    name: member.name,
+    created: input.created,
+    home,
+    projectName: project.name,
+    telegramUserId: member.telegramUserId,
+    githubLogin: member.githubLogin,
+  };
 }
 
 /** Корень присылает имя человека и номер уже существующего топика. */
@@ -304,7 +316,13 @@ export async function assignNamedExecutorTopic(
     actor: input.actor,
     chat: input.chat,
     projectId: project.id,
-    target: { id: member.userId, telegramUserId: member.telegramUserId, githubLogin: null, name: member.name, isRoot: false },
+    target: {
+      id: member.userId,
+      telegramUserId: member.telegramUserId,
+      githubLogin: member.githubLogin,
+      name: member.name,
+      isRoot: false,
+    },
     topicId: input.topicId,
     created: false,
     idempotencyKey: input.idempotencyKey,
