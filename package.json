@@ -22,6 +22,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.4",
+    "@types/pg": "^8.23.1",
     "dependency-cruiser": "^18.4.0",
     "eslint": "^10.11.0",
     "typescript": "^5.9.3",
