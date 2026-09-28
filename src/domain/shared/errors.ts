@@ -8,6 +8,10 @@ export const DOMAIN_ERROR = {
   PROJECT_NAME_BLANK: 'project_name_blank',
   PROJECT_TIMEZONE_BLANK: 'project_timezone_blank',
   PROJECT_CREATED_AT_BLANK: 'project_created_at_blank',
+  PROJECT_CREATOR: 'project_creator',
+  PROJECT_CHAT: 'project_chat',
+  PROJECT_DUPLICATE: 'project_duplicate',
+  PROJECT_IDEMPOTENCY_KEY: 'project_idempotency_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
