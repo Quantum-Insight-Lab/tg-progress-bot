@@ -65,3 +65,8 @@ export function readTaskStatusMigration(root = process.cwd()): string {
 export function readTaskNumberMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '013_task_number.sql'), 'utf8');
 }
+
+/** Таблица канвасов: одно сообщение на проект, исполнителя и дату. */
+export function readCanvasesMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '014_canvases.sql'), 'utf8');
+}
