@@ -31,7 +31,7 @@ src/config         ничего не импортирует из src
 | БД | один пул в `src/infrastructure/db.ts`; SQL — Kysely, без ORM и конкатенации строк | есть |
 | Telegram | один экземпляр grammY в `src/telegram/bot.ts`; приём обновлений — webhook в `src/telegram/webhook.ts`; методы Bot API 10.3 — напрямую, если их нет в типах | есть |
 | Планировщик актов системы | `src/infrastructure/scheduler.ts`: слоты A-28…A-33, A-35, A-36; реализация акта — в своей issue | есть |
-| GitHub | один клиент Octokit в `src/github/client.ts` | появится |
+| GitHub | один клиент Octokit в `src/github/client.ts` | есть |
 | Ошибки домена | `DomainError` с кодом причины в `src/domain/shared/errors.ts` | есть |
 | Логирование | один логгер в `src/infrastructure/logger.ts` | появится |
 | Тесты | Vitest; тест инварианта начинается с его ID, `INV-xx` | есть |

@@ -31,6 +31,7 @@ import { NEW_PROJECT_HEADING } from '../src/telegram/new-project.ts';
 import { EXECUTOR_TOPIC_HEADING } from '../src/telegram/executor-topic.ts';
 import { REPORTS_TOPIC_HEADING } from '../src/telegram/reports-topic.ts';
 import { SCHEDULE_HEADING } from '../src/telegram/schedule.ts';
+import { REPOSITORIES_HEADING } from '../src/telegram/installation-repositories.ts';
 import { SETTINGS_HEADING } from '../src/telegram/settings.ts';
 import { PARTICIPANTS_HEADING, PARTICIPANTS_ROOT_ONLY } from '../src/telegram/members.ts';
 import { START_REPLY_PENDING } from '../src/telegram/start.ts';
@@ -192,6 +193,8 @@ function bodyFor(handler: GuardedHandler, updateId: number, account: { id: numbe
       return messageBody(updateId, account, `${SCHEDULE_HEADING}\nАльфа\n09:00\nEurope/Moscow`);
     case 'settings':
       return messageBody(updateId, account, `${SETTINGS_HEADING}\nАльфа`);
+    case 'installation-repositories':
+      return messageBody(updateId, account, REPOSITORIES_HEADING);
     default: {
       const unreachable: never = handler;
       throw new Error(unreachable);

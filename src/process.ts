@@ -1,5 +1,8 @@
 import type { Kysely } from 'kysely';
+import type { InstallationRepositorySource } from './domain/github/repository.ts';
+import { unconfiguredInstallationSource } from './domain/github/repository.ts';
 import type { Clock } from './domain/shared/clock.ts';
+import { createGithubAppClient, readGithubAppCredentials } from './github/client.ts';
 import type { Database } from './infrastructure/database.ts';
 import { createScheduler, startSchedulerLoop, type Scheduler } from './infrastructure/scheduler.ts';
 import { createAccessGate } from './infrastructure/access.ts';
@@ -10,6 +13,7 @@ import { createChatSchedule } from './infrastructure/schedule.ts';
 import { createGithubLogin } from './infrastructure/github-login.ts';
 import { createMembership } from './infrastructure/membership.ts';
 import { createProjectCreation } from './infrastructure/projects.ts';
+import { createInstallationRepositories } from './infrastructure/installation-repositories.ts';
 import { createProjectSettings } from './infrastructure/settings.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
@@ -19,6 +23,7 @@ import { attachChatBinding, sendSupergroupRequest } from './telegram/chat-bindin
 import { attachExecutorTopic } from './telegram/executor-topic.ts';
 import { attachReportsTopic } from './telegram/reports-topic.ts';
 import { attachSchedule } from './telegram/schedule.ts';
+import { attachInstallationRepositories } from './telegram/installation-repositories.ts';
 import { attachSettings } from './telegram/settings.ts';
 import { attachGithubLogin, deliverGithubLoginPrompt } from './telegram/github-login.ts';
 import { attachParticipants } from './telegram/members.ts';
@@ -40,6 +45,8 @@ export interface ProcessConfig {
   db?: Kysely<Database>;
   /** Задаётся в тестах, чтобы не вызывать `getMe`. Боевой вход поле не ставит. */
   botInfo?: TelegramBotInfo;
+  /** Задаётся в тестах. Боевой вход читает GitHub App из окружения и не берёт личный токен. */
+  installationSource?: InstallationRepositorySource;
 }
 
 export interface RunningProcess {
@@ -79,6 +86,13 @@ export function readProcessConfig(env: NodeJS.ProcessEnv, clock: Clock): Process
   };
 }
 
+function installationSourceOf(config: ProcessConfig): InstallationRepositorySource {
+  if (config.installationSource !== undefined) return config.installationSource;
+  const credentials = readGithubAppCredentials(process.env);
+  if (credentials === null) return unconfiguredInstallationSource();
+  return createGithubAppClient(credentials);
+}
+
 let running: RunningProcess | undefined;
 
 /**
@@ -103,6 +117,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachReportsTopic(bot, createReportsTopics(config.db, config.clock));
     attachSchedule(bot, createChatSchedule(config.db, config.clock));
     attachSettings(bot, createProjectSettings(config.db, config.clock));
+    attachInstallationRepositories(bot, createInstallationRepositories(config.db, installationSourceOf(config)));
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);

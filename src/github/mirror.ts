@@ -1,5 +1,6 @@
 /**
  * Часть Progress Engine «GitHub mirror» (B-3).
- * Зеркало одно на репозиторий. Таблицы и приём webhook GitHub — в своих issues.
+ * Зеркало репозитория — одна строка `repositories` на id GitHub.
+ * Приём webhook GitHub — в своей issue.
  */
 export const githubMirrorPart = { id: 'github-mirror', scope: 'repository' } as const;

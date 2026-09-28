@@ -91,6 +91,15 @@ export const DOMAIN_ERROR = {
   SETTINGS_MEMBER_AMBIGUOUS: 'settings_member_ambiguous',
   SETTINGS_DUPLICATE: 'settings_duplicate',
   SETTINGS_IDEMPOTENCY_KEY: 'settings_idempotency_key',
+  REPOSITORY_ID: 'repository_id',
+  REPOSITORY_OWNER_BLANK: 'repository_owner_blank',
+  REPOSITORY_NAME_BLANK: 'repository_name_blank',
+  REPOSITORY_CHAT: 'repository_chat',
+  REPOSITORY_ACCESS: 'repository_access',
+  REPOSITORY_APP: 'repository_app',
+  REPOSITORY_UNAVAILABLE: 'repository_unavailable',
+  REPOSITORY_IDEMPOTENCY_KEY: 'repository_idempotency_key',
+  REPOSITORY_IDENTITY: 'repository_identity',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

@@ -40,3 +40,8 @@ export function readProjectMembersMigration(root = process.cwd()): string {
 export function readMemberTopicMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '007_member_topic.sql'), 'utf8');
 }
+
+/** Таблица репозиториев установки GitHub App: `id`, `owner`, `name` и constraint'ы. */
+export function readRepositoriesMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '009_repositories.sql'), 'utf8');
+}
