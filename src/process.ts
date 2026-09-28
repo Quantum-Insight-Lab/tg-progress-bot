@@ -18,7 +18,7 @@ import { createInstallationRepositories } from './infrastructure/installation-re
 import { createProjectSettings } from './infrastructure/settings.ts';
 import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
-import { createTaskActions, createTaskMarkActions } from './infrastructure/tasks.ts';
+import { createTaskActions, createTaskMarkActions, createTaskReviewActions } from './infrastructure/tasks.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { attachAccessGuard } from './telegram/access-guard.ts';
@@ -39,6 +39,7 @@ import { renderCanvas } from './projections/canvas-message.ts';
 import { tasksBlockParagraphs } from './projections/tasks-block.ts';
 import { attachTaskCommand } from './telegram/task-command.ts';
 import { attachTaskMark } from './telegram/task-mark.ts';
+import { attachTaskReview } from './telegram/task-review.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
 
 const DEFAULT_HOST = '0.0.0.0';
@@ -181,6 +182,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     };
     attachTaskCommand(bot, createTaskActions(config.db, config.clock), redrawTaskCanvas);
     attachTaskMark(bot, createTaskMarkActions(config.db, config.clock), redrawTaskCanvas);
+    attachTaskReview(bot, createTaskReviewActions(config.db, config.clock), redrawTaskCanvas);
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);
