@@ -19,13 +19,20 @@
     "ci": "npm run typecheck && npm run lint && npm run boundaries && npm run codegen:events -- --check && npm run check:invariants && npm test && npm run tz:check -- --gate --pda"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.4",
+    "@types/pg": "^8.23.1",
     "dependency-cruiser": "^18.4.0",
     "eslint": "^10.11.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.70.1",
     "vitest": "^3.2.7",
     "yaml": "^2.9.1"
+  },
+  "dependencies": {
+    "kysely": "^0.29.6",
+    "pg": "^8.23.0",
+    "zod": "^4.6.5"
   }
 }
