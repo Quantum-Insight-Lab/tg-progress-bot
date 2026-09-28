@@ -92,7 +92,7 @@ function blank(value: string): boolean {
   return value.trim().length === 0;
 }
 
-function supergroupId(value: string): string {
+export function supergroupId(value: string): string {
   const trimmed = value.trim();
   if (!/^-[1-9]\d*$/.test(trimmed)) {
     throw new DomainError(DOMAIN_ERROR.CHAT_IS_TOPIC, 'супергруппа, не топик');
