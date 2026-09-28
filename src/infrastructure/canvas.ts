@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
+import { carryAssigneeDay } from './carry-canvas.ts';
 import {
   CANVAS_DESTINATION_TOPIC,
   decideCanvasMove,
@@ -236,6 +237,18 @@ async function slotFor(
   };
 }
 
+/** После выставления: незакрытые задачи прошлого канваса ложатся на сегодня, если сутки уже новые. */
+async function finish(
+  db: Kysely<Database>,
+  projectId: string,
+  assigneeId: string,
+  now: Date,
+  shown: ShownCanvas,
+): Promise<ShownCanvas> {
+  await carryAssigneeDay(db, projectId, assigneeId, now);
+  return shown;
+}
+
 /**
  * Выставить канвас на дату `now` в таймзоне проекта.
  * Нет строки — новое сообщение и `canvas.posted`. Есть — правка того же `message_id` и `canvas.edited`.
@@ -271,7 +284,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
         occurredAt: input.now,
       }),
     );
-    return { action: 'edit', canvas };
+    return finish(db, input.projectId, input.assigneeId, input.now, { action: 'edit', canvas });
   }
   const messageId = await input.send({
     telegramChatId: move.telegramChatId,
@@ -310,7 +323,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
       },
     ),
   );
-  return { action: 'post', canvas };
+  return finish(db, input.projectId, input.assigneeId, input.now, { action: 'post', canvas });
 }
 
 /** Топик только что указан: канвас этого исполнителя на сегодня. */
@@ -419,6 +432,7 @@ export async function ensureTodayCanvases(
           },
         ),
       );
+      await carryAssigneeDay(db, member.project_id, member.user_id, now);
     } catch (error) {
       failures.push(error);
     }

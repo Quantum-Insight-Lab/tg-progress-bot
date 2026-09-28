@@ -163,6 +163,7 @@ export const DOMAIN_ERROR = {
   CANVAS_ITEM_POSITION: 'canvas_item_position',
   CANVAS_ITEM_CARRIED_BLANK: 'canvas_item_carried_blank',
   CANVAS_ITEM_BUTTONS: 'canvas_item_buttons',
+  CANVAS_CARRY_TASKS: 'canvas_carry_tasks',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

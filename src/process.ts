@@ -18,6 +18,7 @@ import { createInstallationRepositories } from './infrastructure/installation-re
 import { createProjectSettings } from './infrastructure/settings.ts';
 import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
+import { carryOpenCanvases } from './infrastructure/carry-canvas.ts';
 import {
   createTaskActions,
   createTaskCancelActions,
@@ -117,6 +118,7 @@ let running: RunningProcess | undefined;
 
 /**
  * Один процесс backend: webhook Telegram, планировщик актов системы, Progress Engine.
+ * Слот A-30 переносит незакрытые задачи на канвас новых суток.
  * Слот A-31 выставляет канвас на сегодня. Остальные слоты регистрируют свои issues.
  */
 export async function startProcess(config: ProcessConfig): Promise<RunningProcess> {
@@ -154,9 +156,12 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     },
   };
   let ensureToday: ((now: Date) => Promise<void>) | undefined;
+  let carryToday: ((now: Date) => Promise<void>) | undefined;
   if (config.db !== undefined) {
+    const database = config.db;
     const canvas = createCanvasPlacement(config.db, config.clock);
     ensureToday = (now) => canvas.ensureToday(now, deliverCanvas.send);
+    carryToday = (now) => carryOpenCanvases(database, now);
     const binding = createChatBinding(config.db, config.clock);
     attachAccessGuard(bot, createAccessGate(config.db, config.clock));
     attachStartCommand(bot, createUserRegistration(config.db, config.clock));
@@ -203,6 +208,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);
+  if (carryToday !== undefined) scheduler.register('A-30', carryToday);
   if (ensureToday !== undefined) scheduler.register('A-31', ensureToday);
   const webhook: WebhookServer = await startTelegramWebhook({
     bot,
