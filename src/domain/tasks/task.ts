@@ -4,6 +4,7 @@ import { taskPriority, taskStatus, type TaskPriority, type TaskStatus } from './
 /**
  * Задача — шаг, который человек ведёт в Telegram.
  * Поля строки: номер внутри проекта, название, проект, приоритет, исполнитель, статус, даты.
+ * Веса, процента и ключа на зеркало GitHub нет.
  * Ключ — id. Статус и приоритет — из закрытого перечня.
  */
 export interface Task {

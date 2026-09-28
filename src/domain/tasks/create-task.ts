@@ -2,8 +2,9 @@ import { DEFAULT_PRIORITY } from '../../config/constants.ts';
 import { emit, EVENT_TYPES, type EventJournal } from '../../events/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { acceptedTaskText, defineUnlinked } from './github-link.ts';
 import { TASK_STATUS_IN_PROGRESS, taskPriority } from './status.ts';
-import { defineTask, type Task } from './task.ts';
+import type { Task } from './task.ts';
 
 /** Кто заводит задачу. В событии это роль исполнителя. */
 export const TASK_ACTOR_ROLE = 'assignee';
@@ -75,10 +76,10 @@ function assigneeRole(value: string): typeof TASK_ASSIGNEE_MEMBER | typeof TASK_
 
 /**
  * Формулировка после `/task` — название как есть.
- * Ссылку на GitHub, номер issue и PR из текста не достаём.
+ * Ссылку, номер issue и PR из текста не достаём: это закон связи с зеркалом.
  */
 export function taskFormulation(text: string): string {
-  return text.trim();
+  return acceptedTaskText(text).title;
 }
 
 /**
@@ -96,7 +97,7 @@ export async function createTask(
   if (idempotencyKey.length === 0) {
     throw new DomainError(DOMAIN_ERROR.TASK_IDEMPOTENCY_KEY, 'ключ идемпотентности пуст');
   }
-  const title = taskFormulation(input.title);
+  const title = acceptedTaskText(input.title).title;
   if (title.length === 0) {
     throw new DomainError(DOMAIN_ERROR.TASK_TITLE_BLANK, 'формулировка после /task становится названием');
   }
@@ -119,7 +120,7 @@ export async function createTask(
   }
   assigneeRole(owner.role);
   const now = clock.now();
-  const task = defineTask({
+  const task = defineUnlinked({
     id: input.id,
     projectId: owner.projectId,
     number: await store.nextNumber(owner.projectId),

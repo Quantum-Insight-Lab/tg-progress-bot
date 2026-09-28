@@ -1,5 +1,6 @@
 import { EVENT_TYPES, type PayloadByType } from '../../events/index.ts';
 import { TASK_SOURCE, TASK_TOPIC_CHAT } from './create-task.ts';
+import { milestoneAsTaskStatus } from './github-link.ts';
 
 /**
  * Общее между задачей и зеркалом GitHub — человек и проект.
@@ -56,10 +57,12 @@ function decline(fact: GithubFact): null {
   switch (fact.type) {
     case EVENT_TYPES.GITHUB_ISSUE_CHANGED:
       return declineIssue(fact.payload);
+    case EVENT_TYPES.GITHUB_MILESTONE_CHANGED:
+      milestoneAsTaskStatus(fact.payload.title);
+      return null;
     case EVENT_TYPES.GITHUB_PULL_REQUEST_CHANGED:
     case EVENT_TYPES.GITHUB_COMMITS_PUSHED:
     case EVENT_TYPES.GITHUB_WORKFLOW_COMPLETED:
-    case EVENT_TYPES.GITHUB_MILESTONE_CHANGED:
     case EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED:
     case EVENT_TYPES.GITHUB_RECONCILED:
     case EVENT_TYPES.REPO_PR_STALLED:
