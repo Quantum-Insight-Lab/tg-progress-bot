@@ -22,6 +22,10 @@ export const DOMAIN_ERROR = {
   CHAT_ALREADY_BOUND: 'chat_already_bound',
   CHAT_DUPLICATE: 'chat_duplicate',
   CHAT_IDEMPOTENCY_KEY: 'chat_idempotency_key',
+  PROJECT_MEMBER_ID_BLANK: 'project_member_id_blank',
+  PROJECT_MEMBER_PROJECT_BLANK: 'project_member_project_blank',
+  PROJECT_MEMBER_USER_BLANK: 'project_member_user_blank',
+  PROJECT_ROLE: 'project_role',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
