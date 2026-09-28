@@ -388,9 +388,9 @@ describe('Backlog: TR-7, TR-8 и ссылки issues', () => {
   ].join('\n');
   const tz = ['R-001', 'R-002', ...acts, later].map((id) => `{${id}} текст ${id}`).join('\n\n');
   const pda = ['| ID | Что | Из ТЗ |', '| --- | --- | --- |', `| A-1 | акт | ${acts.join(', ')} |`, '| INV-01 | закон | derived: пример |'].join('\n');
-  const issue = (id: string, items: string[], meta: string[] = [], elements = 'A-1 · INV-01'): { file: string; text: string } => ({
+  const issue = (id: string, items: string[], meta: string[] = [], elements = 'A-1 · INV-01', already = 'Предшественников нет.'): { file: string; text: string } => ({
     file: `docs/backlog/${id}.md`,
-    text: ['---', `id: ${id}`, `title: "${id}"`, ...meta, '---', '', '## PDA', '', elements, '', '## Атомы ТЗ', '', ...items.map((item) => `- [${item.startsWith('x:') ? 'x' : ' '}] ${item.replace('x:', '')} — метка`), ''].join('\n'),
+    text: ['---', `id: ${id}`, `title: "${id}"`, ...meta, '---', '', '## Уже есть', '', already, '', '## PDA', '', elements, '', '## Атомы ТЗ', '', ...items.map((item) => `- [${item.startsWith('x:') ? 'x' : ' '}] ${item.replace('x:', '')} — метка`), ''].join('\n'),
   });
   const index = (ids: string[]): string => ids.map((id) => `| [${id}](${id}.md) |`).join('\n');
   const findings = (issues: { file: string; text: string }[], listed = issues.map((i) => i.file.slice(13, -3))): Finding[] =>
@@ -409,8 +409,8 @@ describe('Backlog: TR-7, TR-8 и ссылки issues', () => {
   it('TR-7: покрытый атом MVP назначен issue; атом вне MVP, пункт объёма и отложенное в issue не входят', () => {
     const tr7 = messages(findings([issue('I-01', acts.slice(0, -1)), issue('I-02', ['R-001', later])]), 'TR-7');
     expect(tr7).toEqual([
-      'docs/backlog/I-02.md:12: R-001 — пункт объёма работ, в issue не назначается',
-      `docs/backlog/I-02.md:13: ${later} не входит в MVP`,
+      'docs/backlog/I-02.md:16: R-001 — пункт объёма работ, в issue не назначается',
+      `docs/backlog/I-02.md:17: ${later} не входит в MVP`,
       `${acts.at(-1)} act покрыт в PDA, но не назначен ни одной issue`,
     ]);
     expect(messages(findings([issue('I-01', acts.slice(0, 5)), issue('I-02', acts.slice(5))]), 'TR-7')).toEqual([]);
@@ -418,7 +418,7 @@ describe('Backlog: TR-7, TR-8 и ссылки issues', () => {
 
   it('TR-7: у закрытой issue отмечены все атомы', () => {
     const closed = issue('I-01', ['x:R-003', 'R-004'], ['state: closed']);
-    expect(messages(findings([closed, issue('I-02', acts.slice(2))]), 'TR-7')).toEqual(['docs/backlog/I-01.md:14: I-01 закрыта, а R-004 не отмечен']);
+    expect(messages(findings([closed, issue('I-02', acts.slice(2))]), 'TR-7')).toEqual(['docs/backlog/I-01.md:18: I-01 закрыта, а R-004 не отмечен']);
   });
 
   it(`TR-8: атомов в issue не больше ${MAX_ATOMS_PER_STEP}`, () => {
@@ -428,7 +428,10 @@ describe('Backlog: TR-7, TR-8 и ссылки issues', () => {
   });
 
   it('TR-2: элементы PDA, blocked_by без круга, каталог совпадает с файлами', () => {
-    const issues = [issue('I-01', acts.slice(0, 5), ['blocked_by: [I-02]'], 'A-7'), issue('I-02', acts.slice(5), ['blocked_by: [I-01, I-09]'])];
+    const issues = [
+      issue('I-01', acts.slice(0, 5), ['blocked_by: [I-02]'], 'A-7', '- I-02 — I-02 · A-1 · INV-01'),
+      issue('I-02', acts.slice(5), ['blocked_by: [I-01, I-09]'], 'A-1 · INV-01', '- I-01 — I-01 · A-7\n- I-09 —'),
+    ];
     expect(messages(findings(issues, ['I-01', 'I-05']), 'TR-2')).toEqual([
       'docs/backlog/I-01.md: I-01 → A-7: такого элемента PDA нет',
       'docs/backlog/I-02.md: I-02 blocked_by I-09: такой issue нет',
@@ -436,6 +439,21 @@ describe('Backlog: TR-7, TR-8 и ссылки issues', () => {
       'docs/backlog/README.md: нет строки I-02',
       'docs/backlog/README.md: I-05 — файла нет',
     ]);
+  });
+
+  it('TR-2: «Уже есть» — прямые blocked_by, задача предшественника и его PDA', () => {
+    const ahead = issue('I-02', acts.slice(0, 5), ['blocked_by: [I-01]']);
+    const root = issue('I-01', acts.slice(5));
+    expect(messages(findings([root, ahead]), 'TR-2')).toEqual([
+      'docs/backlog/I-02.md: I-02: «Уже есть» не совпадает с blocked_by. - I-01 — I-01 · A-1 · INV-01',
+    ]);
+    const ready = issue('I-02', acts.slice(0, 5), ['blocked_by: [I-01]'], 'A-1 · INV-01', '- I-01 — I-01 · A-1 · INV-01');
+    expect(messages(findings([root, ready]), 'TR-2')).toEqual([]);
+    const late = {
+      file: 'docs/backlog/I-03.md',
+      text: ['---', 'id: I-03', 'title: "I-03"', '---', '', '## PDA', '', 'A-1', '', '## Уже есть', '', 'Предшественников нет.', '', '## Атомы ТЗ', '', ...acts.slice(0, 5).map((item) => `- [ ] ${item} — метка`), ''].join('\n'),
+    };
+    expect(messages(findings([issue('I-01', acts.slice(5)), late]), 'TR-2')).toEqual(['docs/backlog/I-03.md: I-03: раздел «Уже есть» идёт не первым']);
   });
 
   it('tz:trace: атом → элементы PDA → issues → тесты', () => {
