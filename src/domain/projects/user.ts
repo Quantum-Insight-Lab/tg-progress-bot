@@ -2,10 +2,11 @@ import type { Clock } from '../shared/clock.ts';
 import { emit, EVENT_TYPES, type EventJournal } from '../../events/index.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
 
-/** Человек: аккаунт Telegram. Логин GitHub к нему записывается отдельно. */
+/** Человек: аккаунт Telegram и, если записан, текущий логин GitHub. Пустой логин — сопоставления нет. */
 export interface User {
   id: string;
   telegramUserId: string;
+  githubLogin: string | null;
   name: string;
   isRoot: boolean;
 }
@@ -63,6 +64,7 @@ export async function createRoot(store: UserStore, input: NewUser): Promise<User
   const user: User = {
     id: input.id,
     telegramUserId: input.telegramUserId,
+    githubLogin: null,
     name: input.name,
     isRoot: true,
   };
@@ -134,6 +136,7 @@ async function rememberAccount(store: RegistrationStore, input: NewUser): Promis
   const user: User = {
     id: input.id,
     telegramUserId: input.telegramUserId,
+    githubLogin: null,
     name: input.name,
     isRoot: false,
   };

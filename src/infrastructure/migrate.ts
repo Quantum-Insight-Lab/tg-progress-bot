@@ -6,9 +6,14 @@ export function readEventsMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '001_events.sql'), 'utf8');
 }
 
-/** Таблица пользователей: поля и constraint'ы корня. */
+/** Таблица пользователей: поля и constraint'ы корня, затем текущий `github_login`. */
 export function readUsersMigration(root = process.cwd()): string {
-  return readFileSync(join(root, 'migrations', '002_users.sql'), 'utf8');
+  return `${readFileSync(join(root, 'migrations', '002_users.sql'), 'utf8')}\n${readGithubLoginMigration(root)}`;
+}
+
+/** Поле `github_login`: пустое не уникально, непустое — одно на бота. */
+export function readGithubLoginMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '006_users_github_login.sql'), 'utf8');
 }
 
 /** Таблица проектов: поля и constraint'ы единицы учёта. */
