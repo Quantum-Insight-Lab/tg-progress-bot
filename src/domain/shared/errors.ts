@@ -110,6 +110,9 @@ export const DOMAIN_ERROR = {
   PROJECT_REPOSITORY_ALREADY: 'project_repository_already',
   PROJECT_REPOSITORY_DUPLICATE: 'project_repository_duplicate',
   PROJECT_REPOSITORY_IDEMPOTENCY_KEY: 'project_repository_idempotency_key',
+  PROJECT_REPOSITORY_CHANGE_ACTOR: 'project_repository_change_actor',
+  PROJECT_REPOSITORY_NOT_CONNECTED: 'project_repository_not_connected',
+  PROJECT_REPOSITORY_CHANGE_DUPLICATE: 'project_repository_change_duplicate',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
