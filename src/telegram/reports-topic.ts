@@ -6,6 +6,7 @@ import {
   type ReportsTopicActions,
 } from '../domain/projects/reports-topic.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { afterReportsTopic } from './schedule.ts';
 
 /** Строка настроек: командный топик. */
 export const REPORTS_TOPIC_HEADING = 'Командный топик';
@@ -182,7 +183,7 @@ export async function replyToReportsTopicMessage(
       chat: chatType,
       idempotencyKey,
     });
-    return { text: REPORTS_TOPIC_SET };
+    return { text: afterReportsTopic(REPORTS_TOPIC_SET) };
   } catch (error) {
     return replyOf(error);
   }
@@ -230,7 +231,7 @@ export async function replyToCreateReportsTopic(
       chat: chatType,
       idempotencyKey,
     });
-    return { text: REPORTS_TOPIC_CREATED };
+    return { text: afterReportsTopic(REPORTS_TOPIC_CREATED) };
   } catch (error) {
     return replyOf(error);
   }
