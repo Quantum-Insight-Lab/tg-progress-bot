@@ -29,6 +29,7 @@ import { ACCESS_DENIED_REPLY, GUARDED_HANDLERS, type GuardedHandler } from '../s
 import { GITHUB_LOGIN_HEADING } from '../src/telegram/github-login.ts';
 import { NEW_PROJECT_HEADING } from '../src/telegram/new-project.ts';
 import { EXECUTOR_TOPIC_HEADING } from '../src/telegram/executor-topic.ts';
+import { REPORTS_TOPIC_HEADING } from '../src/telegram/reports-topic.ts';
 import { PARTICIPANTS_HEADING, PARTICIPANTS_ROOT_ONLY } from '../src/telegram/members.ts';
 import { START_REPLY_PENDING } from '../src/telegram/start.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
@@ -183,6 +184,8 @@ function bodyFor(handler: GuardedHandler, updateId: number, account: { id: numbe
       return messageBody(updateId, account, `${EXECUTOR_TOPIC_HEADING}\nАльфа`);
     case 'github-login':
       return messageBody(updateId, account, `${GITHUB_LOGIN_HEADING}\nсекретный-логин`);
+    case 'reports-topic':
+      return messageBody(updateId, account, `${REPORTS_TOPIC_HEADING}\nАльфа`);
     default: {
       const unreachable: never = handler;
       throw new Error(unreachable);

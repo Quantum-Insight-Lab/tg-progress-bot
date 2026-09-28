@@ -168,6 +168,16 @@ function storeOf(trx: Transaction<Database>): ExecutorTopicStore {
     async setTopic(memberId, topicId) {
       await trx.updateTable('project_members').set({ topic_id: String(topicId) }).where('id', '=', memberId).execute();
     },
+    async reportsTopicId(projectId) {
+      const row = await trx
+        .selectFrom('projects')
+        .leftJoin('chats', 'chats.id', 'projects.chat_id')
+        .select(['chats.reports_topic_id'])
+        .where('projects.id', '=', projectId)
+        .executeTakeFirst();
+      if (row === undefined) return null;
+      return topicOf(row.reports_topic_id);
+    },
   };
 }
 
