@@ -50,3 +50,8 @@ export function readRepositoriesMigration(root = process.cwd()): string {
 export function readProjectRepositoryMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '010_project_repository.sql'), 'utf8');
 }
+
+/** Таблица задач: поля и constraint'ы шага, который человек ведёт в Telegram. */
+export function readTasksMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '011_tasks.sql'), 'utf8');
+}

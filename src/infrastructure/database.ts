@@ -57,6 +57,20 @@ export interface ProjectMembersTable {
   topic_id: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
+/** Задача (E-5): шаг в Telegram. Статус и приоритет — текст, перечень значений не здесь. */
+export interface TasksTable {
+  id: string;
+  project_id: string;
+  number: number;
+  title: string;
+  status: string;
+  priority: string;
+  assignee_id: string;
+  created_at: Date;
+  updated_at: Date;
+  completed_at: Date | null;
+}
+
 /** Репозиторий установки GitHub App (E-9). Ключ — id GitHub, не проект. */
 export interface RepositoriesTable {
   id: string;
@@ -70,5 +84,6 @@ export interface Database {
   projects: ProjectsTable;
   chats: ChatsTable;
   project_members: ProjectMembersTable;
+  tasks: TasksTable;
   repositories: RepositoriesTable;
 }

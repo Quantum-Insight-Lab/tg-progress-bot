@@ -113,6 +113,16 @@ export const DOMAIN_ERROR = {
   PROJECT_REPOSITORY_CHANGE_ACTOR: 'project_repository_change_actor',
   PROJECT_REPOSITORY_NOT_CONNECTED: 'project_repository_not_connected',
   PROJECT_REPOSITORY_CHANGE_DUPLICATE: 'project_repository_change_duplicate',
+  TASK_ID_BLANK: 'task_id_blank',
+  TASK_PROJECT_BLANK: 'task_project_blank',
+  TASK_NUMBER: 'task_number',
+  TASK_TITLE_BLANK: 'task_title_blank',
+  TASK_STATUS_BLANK: 'task_status_blank',
+  TASK_PRIORITY_BLANK: 'task_priority_blank',
+  TASK_ASSIGNEE_BLANK: 'task_assignee_blank',
+  TASK_CREATED_AT_BLANK: 'task_created_at_blank',
+  TASK_UPDATED_AT_BLANK: 'task_updated_at_blank',
+  TASK_COMPLETED_AT_BLANK: 'task_completed_at_blank',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
