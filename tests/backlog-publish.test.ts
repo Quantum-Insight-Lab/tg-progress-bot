@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRANCH, creationOrder, issueBody, milestonesFromIndex, withGithub, type BacklogIssue } from '../scripts/backlog-publish.ts';
+import { BRANCH, creationOrder, issueBody, milestonesFromIndex, sameIssueBody, withGithub, type BacklogIssue } from '../scripts/backlog-publish.ts';
 import { parseIssue } from '../scripts/tz-check.ts';
 
 const text = [
@@ -34,6 +34,8 @@ describe('Публикация backlog', () => {
     expect(body).toContain(`[08](${repo}/blob/${BRANCH}/docs/pda/08-observability.md)`);
     expect(body).toContain('[внешнее](https://example.com)');
     expect(body).not.toContain('blocked_by');
+    expect(sameIssueBody(`${body}\n`, body)).toBe(true);
+    expect(sameIssueBody(body.replace('Сделать', 'Другое'), body)).toBe(false);
   });
 
   it('номер GitHub пишется в front matter и заменяется при повторе', () => {

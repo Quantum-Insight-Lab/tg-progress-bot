@@ -3,7 +3,8 @@
  *   npm run backlog:publish             — сухой прогон: план по лейблам, milestones, issues, связям и доске; ничего не пишет
  *   npm run backlog:publish -- --apply  — выполнить план
  *   npm run backlog:publish -- --preview I-24 — тело issue в том виде, в каком оно уйдёт на GitHub
- * Повторный запуск безопасен: issue с `github: N` в front matter заново не создаётся, существующие связи и элементы доски пропускаются.
+ * Повторный запуск безопасен: issue с `github: N` в front matter заново не создаётся,
+ * её тело перезаписывается, если разошлось с файлом; существующие связи и элементы доски пропускаются.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -50,6 +51,12 @@ export function issueBody(issue: BacklogIssue, repoUrl: string): string {
     .replace(/\]\((?!https?:|#)([^)]+)\)/g, (_, path: string) => `](${repoUrl}/blob/${BRANCH}/${posix.normalize(posix.join(BACKLOG_DIR, path))})`)
     .trim();
   return `Источник: [\`${BACKLOG_DIR}/${issue.id}.md\`](${repoUrl}/blob/${BRANCH}/${BACKLOG_DIR}/${issue.id}.md)\n\n${body}\n`;
+}
+
+/** Тело на GitHub совпадает с файлом. Хвост перевода строки GitHub не считает отличием. */
+export function sameIssueBody(current: string | null | undefined, next: string): boolean {
+  const norm = (text: string): string => text.replace(/\r\n/g, '\n').trim();
+  return norm(current ?? '') === norm(next);
 }
 
 /** Front matter с номером issue на GitHub. */
@@ -133,11 +140,19 @@ async function main(argv: string[]): Promise<number> {
 
   const node = new Map<string, { number: number; id: number; url: string }>();
   let created = 0;
+  let refreshed = 0;
   for (const issue of creationOrder(issues) as BacklogIssue[]) {
+    const body = issueBody(issue, repo.url);
     if (issue.github !== undefined) {
+      const found = ghJson<{ number: number; id: number; html_url: string; title: string; body: string | null }>(['api', `repos/${repo.nameWithOwner}/issues/${issue.github}`]);
+      if (found.title !== issue.title) throw new Error(`${issue.id}: #${issue.github} называется «${found.title}», в файле «${issue.title}»`);
+      node.set(issue.id, { number: found.number, id: found.id, url: found.html_url });
+      if (sameIssueBody(found.body, body)) continue;
+      refreshed += 1;
+      log(`${issue.id} #${found.number}: обновить тело`);
       if (apply) {
-        const found = ghJson<{ number: number; id: number; html_url: string }>(['api', `repos/${repo.nameWithOwner}/issues/${issue.github}`]);
-        node.set(issue.id, { number: found.number, id: found.id, url: found.html_url });
+        gh(['api', '-X', 'PATCH', `repos/${repo.nameWithOwner}/issues/${found.number}`, '--input', '-'], JSON.stringify({ body }));
+        await pause(CREATE_PAUSE_MS);
       }
       continue;
     }
@@ -146,14 +161,14 @@ async function main(argv: string[]): Promise<number> {
     if (!apply) continue;
     const milestoneId = milestoneNumber.get(milestone);
     if (milestoneId === undefined) throw new Error(`${issue.id}: milestone «${milestone}» не найден — есть ли он в таблице «Этапы»?`);
-    const payload = { title: issue.title, body: issueBody(issue, repo.url), labels: issue.labels, assignees: [ASSIGNEE], milestone: milestoneId };
+    const payload = { title: issue.title, body, labels: issue.labels, assignees: [ASSIGNEE], milestone: milestoneId };
     const made = ghJson<{ number: number; id: number; html_url: string }>(['api', '-X', 'POST', `repos/${repo.nameWithOwner}/issues`, '--input', '-'], JSON.stringify(payload));
     node.set(issue.id, { number: made.number, id: made.id, url: made.html_url });
     writeFileSync(issue.file, withGithub(issue.text, made.number));
     console.log(`${issue.id} → #${made.number} ${issue.title}`);
     await pause(CREATE_PAUSE_MS);
   }
-  log(`issues: создать ${created}, уже на GitHub ${issues.length - created}; assignee ${ASSIGNEE}`);
+  log(`issues: создать ${created}, обновить тело ${refreshed}, уже совпадают ${issues.length - created - refreshed}; assignee ${ASSIGNEE}`);
 
   let links = 0;
   for (const issue of issues) {
