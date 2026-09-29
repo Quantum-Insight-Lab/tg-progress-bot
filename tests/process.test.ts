@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { Clock } from '../src/domain/shared/clock.ts';
+import { GITHUB_WEBHOOK_PATH } from '../src/github/webhook.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
@@ -64,6 +65,11 @@ describe('один процесс', () => {
     });
     expect(status).toBe(200);
     expect(seen).toEqual([7]);
+    const github = await httpStatus(running.port, 'POST', GITHUB_WEBHOOK_PATH, '{}', {
+      'X-GitHub-Event': 'issues',
+      'X-GitHub-Delivery': 'delivery-1',
+    });
+    expect(github).toBe(404);
     await expect(startProcess(readProcessConfig(env(), clock))).rejects.toThrow('процесс уже запущен');
   });
 
@@ -79,6 +85,9 @@ describe('один процесс', () => {
     expect(config.webhookPath).toBe(TELEGRAM_WEBHOOK_PATH);
     expect(config.host).toBe('0.0.0.0');
     expect(config.clock).toBe(clock);
+    expect(config.githubWebhookSecret).toBeNull();
+    expect(readProcessConfig(env({ GITHUB_WEBHOOK_SECRET: '  hook  ' }), clock).githubWebhookSecret).toBe('hook');
+    expect(readProcessConfig(env({ GITHUB_TOKEN: 'ghp_secret', GH_TOKEN: 'github_pat_secret' }), clock).githubWebhookSecret).toBeNull();
   });
 
   it('сборка процесса одна: webhook, планировщик и движок вызываются из process.ts', () => {
@@ -88,6 +97,7 @@ describe('один процесс', () => {
     expect(callers('createScheduler(', 'src/infrastructure/scheduler.ts')).toEqual(['src/process.ts']);
     expect(callers('startSchedulerLoop(', 'src/infrastructure/scheduler.ts')).toEqual(['src/process.ts']);
     expect(callers('createProgressEngine(', 'src/progress-engine.ts')).toEqual(['src/process.ts']);
+    expect(callers('acceptGithubWebhookHttp(', 'src/github/webhook.ts')).toEqual(['src/process.ts']);
     const polling = filesIn('src').filter((path) => {
       const text = readFileSync(path, 'utf8');
       return text.includes('getUpdates') || text.includes('.start(');

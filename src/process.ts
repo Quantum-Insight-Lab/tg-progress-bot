@@ -3,6 +3,7 @@ import type { InstallationRepositorySource } from './domain/github/repository.ts
 import { unconfiguredInstallationSource } from './domain/github/repository.ts';
 import type { Clock } from './domain/shared/clock.ts';
 import { createGithubAppClient, readGithubAppCredentials } from './github/client.ts';
+import { acceptGithubWebhookHttp, GITHUB_WEBHOOK_PATH } from './github/webhook.ts';
 import type { Database } from './infrastructure/database.ts';
 import { createScheduler, startSchedulerLoop, type Scheduler } from './infrastructure/scheduler.ts';
 import { createAccessGate } from './infrastructure/access.ts';
@@ -30,6 +31,7 @@ import {
   createTaskReviewActions,
 } from './infrastructure/tasks.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
+import { createEventJournal } from './infrastructure/event-journal.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { attachAccessGuard } from './telegram/access-guard.ts';
 import { createTelegramBot, type TelegramBotInfo } from './telegram/bot.ts';
@@ -56,7 +58,7 @@ import { attachTaskCancel } from './telegram/task-cancel.ts';
 import { sendBlockerQuestion } from './telegram/blocker-question.ts';
 import { attachBlockerAnswer } from './telegram/blocker-answer.ts';
 import { sendReviewReminder } from './telegram/review-reminder.ts';
-import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
+import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookRoute, type WebhookServer } from './telegram/webhook.ts';
 
 const DEFAULT_HOST = '0.0.0.0';
 
@@ -67,6 +69,8 @@ export interface ProcessConfig {
   host: string;
   schedulerIntervalMs: number;
   webhookPath: string;
+  /** Секрет подписи webhook GitHub App. Пусто — приём не включается. */
+  githubWebhookSecret: string | null;
   clock: Clock;
   /** Пул для команд бота. Без него обработчики не подключаются. */
   db?: Kysely<Database>;
@@ -90,6 +94,11 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
   return value;
 }
 
+function optional(env: NodeJS.ProcessEnv, name: string): string | null {
+  const value = env[name]?.trim() ?? '';
+  return value.length === 0 ? null : value;
+}
+
 function whole(env: NodeJS.ProcessEnv, name: string): number {
   const raw = required(env, name);
   if (!/^\d+$/.test(raw)) throw new Error(`${name} — целое число`);
@@ -109,6 +118,7 @@ export function readProcessConfig(env: NodeJS.ProcessEnv, clock: Clock): Process
     host: host === undefined || host.length === 0 ? DEFAULT_HOST : host,
     schedulerIntervalMs,
     webhookPath: webhookPath === undefined || webhookPath.length === 0 ? TELEGRAM_WEBHOOK_PATH : webhookPath,
+    githubWebhookSecret: optional(env, 'GITHUB_WEBHOOK_SECRET'),
     clock,
   };
 }
@@ -254,12 +264,22 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   if (remindReviews !== undefined) scheduler.register('A-29', remindReviews);
   if (carryToday !== undefined) scheduler.register('A-30', carryToday);
   if (ensureToday !== undefined) scheduler.register('A-31', ensureToday);
+  const routes: WebhookRoute[] = [];
+  const githubWebhookSecret = config.githubWebhookSecret;
+  if (githubWebhookSecret !== null && config.db !== undefined) {
+    const journal = createEventJournal(config.db);
+    routes.push({
+      path: GITHUB_WEBHOOK_PATH,
+      handle: (req, res) => acceptGithubWebhookHttp(req, res, { secret: githubWebhookSecret, journal, clock: config.clock }),
+    });
+  }
   const webhook: WebhookServer = await startTelegramWebhook({
     bot,
     secretToken: config.webhookSecret,
     path: config.webhookPath,
     port: config.port,
     host: config.host,
+    routes,
   });
   const loop = startSchedulerLoop(scheduler, config.schedulerIntervalMs);
   let stopped = false;

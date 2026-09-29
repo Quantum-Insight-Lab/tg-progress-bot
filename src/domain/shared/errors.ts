@@ -175,6 +175,10 @@ export const DOMAIN_ERROR = {
   BLOCKER_REPLY: 'blocker_reply',
   BLOCKER_ACTOR: 'blocker_actor',
   BLOCKER_ABSENT: 'blocker_absent',
+  GITHUB_DELIVERY: 'github_delivery',
+  GITHUB_DELIVERY_DATE: 'github_delivery_date',
+  GITHUB_DELIVERY_LOGIN: 'github_delivery_login',
+  GITHUB_DELIVERY_TITLE: 'github_delivery_title',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
