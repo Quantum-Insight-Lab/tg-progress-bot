@@ -1,4 +1,5 @@
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
+import { projectShareRatio } from '../domain/progress/no-data.ts';
 import {
   projectRepositoryReadings,
   type IssueRow,
@@ -44,4 +45,49 @@ export async function loadProjectRepositoryReadings(
     }
   }
   return projectRepositoryReadings(projects, issues);
+}
+
+async function columnPresent(db: Kysely<Database>, table: string, column: string): Promise<boolean> {
+  const found = await sql<{ column_name: string }>`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = ${table}
+      AND column_name = ${column}
+  `.execute(db);
+  return found.rows.length > 0;
+}
+
+/**
+ * Процент проекта для строки канваса.
+ * Колонки репозитория нет — репозиторий не подключён, числа нет.
+ * Пустой знаменатель тоже даёт пусто, не ноль.
+ */
+export async function loadProjectShareRatio(db: Kysely<Database>, projectId: string): Promise<number | null> {
+  if (!(await columnPresent(db, 'projects', 'repository_id'))) return null;
+  const linked = await db
+    .selectFrom('projects')
+    .select(['repository_id'])
+    .where('id', '=', projectId)
+    .executeTakeFirst();
+  const repositoryId = linked?.repository_id ?? null;
+  if (repositoryId === null || repositoryId.trim().length === 0) return null;
+  const issues: IssueRow[] = [];
+  if (await columnPresent(db, 'issues', 'issue_number')) {
+    const rows = await db
+      .selectFrom('issues')
+      .select(['repository_id', 'issue_number', 'state', 'state_reason'])
+      .where('repository_id', '=', repositoryId)
+      .execute();
+    for (const row of rows) {
+      issues.push({
+        repositoryId: row.repository_id,
+        issueNumber: row.issue_number,
+        state: row.state,
+        stateReason: row.state_reason,
+      });
+    }
+  }
+  const reading = projectRepositoryReadings([{ projectId, repositoryId, memberKeys: [] }], issues)[0];
+  return projectShareRatio(reading?.share ?? null);
 }
