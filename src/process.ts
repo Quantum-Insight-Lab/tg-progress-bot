@@ -24,6 +24,7 @@ import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
 import { carryOpenCanvases } from './infrastructure/carry-canvas.ts';
 import { detectStaleTasks } from './infrastructure/detect-blocker.ts';
+import { noticeProjectDivergence } from './infrastructure/divergence.ts';
 import { noticeStalePullRequests } from './infrastructure/pr-stall.ts';
 import { takeProgressSnapshots } from './infrastructure/progress-snapshot.ts';
 import { remindStaleReviews } from './infrastructure/remind-review.ts';
@@ -220,6 +221,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   let remindReviews: ((now: Date) => Promise<void>) | undefined;
   let noticePullRequests: ((now: Date) => Promise<void>) | undefined;
   let takeSnapshots: ((now: Date) => Promise<void>) | undefined;
+  let noticeDivergence: ((now: Date) => Promise<void>) | undefined;
   if (config.db !== undefined) {
     const database = config.db;
     const canvas = createCanvasPlacement(config.db, config.clock);
@@ -292,6 +294,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
       });
     noticePullRequests = (now) => noticeStalePullRequests(database, now);
     takeSnapshots = (now) => takeProgressSnapshots(database, now);
+    noticeDivergence = (now) => noticeProjectDivergence(database, now);
     remindReviews = (now) =>
       remindStaleReviews(database, now, async (hit) => {
         await sendReviewReminder(bot.api, {
@@ -310,6 +313,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   if (ensureToday !== undefined) scheduler.register('A-31', ensureToday);
   if (noticePullRequests !== undefined) scheduler.register('A-35', noticePullRequests);
   if (takeSnapshots !== undefined) scheduler.register('A-32', takeSnapshots);
+  if (noticeDivergence !== undefined) scheduler.register('A-36', noticeDivergence);
   const routes: WebhookRoute[] = [];
   const githubWebhookSecret = config.githubWebhookSecret;
   if (githubWebhookSecret !== null && config.db !== undefined) {
