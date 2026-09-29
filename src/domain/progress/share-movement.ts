@@ -40,6 +40,9 @@ export const SHARE_FACT_CHECKMARK = 'checkmark';
 
 export const SHARE_FACT_MERGED_PULL_REQUEST = 'pull_request_merged';
 
+/** Коммит репозитория. В долю бэклога не входит. */
+export const SHARE_FACT_COMMIT = 'commit';
+
 export const SHARE_FACT_TASK_PRIORITY = 'task_priority';
 
 export const SHARE_FACT_ISSUE_STATE = 'issue_state';
@@ -50,6 +53,7 @@ export type ShareFact =
   | { kind: typeof SHARE_FACT_TASK_CLOSED }
   | { kind: typeof SHARE_FACT_CHECKMARK }
   | { kind: typeof SHARE_FACT_MERGED_PULL_REQUEST }
+  | { kind: typeof SHARE_FACT_COMMIT }
   | { kind: typeof SHARE_FACT_TASK_PRIORITY; priority: string }
   | {
       kind: typeof SHARE_FACT_ISSUE_STATE;
@@ -150,7 +154,7 @@ function applyIssueState(issues: RepositoryIssue[], fact: Extract<ShareFact, { k
 
 /**
  * Долю двигает смена состояния issue.
- * Закрытая задача, галочка, приоритет, учёт дня и смерженный PR формулу не меняют.
+ * Закрытая задача, галочка, приоритет, учёт дня, смерженный PR и коммит формулу не меняют.
  */
 export function shareAfter(issues: readonly RepositoryIssue[], facts: readonly ShareFact[]): BacklogShare {
   const current = issuesOnce(issues);
@@ -163,6 +167,7 @@ export function shareAfter(issues: readonly RepositoryIssue[], facts: readonly S
       case SHARE_FACT_TASK_CLOSED:
       case SHARE_FACT_CHECKMARK:
       case SHARE_FACT_MERGED_PULL_REQUEST:
+      case SHARE_FACT_COMMIT:
       case SHARE_FACT_TASK_PRIORITY:
         break;
       default: {

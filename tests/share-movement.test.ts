@@ -15,6 +15,7 @@ import {
   projectShare,
   repositoryBacklog,
   SHARE_FACT_CHECKMARK,
+  SHARE_FACT_COMMIT,
   SHARE_FACT_DAY_TASK,
   SHARE_FACT_ISSUE_STATE,
   SHARE_FACT_MERGED_PULL_REQUEST,
@@ -83,6 +84,26 @@ describe('что долю не двигает', () => {
     const before = projectShare(issues);
     expect(shareAfter(issues, [{ kind: SHARE_FACT_CHECKMARK }])).toEqual(before);
     expect(before.ratio).toBe(1 / 2);
+  });
+
+  it('INV-01 коммиты в долю бэклога не входят', () => {
+    const issues = [openIssue('1'), completedIssue('2'), completedIssue('3')];
+    const before = projectShare(issues);
+    const after = shareAfter(issues, [
+      { kind: SHARE_FACT_COMMIT },
+      { kind: SHARE_FACT_COMMIT },
+      { kind: SHARE_FACT_MERGED_PULL_REQUEST },
+    ]);
+    expect(after).toEqual(before);
+    expect(after).toEqual({ completed: 2, remaining: 1, ratio: 2 / 3 });
+    expect(after.completed).toBe(2);
+  });
+
+  it('R-719 Коммиты в долю бэклога не входят', () => {
+    const issues = [openIssue('1'), openIssue('2')];
+    const before = projectShare(issues);
+    expect(shareAfter(issues, [{ kind: SHARE_FACT_COMMIT }, { kind: SHARE_FACT_COMMIT }])).toEqual(before);
+    expect(before).toEqual({ completed: 0, remaining: 2, ratio: 0 });
   });
 
   it('INV-01 смерженный PR процент не двигает', () => {
@@ -209,6 +230,8 @@ describe('что долю не двигает', () => {
       { kind: SHARE_FACT_TASK_CLOSED },
       { kind: SHARE_FACT_CHECKMARK },
       { kind: SHARE_FACT_MERGED_PULL_REQUEST },
+      { kind: SHARE_FACT_COMMIT },
+      { kind: SHARE_FACT_COMMIT },
     );
     expect(shareAfter(issues, facts)).toEqual(before);
     expect(before).toEqual({ completed: 1, remaining: 1, ratio: 1 / 2 });
