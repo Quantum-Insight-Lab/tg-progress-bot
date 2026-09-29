@@ -184,6 +184,20 @@ export interface PullRequestsTable {
   merged_by_login: string | null;
 }
 
+/**
+ * Коммит зеркала (E-15). Ключ — id.
+ * Природный ключ — `repository_id` и `sha`, не проект и не задача.
+ * Строка живёт, пока коммит внутри окна `COMMITS_TAIL_DAYS`.
+ */
+export interface CommitsTable {
+  id: string;
+  repository_id: string;
+  sha: string;
+  message: string;
+  author_login: string;
+  created_at: Date;
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
@@ -200,4 +214,5 @@ export interface Database {
   issue_dependencies: IssueDependenciesTable;
   milestones: MilestonesTable;
   pull_requests: PullRequestsTable;
+  commits: CommitsTable;
 }

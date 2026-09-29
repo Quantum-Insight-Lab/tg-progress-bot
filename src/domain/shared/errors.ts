@@ -210,6 +210,12 @@ export const DOMAIN_ERROR = {
   PULL_REQUEST_MIRROR: 'pull_request_mirror',
   CI_STATUS: 'ci_status',
   CI_BRANCH: 'ci_branch',
+  COMMIT_ID_BLANK: 'commit_id_blank',
+  COMMIT_SHA_BLANK: 'commit_sha_blank',
+  COMMIT_MESSAGE_BLANK: 'commit_message_blank',
+  COMMIT_AUTHOR_LOGIN: 'commit_author_login',
+  COMMIT_CREATED_AT: 'commit_created_at',
+  COMMIT_MIRROR: 'commit_mirror',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

@@ -425,17 +425,6 @@ describe('приём webhook GitHub', () => {
       clock,
     });
     expect(acknowledged).toBe(200);
-    const push = Buffer.from(JSON.stringify({ ref: 'refs/heads/main', repository: { id: 42 } }));
-    const pushed = await acceptGithubWebhook({
-      secret,
-      eventName: 'push',
-      deliveryId: 'delivery-push',
-      signature: sign(push),
-      body: push,
-      journal: handle.journal,
-      clock,
-    });
-    expect(pushed).toBe(200);
     expect(await eventTypes(handle.db)).toEqual([]);
   });
 });

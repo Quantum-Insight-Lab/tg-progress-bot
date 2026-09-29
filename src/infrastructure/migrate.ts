@@ -110,3 +110,8 @@ export function readPullRequestsMigration(root = process.cwd()): string {
 export function readCiMirrorMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '022_ci_mirror.sql'), 'utf8');
 }
+
+/** Таблица commits: хвост коммитов и природный ключ. Проекта и задачи в строке нет. */
+export function readCommitsMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '023_commits.sql'), 'utf8');
+}

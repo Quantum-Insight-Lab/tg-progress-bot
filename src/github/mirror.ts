@@ -7,6 +7,6 @@
  * Milestone пишется из `github.milestone_changed` по природному ключу.
  * Pull request пишется из `github.pull_request_changed` по природному ключу.
  * CI пишется из `github.workflow_completed`: основная ветка и уже лежащие pull request.
- * Таблицы коммитов и остальных объектов — в своих issues.
+ * Коммиты пишутся из `github.commits_pushed`: хвост репозитория, не вся история.
  */
 export const githubMirrorPart = { id: 'github-mirror', scope: 'repository' } as const;

@@ -7,6 +7,8 @@ import type {
   IssueLinkDelivery,
   MilestoneDelivery,
   PullRequestDelivery,
+  PushCommitDelivery,
+  PushDelivery,
   WorkflowDelivery,
 } from '../domain/github/delivery.ts';
 import {
@@ -31,6 +33,7 @@ const EVENT_ISSUE_DEPENDENCIES = 'issue_dependencies';
 const EVENT_SUB_ISSUES = 'sub_issues';
 const EVENT_MILESTONE = 'milestone';
 const EVENT_WORKFLOW_RUN = 'workflow_run';
+const EVENT_PUSH = 'push';
 const ACTION_COMPLETED = 'completed';
 const STATUS_OK = 200;
 const STATUS_BAD = 400;
@@ -54,6 +57,8 @@ export interface GithubWebhookRequest {
   applyPullRequest?: (payload: PayloadByType['github.pull_request_changed']) => Promise<void>;
   /** Пишет CI после новой доставки workflow. Повтор ключа сюда не приходит. */
   applyWorkflow?: (payload: PayloadByType['github.workflow_completed']) => Promise<void>;
+  /** Пишет хвост коммитов после новой доставки push. Повтор ключа сюда не приходит. */
+  applyCommits?: (payload: PayloadByType['github.commits_pushed']) => Promise<void>;
 }
 
 export interface GithubWebhookHttpDeps {
@@ -67,6 +72,7 @@ export interface GithubWebhookHttpDeps {
       applyMilestone: (payload: PayloadByType['github.milestone_changed']) => Promise<void>,
       applyPullRequest: (payload: PayloadByType['github.pull_request_changed']) => Promise<void>,
       applyWorkflow: (payload: PayloadByType['github.workflow_completed']) => Promise<void>,
+      applyCommits: (payload: PayloadByType['github.commits_pushed']) => Promise<void>,
     ) => Promise<number>,
   ) => Promise<number>;
 }
@@ -336,6 +342,52 @@ function parseWorkflow(deliveryId: string, body: Record<string, unknown>): Githu
   return delivery;
 }
 
+/**
+ * Коммит push: sha, сообщение, автор и время.
+ * Без логина автора коммит в хвост не входит: отнести его не к кому.
+ * Неполное тело одного коммита не отменяет остальные.
+ */
+function parsePushCommit(value: unknown): PushCommitDelivery | 'skip' | 'invalid' {
+  if (!isRecord(value)) return 'invalid';
+  const shaSource = value.id !== undefined ? value.id : value.sha;
+  if (shaSource === undefined || shaSource === null) return 'skip';
+  if (typeof shaSource !== 'string') return 'invalid';
+  const message = value.message;
+  if (message === undefined || message === null) return 'skip';
+  if (typeof message !== 'string') return 'invalid';
+  const created = value.timestamp !== undefined ? value.timestamp : value.created_at;
+  if (created === undefined || created === null) return 'skip';
+  if (typeof created !== 'string') return 'invalid';
+  if (!isRecord(value.author)) return 'skip';
+  const author = text(value.author.username);
+  if (author === null || author.trim().length === 0) return 'skip';
+  if (shaSource.trim().length === 0 || message.trim().length === 0 || created.trim().length === 0) return 'skip';
+  return { sha: shaSource, message, authorLogin: author, createdAt: created };
+}
+
+/** `push` становится фактом коммитов. Пустой список — push без новых коммитов, факт всё равно есть. */
+function parsePush(deliveryId: string, body: Record<string, unknown>): GithubDelivery | null {
+  const repository = repositoryId(body);
+  if (repository === null) return null;
+  if (body.commits !== undefined && body.commits !== null && !Array.isArray(body.commits)) return null;
+  const raw = Array.isArray(body.commits) ? body.commits : [];
+  const commits: PushCommitDelivery[] = [];
+  for (const item of raw) {
+    const parsed = parsePushCommit(item);
+    if (parsed === 'invalid') return null;
+    if (parsed === 'skip') continue;
+    commits.push(parsed);
+  }
+  const delivery: PushDelivery = {
+    kind: 'push',
+    deliveryId,
+    repositoryId: repository,
+    commits,
+    senderLogin: isRecord(body.sender) ? login(body.sender) : null,
+  };
+  return delivery;
+}
+
 function parseDelivery(eventName: string, deliveryId: string, json: unknown): GithubDelivery | null {
   if (!isRecord(json)) return null;
   if (eventName === EVENT_ISSUES) return parseIssue(deliveryId, json);
@@ -345,6 +397,7 @@ function parseDelivery(eventName: string, deliveryId: string, json: unknown): Gi
   }
   if (eventName === EVENT_MILESTONE) return parseMilestone(deliveryId, json);
   if (eventName === EVENT_WORKFLOW_RUN) return parseWorkflow(deliveryId, json);
+  if (eventName === EVENT_PUSH) return parsePush(deliveryId, json);
   return { kind: 'other', deliveryId, eventName };
 }
 
@@ -404,6 +457,13 @@ export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<
   ) {
     await input.applyWorkflow(result.payload);
   }
+  if (
+    input.applyCommits !== undefined &&
+    result.status === 'applied' &&
+    result.eventType === EVENT_TYPES.GITHUB_COMMITS_PUSHED
+  ) {
+    await input.applyCommits(result.payload);
+  }
   return STATUS_OK;
 }
 
@@ -418,7 +478,15 @@ export async function acceptGithubWebhookHttp(
     const eventName = header(req, 'x-github-event');
     const deliveryId = header(req, 'x-github-delivery');
     const signature = header(req, 'x-hub-signature-256');
-    const status = await deps.isolate((journal, applyIssue, applyIssueLink, applyMilestone, applyPullRequest, applyWorkflow) =>
+    const status = await deps.isolate((
+      journal,
+      applyIssue,
+      applyIssueLink,
+      applyMilestone,
+      applyPullRequest,
+      applyWorkflow,
+      applyCommits,
+    ) =>
       acceptGithubWebhook({
         secret: deps.secret,
         eventName,
@@ -432,6 +500,7 @@ export async function acceptGithubWebhookHttp(
         applyMilestone,
         applyPullRequest,
         applyWorkflow,
+        applyCommits,
       }),
     );
     if (!res.writableEnded) {

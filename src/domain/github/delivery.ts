@@ -3,6 +3,7 @@ import type { EventJournal } from '../../events/journal.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
 import { ciBranch, ciStatus, type CiStatus } from './ci-status.ts';
+import { pushedCommits } from './commit.ts';
 import { issueLinkAction, issueLinkType, type IssueLinkAction, type IssueLinkType } from './issue-dependency.ts';
 import { milestoneFields } from './milestone.ts';
 import { githubRepositoryId } from './repository.ts';
@@ -92,9 +93,26 @@ export interface WorkflowDelivery {
   senderLogin: string | null;
 }
 
+/** Один коммит из доставки `push`. Автор — тот, кто сделал коммит. */
+export interface PushCommitDelivery {
+  sha: string;
+  message: string;
+  authorLogin: string;
+  createdAt: string;
+}
+
+/** Доставка `push`: коммиты репозитория. Хвост отбирает зеркало, не эта запись. */
+export interface PushDelivery {
+  kind: 'push';
+  deliveryId: string;
+  repositoryId: string;
+  commits: readonly PushCommitDelivery[];
+  senderLogin: string | null;
+}
+
 /**
  * Подписанная доставка, для которой этот шаг не публикует факт.
- * Событие push — в своей issue.
+ * Ping и чужие события сюда и входят. `push` — нет.
  */
 export interface OtherDelivery {
   kind: 'other';
@@ -108,6 +126,7 @@ export type GithubDelivery =
   | IssueLinkDelivery
   | MilestoneDelivery
   | WorkflowDelivery
+  | PushDelivery
   | OtherDelivery;
 
 export type GithubDeliveryResult =
@@ -136,6 +155,11 @@ export type GithubDeliveryResult =
       status: 'applied' | 'duplicate';
       eventType: typeof EVENT_TYPES.GITHUB_WORKFLOW_COMPLETED;
       payload: PayloadByType['github.workflow_completed'];
+    }
+  | {
+      status: 'applied' | 'duplicate';
+      eventType: typeof EVENT_TYPES.GITHUB_COMMITS_PUSHED;
+      payload: PayloadByType['github.commits_pushed'];
     };
 
 /** Команд записи в GitHub нет: синхронизация только в сторону бота. */
@@ -264,10 +288,57 @@ function workflowNumbers(values: readonly number[]): number[] {
   return result;
 }
 
+function storedCommits(payload: unknown): PayloadByType['github.commits_pushed'] {
+  const parsed = payloadSchemaByType[EVENT_TYPES.GITHUB_COMMITS_PUSHED].safeParse(payload);
+  if (!parsed.success) throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'факт push не прочитан');
+  return parsed.data;
+}
+
 function storedMilestone(payload: unknown): PayloadByType['github.milestone_changed'] {
   const parsed = payloadSchemaByType[EVENT_TYPES.GITHUB_MILESTONE_CHANGED].safeParse(payload);
   if (!parsed.success) throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'факт milestone не прочитан');
   return parsed.data;
+}
+
+async function recordPush(
+  journal: EventJournal,
+  clock: Clock,
+  delivery: PushDelivery,
+  idempotencyKey: string,
+): Promise<GithubDeliveryResult> {
+  const repositoryId = githubRepositoryId(delivery.repositoryId);
+  const commits = pushedCommits(delivery.commits);
+  const payload: PayloadByType['github.commits_pushed'] = {
+    repository_id: repositoryId,
+    commits: commits.map((commit) => ({
+      sha: commit.sha,
+      author_login: commit.authorLogin,
+      message: commit.message,
+      created_at: commit.createdAt,
+    })),
+  };
+  const published = await emit(journal, {
+    type: EVENT_TYPES.GITHUB_COMMITS_PUSHED,
+    source: GITHUB_DELIVERY_SOURCE,
+    idempotencyKey,
+    payload,
+    actor: { id: actorId(optionalText(delivery.senderLogin)), role: GITHUB_ACTOR_ROLE },
+    subject: { entity: REPOSITORY_SUBJECT, id: repositoryId },
+    occurredAt: clock.now(),
+    causationId: null,
+    correlationId: null,
+  });
+  if (published.status === 'duplicate') {
+    if (published.row.eventType !== EVENT_TYPES.GITHUB_COMMITS_PUSHED) {
+      throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'ключ доставки уже занят');
+    }
+    return {
+      status: 'duplicate',
+      eventType: EVENT_TYPES.GITHUB_COMMITS_PUSHED,
+      payload: storedCommits(published.row.payload),
+    };
+  }
+  return { status: 'applied', eventType: EVENT_TYPES.GITHUB_COMMITS_PUSHED, payload };
 }
 
 async function recordWorkflow(
@@ -450,6 +521,9 @@ export async function recordGithubDelivery(
   }
   if (delivery.kind === 'workflow') {
     return recordWorkflow(journal, clock, delivery, idempotencyKey);
+  }
+  if (delivery.kind === 'push') {
+    return recordPush(journal, clock, delivery, idempotencyKey);
   }
   if (!positiveInt(delivery.number)) throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'номер pull request — число GitHub');
   const repositoryId = githubRepositoryId(delivery.repositoryId);
