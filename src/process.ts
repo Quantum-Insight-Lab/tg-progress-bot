@@ -36,6 +36,7 @@ import { createEventJournal } from './infrastructure/event-journal.ts';
 import { mirrorGithubIssueLink } from './infrastructure/issue-links.ts';
 import { mirrorGithubIssue } from './infrastructure/issue-mirror.ts';
 import { mirrorGithubMilestone } from './infrastructure/milestone-mirror.ts';
+import { mirrorGithubPullRequest } from './infrastructure/pull-request-mirror.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { attachAccessGuard } from './telegram/access-guard.ts';
 import { createTelegramBot, type TelegramBotInfo } from './telegram/bot.ts';
@@ -290,6 +291,9 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
                 },
                 async (payload) => {
                   await mirrorGithubMilestone(trx, payload, randomUUID());
+                },
+                async (payload) => {
+                  await mirrorGithubPullRequest(trx, payload, randomUUID());
                 },
               ),
             ),

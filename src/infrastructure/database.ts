@@ -159,6 +159,20 @@ export interface MilestonesTable {
   due_on: string | null;
 }
 
+/**
+ * Pull request зеркала (E-14). Ключ — id.
+ * Природный ключ — `repository_id` и `pull_request_number`, не проект и не задача.
+ * `ci_status`, даты и логин слившего этой таблицей пока не заданы.
+ */
+export interface PullRequestsTable {
+  id: string;
+  repository_id: string;
+  pull_request_number: number;
+  title: string;
+  author_login: string;
+  state: 'open' | 'closed' | 'merged';
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
@@ -174,4 +188,5 @@ export interface Database {
   issue_assignees: IssueAssigneesTable;
   issue_dependencies: IssueDependenciesTable;
   milestones: MilestonesTable;
+  pull_requests: PullRequestsTable;
 }

@@ -100,3 +100,8 @@ export function readIssueDependenciesMigration(root = process.cwd()): string {
 export function readMilestonesMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '020_milestones.sql'), 'utf8');
 }
+
+/** Таблица pull_requests: поля зеркала и природный ключ. Проекта и задачи в строке нет. */
+export function readPullRequestsMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '021_pull_requests.sql'), 'utf8');
+}

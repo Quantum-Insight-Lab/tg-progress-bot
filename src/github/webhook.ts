@@ -40,6 +40,8 @@ export interface GithubWebhookRequest {
   applyIssueLink?: (payload: PayloadByType['github.issue_links_changed']) => Promise<void>;
   /** Пишет milestone после новой доставки. Повтор ключа сюда не приходит. */
   applyMilestone?: (payload: PayloadByType['github.milestone_changed']) => Promise<void>;
+  /** Пишет pull request после новой доставки. Повтор ключа сюда не приходит. */
+  applyPullRequest?: (payload: PayloadByType['github.pull_request_changed']) => Promise<void>;
 }
 
 export interface GithubWebhookHttpDeps {
@@ -51,6 +53,7 @@ export interface GithubWebhookHttpDeps {
       applyIssue: (payload: PayloadByType['github.issue_changed']) => Promise<void>,
       applyIssueLink: (payload: PayloadByType['github.issue_links_changed']) => Promise<void>,
       applyMilestone: (payload: PayloadByType['github.milestone_changed']) => Promise<void>,
+      applyPullRequest: (payload: PayloadByType['github.pull_request_changed']) => Promise<void>,
     ) => Promise<number>,
   ) => Promise<number>;
 }
@@ -327,6 +330,13 @@ export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<
   ) {
     await input.applyMilestone(result.payload);
   }
+  if (
+    input.applyPullRequest !== undefined &&
+    result.status === 'applied' &&
+    result.eventType === EVENT_TYPES.GITHUB_PULL_REQUEST_CHANGED
+  ) {
+    await input.applyPullRequest(result.payload);
+  }
   return STATUS_OK;
 }
 
@@ -341,7 +351,7 @@ export async function acceptGithubWebhookHttp(
     const eventName = header(req, 'x-github-event');
     const deliveryId = header(req, 'x-github-delivery');
     const signature = header(req, 'x-hub-signature-256');
-    const status = await deps.isolate((journal, applyIssue, applyIssueLink, applyMilestone) =>
+    const status = await deps.isolate((journal, applyIssue, applyIssueLink, applyMilestone, applyPullRequest) =>
       acceptGithubWebhook({
         secret: deps.secret,
         eventName,
@@ -353,6 +363,7 @@ export async function acceptGithubWebhookHttp(
         applyIssue,
         applyIssueLink,
         applyMilestone,
+        applyPullRequest,
       }),
     );
     if (!res.writableEnded) {
