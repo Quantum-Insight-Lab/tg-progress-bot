@@ -40,7 +40,8 @@ import {
   type TaskStore,
   type TopicOwner,
 } from '../domain/tasks/create-task.ts';
-import { closeBlocker, defineBlocker, isOpenBlocker } from '../domain/tasks/blocker.ts';
+import { closeBlocker, defineBlocker, isOpenBlocker, type Blocker } from '../domain/tasks/blocker.ts';
+import { publishBlockerDetected, type BlockerDetectStore } from '../domain/tasks/detect-blocker.ts';
 import type { TaskPriority } from '../domain/tasks/status.ts';
 import { defineTask, type Task } from '../domain/tasks/task.ts';
 import { closesBlockerOnExit } from '../domain/tasks/transition.ts';
@@ -457,6 +458,46 @@ export function createTaskMarkActions(db: Kysely<Database>, clock: Clock): TaskM
       return db.transaction().execute((trx) => pressTaskMark(markStore(trx), createEventJournal(trx), clock, input));
     },
   };
+}
+
+function detectStore(trx: Transaction<Database>): BlockerDetectStore {
+  return {
+    seen(idempotencyKey) {
+      return seenEvent(trx, idempotencyKey);
+    },
+    async insertBlocker(blocker: Blocker) {
+      await trx
+        .insertInto('blockers')
+        .values({
+          id: blocker.id,
+          task_id: blocker.taskId,
+          reason: blocker.reason,
+          asked_at: new Date(blocker.askedAt),
+          resolved_at: blocker.resolvedAt === null ? null : new Date(blocker.resolvedAt),
+        })
+        .execute();
+    },
+    saveStatus(task, from) {
+      return writeStatus(trx, task, from);
+    },
+  };
+}
+
+/**
+ * A-28 внутри уже открытой транзакции: блокер, `BLOCKED` и `blocker.detected`.
+ * Статус пишет та же функция, что и кнопки задачи.
+ */
+export function commitBlockerDetected(
+  trx: Transaction<Database>,
+  input: {
+    task: Task;
+    blockerId: string;
+    day: number;
+    idempotencyKey: string;
+    occurredAt: Date;
+  },
+): Promise<{ applied: boolean; eventId: string }> {
+  return publishBlockerDetected(detectStore(trx), createEventJournal(trx), input);
 }
 
 /** `/task`: строка `tasks` и `task.created` коммитятся одной транзакцией. */

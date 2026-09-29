@@ -19,6 +19,7 @@ import { createProjectSettings } from './infrastructure/settings.ts';
 import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
 import { carryOpenCanvases } from './infrastructure/carry-canvas.ts';
+import { detectStaleTasks } from './infrastructure/detect-blocker.ts';
 import {
   createTaskActions,
   createTaskCancelActions,
@@ -50,6 +51,7 @@ import { attachTaskMark } from './telegram/task-mark.ts';
 import { attachTaskPlan } from './telegram/task-plan.ts';
 import { attachTaskReview } from './telegram/task-review.ts';
 import { attachTaskCancel } from './telegram/task-cancel.ts';
+import { sendBlockerQuestion } from './telegram/blocker-question.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
 
 const DEFAULT_HOST = '0.0.0.0';
@@ -118,6 +120,7 @@ let running: RunningProcess | undefined;
 
 /**
  * Один процесс backend: webhook Telegram, планировщик актов системы, Progress Engine.
+ * Слот A-28 переводит застоявшуюся задачу в `BLOCKED` и спрашивает исполнителя.
  * Слот A-30 переносит незакрытые задачи на канвас новых суток.
  * Слот A-31 выставляет канвас на сегодня. Остальные слоты регистрируют свои issues.
  */
@@ -158,6 +161,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   };
   let ensureToday: ((now: Date) => Promise<void>) | undefined;
   let carryToday: ((now: Date) => Promise<void>) | undefined;
+  let detectStale: ((now: Date) => Promise<void>) | undefined;
   if (config.db !== undefined) {
     const database = config.db;
     const canvas = createCanvasPlacement(config.db, config.clock);
@@ -209,9 +213,28 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachTaskPlan(bot, createTaskPlanActions(config.db, config.clock), redrawTaskCanvas);
     attachTaskReview(bot, createTaskReviewActions(config.db, config.clock), redrawTaskCanvas);
     attachTaskCancel(bot, createTaskCancelActions(config.db, config.clock), redrawTaskCanvas);
+    detectStale = (now) =>
+      detectStaleTasks(database, now, async (hit) => {
+        await sendBlockerQuestion(bot.api, {
+          chatId: hit.telegramChatId,
+          messageThreadId: hit.topicId,
+          taskNumber: hit.taskNumber,
+          day: hit.day,
+        });
+        await canvas.show({
+          projectId: hit.projectId,
+          assigneeId: hit.assigneeId,
+          destination: CANVAS_DESTINATION_TOPIC,
+          causationId: hit.eventId,
+          cause: null,
+          send: deliverCanvas.send,
+          edit: deliverCanvas.edit,
+        });
+      });
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);
+  if (detectStale !== undefined) scheduler.register('A-28', detectStale);
   if (carryToday !== undefined) scheduler.register('A-30', carryToday);
   if (ensureToday !== undefined) scheduler.register('A-31', ensureToday);
   const webhook: WebhookServer = await startTelegramWebhook({
