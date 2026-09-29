@@ -244,13 +244,17 @@ events:
     owner: max
 
   - type: canvas.full
-    version: 1
+    version: 2
     context: tasks
     actor: system
     subject: Canvas
     payload:
-      canvas_id: string
-    idempotency_key: telegram update_id
+      # canvas_id пуст, пока сообщение не отправлено: строка canvases без message_id не создаётся.
+      canvas_id: string | null
+      project_id: string
+      assignee_id: string
+      canvas_date: date
+    idempotency_key: project_id + assignee_id + canvas_date + telegram update_id for update, project_id + assignee_id + canvas_date + schedule for A-31
     invariants: [INV-09, INV-23]
     realizes: [R-633]
     projections: [P-1]

@@ -2,7 +2,7 @@ import type { Bot } from 'grammy';
 import type { TaskCancelling, TaskCancelResult } from '../domain/tasks/cancel-task.ts';
 import { TASK_TRANSITION_CANCEL } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
-import type { CanvasRedraw, TaskCommandPlace } from './task-command.ts';
+import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const CANCEL_DATA = new RegExp(`^task:${TASK_TRANSITION_CANCEL}:([1-9]\\d*)$`);
 
@@ -71,6 +71,7 @@ export function attachTaskCancel(bot: Bot, actions: TaskCancelling, canvas?: Can
     const from = ctx.from;
     const message = ctx.callbackQuery.message;
     const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+    let notice: { text: string } | undefined;
     try {
       if (taskNumber === null || from.is_bot) return;
       const cancelled = await replyToTaskCancel(
@@ -90,13 +91,16 @@ export function attachTaskCancel(bot: Bot, actions: TaskCancelling, canvas?: Can
             projectId: cancelled.task.projectId,
             assigneeId: cancelled.task.assigneeId,
             causationId: cancelled.eventId,
+            cause: String(ctx.update.update_id),
           });
         } catch (error) {
-          if (!(error instanceof DomainError) || error.code !== DOMAIN_ERROR.CANVAS_DUPLICATE) throw error;
+          const failure = canvasRedrawFailure(error);
+          if (failure === null) throw error;
+          if (failure === 'full') notice = { text: CANVAS_FULL_REPLY };
         }
       }
     } finally {
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery(notice);
     }
   });
 }

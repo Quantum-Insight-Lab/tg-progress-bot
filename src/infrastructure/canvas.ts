@@ -3,8 +3,10 @@ import { sql, type Kysely, type Transaction } from 'kysely';
 import { carryAssigneeDay } from './carry-canvas.ts';
 import {
   CANVAS_DESTINATION_TOPIC,
+  CANVAS_FULL_SCHEDULE,
   decideCanvasMove,
   recordEditedCanvas,
+  recordFullCanvas,
   recordPostedCanvas,
   requireEditCausation,
   type CanvasSlotState,
@@ -42,14 +44,22 @@ export interface ShownCanvas {
   canvas: Canvas;
 }
 
+/** Новое сообщение. Число — прежние вызовы, где ужатия не было. */
+export type CanvasSendResult = number | { status: 'sent'; messageId: number; shrunk: boolean } | { status: 'full' };
+
+/** Правка того же сообщения. `void` — ужатия не было. */
+export type CanvasEditResult = void | { status: 'edited'; shrunk: boolean } | { status: 'full' };
+
 export interface ShowCanvasInput {
   projectId: string;
   assigneeId: string;
   destination: string;
   now: Date;
   causationId: string | null;
-  send(home: CanvasHome): Promise<number>;
-  edit(home: CanvasHome, messageId: number): Promise<void>;
+  /** Апдейт Telegram. Пусто — слот A-31, ключ `schedule`. */
+  cause?: string | null;
+  send(home: CanvasHome): Promise<CanvasSendResult>;
+  edit(home: CanvasHome, messageId: number): Promise<CanvasEditResult>;
 }
 
 interface SlotRow {
@@ -237,6 +247,47 @@ async function slotFor(
   };
 }
 
+function sentOf(value: CanvasSendResult): { status: 'full' } | { status: 'sent'; messageId: number; shrunk: boolean } {
+  if (typeof value === 'number') return { status: 'sent', messageId: value, shrunk: false };
+  if (value.status === 'full') return { status: 'full' };
+  return value;
+}
+
+function editedOf(value: CanvasEditResult): { status: 'full' } | { status: 'edited'; shrunk: boolean } {
+  if (value === undefined) return { status: 'edited', shrunk: false };
+  if (value.status === 'full') return { status: 'full' };
+  return value;
+}
+
+function noteFull(
+  db: Kysely<Database>,
+  input: {
+    projectId: string;
+    assigneeId: string;
+    canvasId: string | null;
+    canvasDate: string;
+    cause: string | null | undefined;
+    now: Date;
+  },
+): Promise<'applied' | 'duplicate'> {
+  const cause = input.cause?.trim() || CANVAS_FULL_SCHEDULE;
+  return db.transaction().execute((trx) =>
+    recordFullCanvas(createEventJournal(trx), {
+      canvasId: input.canvasId,
+      projectId: input.projectId,
+      assigneeId: input.assigneeId,
+      canvasDate: input.canvasDate,
+      cause,
+      occurredAt: input.now,
+    }),
+  );
+}
+
+function rejectedFull(recorded: 'applied' | 'duplicate'): never {
+  if (recorded === 'duplicate') throw new DomainError(DOMAIN_ERROR.CANVAS_DUPLICATE, 'canvas.full уже записан');
+  throw new DomainError(DOMAIN_ERROR.CANVAS_FULL, 'канвас заполнен');
+}
+
 /** После выставления: незакрытые задачи прошлого канваса ложатся на сегодня, если сутки уже новые. */
 async function finish(
   db: Kysely<Database>,
@@ -266,34 +317,64 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
   if (move.kind === 'edit') {
     const causationId = requireEditCausation(input.causationId);
     const telegramChatId = slot.telegramChatId ?? '';
-    await input.edit(
-      {
-        telegramChatId,
-        topicId: move.canvas.topicId,
-        projectName: project.name,
-        canvasDate: move.canvas.canvasDate,
-        tasks: lines.tasks,
-        plan: lines.plan,
-      },
-      move.canvas.messageId,
+    const edited = editedOf(
+      await input.edit(
+        {
+          telegramChatId,
+          topicId: move.canvas.topicId,
+          projectName: project.name,
+          canvasDate: move.canvas.canvasDate,
+          tasks: lines.tasks,
+          plan: lines.plan,
+        },
+        move.canvas.messageId,
+      ),
     );
+    if (edited.status === 'full') {
+      rejectedFull(
+        await noteFull(db, {
+          projectId: input.projectId,
+          assigneeId: input.assigneeId,
+          canvasId: move.canvas.id,
+          canvasDate: move.canvas.canvasDate,
+          cause: input.cause,
+          now: input.now,
+        }),
+      );
+    }
     const canvas = await db.transaction().execute((trx) =>
       recordEditedCanvas(createEventJournal(trx), {
         canvas: move.canvas,
         causationId,
         occurredAt: input.now,
+        shrunk: edited.shrunk,
       }),
     );
     return finish(db, input.projectId, input.assigneeId, input.now, { action: 'edit', canvas });
   }
-  const messageId = await input.send({
-    telegramChatId: move.telegramChatId,
-    topicId: move.topicId,
-    projectName: project.name,
-    canvasDate: move.canvasDate,
-    tasks: lines.tasks,
-    plan: lines.plan,
-  });
+  const sent = sentOf(
+    await input.send({
+      telegramChatId: move.telegramChatId,
+      topicId: move.topicId,
+      projectName: project.name,
+      canvasDate: move.canvasDate,
+      tasks: lines.tasks,
+      plan: lines.plan,
+    }),
+  );
+  if (sent.status === 'full') {
+    rejectedFull(
+      await noteFull(db, {
+        projectId: input.projectId,
+        assigneeId: input.assigneeId,
+        canvasId: null,
+        canvasDate: move.canvasDate,
+        cause: input.cause,
+        now: input.now,
+      }),
+    );
+  }
+  const messageId = sent.messageId;
   const canvas = await db.transaction().execute((trx) =>
     recordPostedCanvas(
       {
@@ -334,6 +415,7 @@ export async function showCanvasForTopic(
     topicId: number;
     now: Date;
     causationId: string | null;
+    cause?: string | null;
     send: ShowCanvasInput['send'];
     edit: ShowCanvasInput['edit'];
   },
@@ -360,6 +442,7 @@ export async function showCanvasForTopic(
     destination: CANVAS_DESTINATION_TOPIC,
     now: input.now,
     causationId: input.causationId,
+    cause: input.cause ?? null,
     send: input.send,
     edit: input.edit,
   });
@@ -372,7 +455,7 @@ export async function showCanvasForTopic(
 export async function ensureTodayCanvases(
   db: Kysely<Database>,
   now: Date,
-  send: (home: CanvasHome) => Promise<number>,
+  send: (home: CanvasHome) => Promise<CanvasSendResult>,
 ): Promise<void> {
   const members = await sql<MemberRow>`
     SELECT project_members.project_id::text AS project_id,
@@ -395,14 +478,28 @@ export async function ensureTodayCanvases(
       if (existing !== null) continue;
       const topicId = whole(member.topic_id, 'topic_id');
       const lines = await assigneeCanvasLines(db, member.project_id, member.user_id, canvasDate, member.timezone);
-      const messageId = await send({
-        telegramChatId: member.telegram_chat_id,
-        topicId,
-        projectName: member.project_name,
-        canvasDate,
-        tasks: lines.tasks,
-        plan: lines.plan,
-      });
+      const sent = sentOf(
+        await send({
+          telegramChatId: member.telegram_chat_id,
+          topicId,
+          projectName: member.project_name,
+          canvasDate,
+          tasks: lines.tasks,
+          plan: lines.plan,
+        }),
+      );
+      if (sent.status === 'full') {
+        await noteFull(db, {
+          projectId: member.project_id,
+          assigneeId: member.user_id,
+          canvasId: null,
+          canvasDate,
+          cause: CANVAS_FULL_SCHEDULE,
+          now,
+        });
+        continue;
+      }
+      const messageId = sent.messageId;
       await db.transaction().execute((trx) =>
         recordPostedCanvas(
           {
@@ -447,7 +544,7 @@ export async function ensureTodayCanvases(
 export interface CanvasPlacement {
   show(input: Omit<ShowCanvasInput, 'now'> & { now?: Date }): Promise<ShownCanvas>;
   showForTopic(input: Omit<Parameters<typeof showCanvasForTopic>[1], 'now'>): Promise<ShownCanvas>;
-  ensureToday(now: Date, send: (home: CanvasHome) => Promise<number>): Promise<void>;
+  ensureToday(now: Date, send: (home: CanvasHome) => Promise<CanvasSendResult>): Promise<void>;
 }
 
 /** Часы — только момент «сегодня». Дата канваса считается по таймзоне проекта. */

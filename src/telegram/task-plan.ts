@@ -3,7 +3,7 @@ import type { TaskPlanResult, TaskPlanning } from '../domain/tasks/plan-task.ts'
 import { TASK_TRANSITION_PLAN, TASK_TRANSITION_RESUME } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { TASK_PRIORITY_ACTION } from '../projections/tasks-block.ts';
-import type { CanvasRedraw, TaskCommandPlace } from './task-command.ts';
+import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const STEER_DATA = new RegExp(
   `^task:(${TASK_TRANSITION_PLAN}|${TASK_TRANSITION_RESUME}|${TASK_PRIORITY_ACTION}):([1-9]\\d*)$`,
@@ -79,6 +79,7 @@ export function attachTaskPlan(bot: Bot, actions: TaskPlanning, canvas?: CanvasR
       const from = ctx.from;
       const message = ctx.callbackQuery.message;
       const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+      let notice: { text: string } | undefined;
       try {
         if (parsed === null || from.is_bot) return;
         const steered = await replyToTaskPlan(
@@ -99,13 +100,16 @@ export function attachTaskPlan(bot: Bot, actions: TaskPlanning, canvas?: CanvasR
               projectId: steered.task.projectId,
               assigneeId: steered.task.assigneeId,
               causationId: steered.eventId,
+              cause: String(ctx.update.update_id),
             });
           } catch (error) {
-            if (!(error instanceof DomainError) || error.code !== DOMAIN_ERROR.CANVAS_DUPLICATE) throw error;
+            const failure = canvasRedrawFailure(error);
+            if (failure === null) throw error;
+            if (failure === 'full') notice = { text: CANVAS_FULL_REPLY };
           }
         }
       } finally {
-        await ctx.answerCallbackQuery();
+        await ctx.answerCallbackQuery(notice);
       }
     },
   );

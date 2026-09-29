@@ -65,7 +65,7 @@ export const EVENT_VERSIONS = {
   'review.reminded': 1,
   'canvas.posted': 1,
   'canvas.edited': 1,
-  'canvas.full': 1,
+  'canvas.full': 2,
   'canvas.carried_over': 1,
   'divergence.detected': 1,
   'user.registered': 1,
@@ -195,7 +195,10 @@ export interface CanvasEditedPayload {
 }
 
 export interface CanvasFullPayload {
-  canvas_id: string;
+  canvas_id: string | null;
+  project_id: string;
+  assignee_id: string;
+  canvas_date: string;
 }
 
 export interface CanvasCarriedOverPayload {
@@ -520,7 +523,10 @@ export const CanvasEditedPayloadSchema = z.strictObject({
 });
 
 export const CanvasFullPayloadSchema = z.strictObject({
-  canvas_id: z.string(),
+  canvas_id: z.union([z.string(), z.null()]),
+  project_id: z.string(),
+  assignee_id: z.string(),
+  canvas_date: z.string(),
 });
 
 export const CanvasCarriedOverPayloadSchema = z.strictObject({

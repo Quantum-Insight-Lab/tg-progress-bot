@@ -2,7 +2,7 @@ import type { Bot } from 'grammy';
 import type { TaskMarking, TaskMarkResult } from '../domain/tasks/check-task.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { TASK_MARK_ACTION } from '../projections/tasks-block.ts';
-import type { CanvasRedraw, TaskCommandPlace } from './task-command.ts';
+import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const MARK_DATA = new RegExp(`^task:${TASK_MARK_ACTION}:([1-9]\\d*)$`);
 
@@ -71,6 +71,7 @@ export function attachTaskMark(bot: Bot, actions: TaskMarking, canvas?: CanvasRe
     const from = ctx.from;
     const message = ctx.callbackQuery.message;
     const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+    let notice: { text: string } | undefined;
     try {
       if (number === null || from.is_bot) return;
       const marked = await replyToTaskMark(
@@ -90,13 +91,16 @@ export function attachTaskMark(bot: Bot, actions: TaskMarking, canvas?: CanvasRe
             projectId: marked.task.projectId,
             assigneeId: marked.task.assigneeId,
             causationId: marked.eventId,
+            cause: String(ctx.update.update_id),
           });
         } catch (error) {
-          if (!(error instanceof DomainError) || error.code !== DOMAIN_ERROR.CANVAS_DUPLICATE) throw error;
+          const failure = canvasRedrawFailure(error);
+          if (failure === null) throw error;
+          if (failure === 'full') notice = { text: CANVAS_FULL_REPLY };
         }
       }
     } finally {
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery(notice);
     }
   });
 }

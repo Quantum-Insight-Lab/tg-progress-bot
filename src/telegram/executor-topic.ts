@@ -4,6 +4,7 @@ import { canvasHome, type AssignedTopic, type ExecutorTopicActions, type TopicBo
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { REPORTS_TOPIC_COLLIDES } from './reports-topic.ts';
 import { FIRST_MESSAGE_TASK, renderFirstEmployeeMessage } from '../projections/first-employee-message.ts';
+import { CANVAS_FULL_REPLY } from './task-command.ts';
 
 /** Строка настроек: топик исполнителя. */
 export const EXECUTOR_TOPIC_HEADING = 'Топик исполнителя';
@@ -182,6 +183,8 @@ function replyOf(error: unknown): ScreenReply | null {
       return { text: EXECUTOR_TOPIC_ALREADY };
     case DOMAIN_ERROR.REPORTS_TOPIC_COLLIDES:
       return { text: REPORTS_TOPIC_COLLIDES };
+    case DOMAIN_ERROR.CANVAS_FULL:
+      return { text: CANVAS_FULL_REPLY };
     default:
       throw error;
   }
@@ -193,7 +196,7 @@ function inPrivate(chatType: string | undefined, from: TelegramAccount | undefin
 
 /** После топика канвас уходит в него отдельным сообщением. Первое сообщение сотруднику остаётся. */
 export interface CanvasNotice {
-  posted(input: { telegramUserId: string; topicId: number }): Promise<void>;
+  posted(input: { telegramUserId: string; topicId: number; cause?: string }): Promise<void>;
 }
 
 /** Один текст сотруднику в личку и тем же текстом в его топик. Канвас этим сообщением не становится. */
@@ -234,7 +237,7 @@ export async function replyToExecutorTopicMessage(
       idempotencyKey,
     });
     await deliverFirstMessage(channel, assigned);
-    await canvas?.posted({ telegramUserId: assigned.telegramUserId, topicId: assigned.home.topicId });
+    await canvas?.posted({ telegramUserId: assigned.telegramUserId, topicId: assigned.home.topicId, cause: idempotencyKey });
     return { text: EXECUTOR_TOPIC_SET };
   } catch (error) {
     return replyOf(error);
@@ -294,7 +297,7 @@ export async function replyToCreateTopic(
       idempotencyKey,
     });
     await deliverFirstMessage(channel, assigned);
-    await canvas?.posted({ telegramUserId: assigned.telegramUserId, topicId: assigned.home.topicId });
+    await canvas?.posted({ telegramUserId: assigned.telegramUserId, topicId: assigned.home.topicId, cause: idempotencyKey });
     return { text: EXECUTOR_TOPIC_CREATED };
   } catch (error) {
     return replyOf(error);

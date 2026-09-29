@@ -7,15 +7,23 @@ export interface CanvasTopic {
   messageThreadId: number;
 }
 
+function assertNoChecklist(message: CanvasRichMessage): void {
+  const raw = JSON.stringify(message);
+  if (raw.includes('sendChecklist') || raw.includes('"type":"checklist"')) {
+    throw new Error('sendChecklist не используем');
+  }
+}
+
 /**
  * B-6. Канвас уходит методом `sendRichMessage` в топик (`message_thread_id`).
- * Клавиатуры под сообщением нет: `reply_markup` в вызов не передаётся.
+ * `sendChecklist` не вызывается. Клавиатуры под сообщением нет: `reply_markup` в вызов не передаётся.
  */
 export async function sendCanvasMessage(
   api: Pick<Api, 'sendRichMessage'>,
   topic: CanvasTopic,
   message: CanvasRichMessage,
 ): Promise<number> {
+  assertNoChecklist(message);
   const sent = await api.sendRichMessage(topic.chatId, message, {
     message_thread_id: topic.messageThreadId,
   });
@@ -32,5 +40,6 @@ export async function editCanvasMessage(
   messageId: number,
   message: CanvasRichMessage,
 ): Promise<void> {
+  assertNoChecklist(message);
   await api.editMessageText(topic.chatId, messageId, message);
 }

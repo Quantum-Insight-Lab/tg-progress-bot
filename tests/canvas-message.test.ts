@@ -1,6 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Transformer } from 'grammy';
 import {
+  CANVAS_CHECKBOX_DONE,
+  CANVAS_CHECKBOX_OPEN,
   CANVAS_LINK_STYLE,
   CANVAS_SECTION_ORDER,
   renderCanvas,
@@ -143,6 +145,28 @@ describe('B-6 канвас уходит в топик', () => {
     expect(payload).not.toHaveProperty('reply_markup');
     expect(payload).not.toHaveProperty('text');
     expect(JSON.stringify(payload)).not.toContain('inline_keyboard');
+  });
+
+  it('R-608 галочка - [ ] в rich message — рисунок без callback_data', () => {
+    const drawn = renderCanvasMessage([{ pieces: [{ kind: 'text', text: `${CANVAS_CHECKBOX_OPEN} пункт` }] }]);
+    expect(JSON.stringify(drawn)).toContain(CANVAS_CHECKBOX_OPEN);
+    expect(JSON.stringify(drawn)).not.toContain('callback_data');
+    expect(() =>
+      renderCanvasMessage([
+        { pieces: [{ kind: 'action', label: CANVAS_CHECKBOX_OPEN, callbackData: 'task:mark:1' }] },
+      ]),
+    ).toThrow(/рисунок/);
+    expect(() =>
+      renderCanvasMessage([{ pieces: [{ kind: 'action', label: CANVAS_CHECKBOX_DONE, callbackData: 'task:mark:1' }] }]),
+    ).toThrow(/рисунок/);
+  });
+
+  it('R-610 sendChecklist не используем', async () => {
+    await sendCanvasMessage(bot.api, { chatId: '-1001', messageThreadId: 42 }, taskParagraph);
+    expect(calls.map((call) => call.method)).toEqual(['sendRichMessage']);
+    expect(calls.some((call) => call.method === 'sendChecklist')).toBe(false);
+    expect(JSON.stringify(calls[0]?.payload)).not.toContain('sendChecklist');
+    expect(JSON.stringify(calls[0]?.payload)).not.toContain('checklist');
   });
 
   it('R-598 клавиатуры под сообщением нет', async () => {
