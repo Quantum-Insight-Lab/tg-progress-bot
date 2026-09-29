@@ -113,6 +113,22 @@ export interface RepositoriesTable {
   name: string;
 }
 
+/**
+ * Issue зеркала (E-10). Ключ — id.
+ * `state_reason` пуст у открытого. Природный ключ репозитория и номера этой таблицей не задаётся.
+ */
+export interface IssuesTable {
+  id: string;
+  repository_id: string;
+  issue_number: number;
+  title: string;
+  state: 'open' | 'closed';
+  state_reason: 'completed' | 'not_planned' | null;
+  closed_by_login: string | null;
+  updated_at: Date;
+  closed_at: Date | null;
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
@@ -124,4 +140,5 @@ export interface Database {
   canvas_items: CanvasItemsTable;
   blockers: BlockersTable;
   repositories: RepositoriesTable;
+  issues: IssuesTable;
 }
