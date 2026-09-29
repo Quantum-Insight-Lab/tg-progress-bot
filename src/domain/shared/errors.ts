@@ -172,6 +172,9 @@ export const DOMAIN_ERROR = {
   BLOCKER_ASKED_AT: 'blocker_asked_at',
   BLOCKER_RESOLVED_AT: 'blocker_resolved_at',
   BLOCKER_NOT_TASK: 'blocker_not_task',
+  BLOCKER_REPLY: 'blocker_reply',
+  BLOCKER_ACTOR: 'blocker_actor',
+  BLOCKER_ABSENT: 'blocker_absent',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

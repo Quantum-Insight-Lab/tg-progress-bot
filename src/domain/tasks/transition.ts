@@ -34,6 +34,9 @@ export const TASK_TRANSITION_CANCEL = 'cancel';
 /** Застой: `IN_PROGRESS` без галочки дольше порога уходит в `BLOCKED`. */
 export const TASK_TRANSITION_STALE = 'stale';
 
+/** «Нет блокера»: задача возвращается из `BLOCKED` в `IN_PROGRESS`. */
+export const TASK_TRANSITION_NO_BLOCKER = 'noblock';
+
 /**
  * Кто нажал «подтвердить» или «вернуть».
  * Роль — строка участника этого проекта. Контекст проектов сюда не импортируется.
@@ -70,6 +73,7 @@ const TASK_TRANSITIONS: readonly TransitionRow[] = [
   { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_BLOCKED, to: TASK_STATUS_CANCELLED },
   { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_REVIEW, to: TASK_STATUS_CANCELLED },
   { act: TASK_TRANSITION_STALE, from: TASK_STATUS_IN_PROGRESS, to: TASK_STATUS_BLOCKED },
+  { act: TASK_TRANSITION_NO_BLOCKER, from: TASK_STATUS_BLOCKED, to: TASK_STATUS_IN_PROGRESS },
 ];
 
 export interface TaskTransition {
