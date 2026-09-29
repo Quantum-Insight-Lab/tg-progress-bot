@@ -193,6 +193,12 @@ export const DOMAIN_ERROR = {
   ISSUE_LINK_ACTION: 'issue_link_action',
   ISSUE_LINK_SELF: 'issue_link_self',
   ISSUE_LINK_ISSUE: 'issue_link_issue',
+  MILESTONE_ID_BLANK: 'milestone_id_blank',
+  MILESTONE_NUMBER: 'milestone_number',
+  MILESTONE_TITLE_BLANK: 'milestone_title_blank',
+  MILESTONE_STATE: 'milestone_state',
+  MILESTONE_DUE_ON: 'milestone_due_on',
+  MILESTONE_MIRROR: 'milestone_mirror',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

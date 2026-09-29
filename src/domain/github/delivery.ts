@@ -3,6 +3,7 @@ import type { EventJournal } from '../../events/journal.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
 import { issueLinkAction, issueLinkType, type IssueLinkAction, type IssueLinkType } from './issue-dependency.ts';
+import { milestoneFields } from './milestone.ts';
 import { githubRepositoryId } from './repository.ts';
 
 /** Факт пришёл из GitHub, не из кнопки бота. */
@@ -13,6 +14,7 @@ export const GITHUB_ACTOR_ROLE = 'github';
 
 const ISSUE_SUBJECT = 'Issue';
 const PULL_REQUEST_SUBJECT = 'PullRequest';
+const MILESTONE_SUBJECT = 'Milestone';
 const ACTOR_FALLBACK = 'github';
 const STATE_OPEN = 'open';
 const STATE_CLOSED = 'closed';
@@ -64,9 +66,21 @@ export interface IssueLinkDelivery {
   senderLogin: string | null;
 }
 
+/** Снимок milestone из доставки webhook. */
+export interface MilestoneDelivery {
+  kind: 'milestone';
+  deliveryId: string;
+  repositoryId: string;
+  number: number;
+  title: string;
+  state: string;
+  dueOn: string | null;
+  senderLogin: string | null;
+}
+
 /**
  * Подписанная доставка, для которой этот шаг не публикует факт.
- * События push, milestone и workflow — в своих issues.
+ * События push и workflow — в своих issues.
  */
 export interface OtherDelivery {
   kind: 'other';
@@ -74,7 +88,7 @@ export interface OtherDelivery {
   eventName: string;
 }
 
-export type GithubDelivery = IssueDelivery | PullRequestDelivery | IssueLinkDelivery | OtherDelivery;
+export type GithubDelivery = IssueDelivery | PullRequestDelivery | IssueLinkDelivery | MilestoneDelivery | OtherDelivery;
 
 export type GithubDeliveryResult =
   | { status: 'ignored' }
@@ -92,6 +106,11 @@ export type GithubDeliveryResult =
       status: 'applied' | 'duplicate';
       eventType: typeof EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED;
       payload: PayloadByType['github.issue_links_changed'];
+    }
+  | {
+      status: 'applied' | 'duplicate';
+      eventType: typeof EVENT_TYPES.GITHUB_MILESTONE_CHANGED;
+      payload: PayloadByType['github.milestone_changed'];
     };
 
 /** Команд записи в GitHub нет: синхронизация только в сторону бота. */
@@ -200,6 +219,56 @@ function storedIssueLink(payload: unknown): PayloadByType['github.issue_links_ch
   return parsed.data;
 }
 
+function storedMilestone(payload: unknown): PayloadByType['github.milestone_changed'] {
+  const parsed = payloadSchemaByType[EVENT_TYPES.GITHUB_MILESTONE_CHANGED].safeParse(payload);
+  if (!parsed.success) throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'факт milestone не прочитан');
+  return parsed.data;
+}
+
+async function recordMilestone(
+  journal: EventJournal,
+  clock: Clock,
+  delivery: MilestoneDelivery,
+  idempotencyKey: string,
+): Promise<GithubDeliveryResult> {
+  const fields = milestoneFields({
+    repositoryId: delivery.repositoryId,
+    milestoneNumber: delivery.number,
+    title: delivery.title,
+    state: delivery.state,
+    dueOn: delivery.dueOn,
+  });
+  const payload: PayloadByType['github.milestone_changed'] = {
+    repository_id: fields.repositoryId,
+    milestone_number: fields.milestoneNumber,
+    title: fields.title,
+    state: fields.state,
+    due_on: fields.dueOn,
+  };
+  const published = await emit(journal, {
+    type: EVENT_TYPES.GITHUB_MILESTONE_CHANGED,
+    source: GITHUB_DELIVERY_SOURCE,
+    idempotencyKey,
+    payload,
+    actor: { id: actorId(optionalText(delivery.senderLogin)), role: GITHUB_ACTOR_ROLE },
+    subject: { entity: MILESTONE_SUBJECT, id: subjectId(fields.repositoryId, fields.milestoneNumber) },
+    occurredAt: clock.now(),
+    causationId: null,
+    correlationId: null,
+  });
+  if (published.status === 'duplicate') {
+    if (published.row.eventType !== EVENT_TYPES.GITHUB_MILESTONE_CHANGED) {
+      throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'ключ доставки уже занят');
+    }
+    return {
+      status: 'duplicate',
+      eventType: EVENT_TYPES.GITHUB_MILESTONE_CHANGED,
+      payload: storedMilestone(published.row.payload),
+    };
+  }
+  return { status: 'applied', eventType: EVENT_TYPES.GITHUB_MILESTONE_CHANGED, payload };
+}
+
 async function recordIssueLink(
   journal: EventJournal,
   clock: Clock,
@@ -292,6 +361,9 @@ export async function recordGithubDelivery(
   }
   if (delivery.kind === 'issue_link') {
     return recordIssueLink(journal, clock, delivery, idempotencyKey);
+  }
+  if (delivery.kind === 'milestone') {
+    return recordMilestone(journal, clock, delivery, idempotencyKey);
   }
   if (!positiveInt(delivery.number)) throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'номер pull request — число GitHub');
   const repositoryId = githubRepositoryId(delivery.repositoryId);
