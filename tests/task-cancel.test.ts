@@ -36,6 +36,7 @@ import { createChatBinding } from '../src/infrastructure/chats.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import {
+  readBlockersMigration,
   readChatsMigration,
   readEventsMigration,
   readMemberTopicMigration,
@@ -437,6 +438,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readProjectMembersMigration());
   await pglite.exec(readMemberTopicMigration());
   await pglite.exec(readTasksMigration());
+  await pglite.exec(readBlockersMigration());
   const db = new Kysely<Database>({ dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }) });
   return {
     db,

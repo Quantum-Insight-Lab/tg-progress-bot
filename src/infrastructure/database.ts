@@ -93,6 +93,19 @@ export interface CanvasItemsTable {
   carried_from_canvas_id: string | null;
 }
 
+/**
+ * Блокер (E-6): причина, по которой задача стоит.
+ * Причина пуста, пока исполнитель не ответил. Открыт, пока `resolved_at` пуст.
+ * Строк CI и PR в таблице нет.
+ */
+export interface BlockersTable {
+  id: string;
+  task_id: string;
+  reason: string | null;
+  asked_at: Date;
+  resolved_at: Date | null;
+}
+
 /** Репозиторий установки GitHub App (E-9). Ключ — id GitHub, не проект. */
 export interface RepositoriesTable {
   id: string;
@@ -109,5 +122,6 @@ export interface Database {
   tasks: TasksTable;
   canvases: CanvasesTable;
   canvas_items: CanvasItemsTable;
+  blockers: BlockersTable;
   repositories: RepositoriesTable;
 }

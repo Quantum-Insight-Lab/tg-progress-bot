@@ -71,7 +71,7 @@ const TASK_TRANSITIONS: readonly TransitionRow[] = [
 export interface TaskTransition {
   from: TaskStatus;
   to: TaskStatus;
-  /** Выход из `BLOCKED` закрывает блокер. Строку `blockers` пишет акт блокера. */
+  /** Выход из `BLOCKED` закрывает открытый блокер. Строку пишет акт блокера. */
   closesBlocker: boolean;
 }
 
@@ -126,8 +126,13 @@ export function transitionTask(from: TaskStatus, act: string, decision?: ReviewD
   return {
     from,
     to,
-    closesBlocker: from === TASK_STATUS_BLOCKED && to !== TASK_STATUS_BLOCKED,
+    closesBlocker: closesBlockerOnExit(from, to),
   };
+}
+
+/** Выход из `BLOCKED` любым актом закрывает блокер. Другой переход его не трогает. */
+export function closesBlockerOnExit(from: TaskStatus, to: TaskStatus): boolean {
+  return from === TASK_STATUS_BLOCKED && to !== TASK_STATUS_BLOCKED;
 }
 
 /** Нажатие кружка: галочка, если её ещё нет, и снятие, если задача уже на подтверждении. */

@@ -166,6 +166,12 @@ export const DOMAIN_ERROR = {
   CANVAS_ITEM_CARRIED_BLANK: 'canvas_item_carried_blank',
   CANVAS_ITEM_BUTTONS: 'canvas_item_buttons',
   CANVAS_CARRY_TASKS: 'canvas_carry_tasks',
+  BLOCKER_ID_BLANK: 'blocker_id_blank',
+  BLOCKER_TASK_BLANK: 'blocker_task_blank',
+  BLOCKER_REASON: 'blocker_reason',
+  BLOCKER_ASKED_AT: 'blocker_asked_at',
+  BLOCKER_RESOLVED_AT: 'blocker_resolved_at',
+  BLOCKER_NOT_TASK: 'blocker_not_task',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
