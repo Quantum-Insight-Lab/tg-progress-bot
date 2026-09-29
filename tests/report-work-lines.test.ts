@@ -3,6 +3,7 @@ import { taskDayMark } from '../src/projections/tasks-block.ts';
 import {
   reportNextLine,
   reportNowLine,
+  reportNowLines,
   reportRiskLines,
   reportWorkLines,
   type ReportNextLineTask,
@@ -52,6 +53,21 @@ describe('макет строк Сейчас, Дальше и Риск', () => {
     expect(reportNextLine(next)).toBe(nextLine);
     expect(reportNextLine(next)).not.toContain('Андрей');
     expect(reportNextLine(next)).not.toContain('день');
+  });
+
+  it('R-737 Нет таких — строка не печатается', () => {
+    expect(reportNowLines([], true)).toEqual([]);
+    expect(reportNowLines([], false)).toEqual([]);
+    const lines = reportWorkLines({
+      now: [],
+      next: [next],
+      reasons: [{ text: reason }],
+      defaultBranchCiRed: false,
+      pullRequests: [],
+      showAssignee: true,
+    });
+    expect(lines.join('\n')).not.toContain('Сейчас');
+    expect(lines).toEqual([nextLine, riskLine]);
   });
 
   it('R-683 Риск: нет стабильного доступа к одному из источников данных', () => {
