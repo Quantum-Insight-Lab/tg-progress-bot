@@ -1,6 +1,14 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { GithubDelivery, IssueDelivery, IssueLinkDelivery, MilestoneDelivery, PullRequestDelivery } from '../domain/github/delivery.ts';
+import { workflowConclusion } from '../domain/github/ci-status.ts';
+import type {
+  GithubDelivery,
+  IssueDelivery,
+  IssueLinkDelivery,
+  MilestoneDelivery,
+  PullRequestDelivery,
+  WorkflowDelivery,
+} from '../domain/github/delivery.ts';
 import {
   ISSUE_LINK_ADDED,
   ISSUE_LINK_BLOCKED_BY,
@@ -22,6 +30,8 @@ const EVENT_PULL_REQUEST = 'pull_request';
 const EVENT_ISSUE_DEPENDENCIES = 'issue_dependencies';
 const EVENT_SUB_ISSUES = 'sub_issues';
 const EVENT_MILESTONE = 'milestone';
+const EVENT_WORKFLOW_RUN = 'workflow_run';
+const ACTION_COMPLETED = 'completed';
 const STATUS_OK = 200;
 const STATUS_BAD = 400;
 const STATUS_UNAUTHORIZED = 401;
@@ -42,6 +52,8 @@ export interface GithubWebhookRequest {
   applyMilestone?: (payload: PayloadByType['github.milestone_changed']) => Promise<void>;
   /** Пишет pull request после новой доставки. Повтор ключа сюда не приходит. */
   applyPullRequest?: (payload: PayloadByType['github.pull_request_changed']) => Promise<void>;
+  /** Пишет CI после новой доставки workflow. Повтор ключа сюда не приходит. */
+  applyWorkflow?: (payload: PayloadByType['github.workflow_completed']) => Promise<void>;
 }
 
 export interface GithubWebhookHttpDeps {
@@ -54,6 +66,7 @@ export interface GithubWebhookHttpDeps {
       applyIssueLink: (payload: PayloadByType['github.issue_links_changed']) => Promise<void>,
       applyMilestone: (payload: PayloadByType['github.milestone_changed']) => Promise<void>,
       applyPullRequest: (payload: PayloadByType['github.pull_request_changed']) => Promise<void>,
+      applyWorkflow: (payload: PayloadByType['github.workflow_completed']) => Promise<void>,
     ) => Promise<number>,
   ) => Promise<number>;
 }
@@ -277,6 +290,52 @@ function parseMilestone(deliveryId: string, body: Record<string, unknown>): Mile
   };
 }
 
+function workflowPullRequestNumbers(value: unknown): number[] | null {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) return null;
+  const numbers: number[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const number = numberValue(item.number);
+    if (number === null) return null;
+    numbers.push(number);
+  }
+  return numbers;
+}
+
+/**
+ * `workflow_run` со статусом completed становится фактом CI.
+ * Незавершённый прогон и пустое тело фактом не являются.
+ * Имя ветки нужно только чтобы отличить основную; в зеркало оно не пишется.
+ */
+function parseWorkflow(deliveryId: string, body: Record<string, unknown>): GithubDelivery | null {
+  const action = text(body.action)?.trim().toLowerCase() ?? '';
+  if (action !== ACTION_COMPLETED || !isRecord(body.workflow_run)) {
+    return { kind: 'other', deliveryId, eventName: EVENT_WORKFLOW_RUN };
+  }
+  const repository = repositoryId(body);
+  const branch = text(body.workflow_run.head_branch);
+  if (repository === null || branch === null) return null;
+  const rawConclusion = body.workflow_run.conclusion;
+  if (rawConclusion !== null && rawConclusion !== undefined && typeof rawConclusion !== 'string') return null;
+  const conclusion = workflowConclusion(typeof rawConclusion === 'string' ? rawConclusion : null);
+  if (conclusion === null) return { kind: 'other', deliveryId, eventName: EVENT_WORKFLOW_RUN };
+  const pullRequestNumbers = workflowPullRequestNumbers(body.workflow_run.pull_requests);
+  if (pullRequestNumbers === null) return null;
+  const defaultBranch = isRecord(body.repository) ? text(body.repository.default_branch) : null;
+  const delivery: WorkflowDelivery = {
+    kind: 'workflow',
+    deliveryId,
+    repositoryId: repository,
+    branch,
+    isDefaultBranch: defaultBranch !== null && defaultBranch.trim() === branch.trim(),
+    conclusion,
+    pullRequestNumbers,
+    senderLogin: isRecord(body.sender) ? login(body.sender) : null,
+  };
+  return delivery;
+}
+
 function parseDelivery(eventName: string, deliveryId: string, json: unknown): GithubDelivery | null {
   if (!isRecord(json)) return null;
   if (eventName === EVENT_ISSUES) return parseIssue(deliveryId, json);
@@ -285,6 +344,7 @@ function parseDelivery(eventName: string, deliveryId: string, json: unknown): Gi
     return parseIssueLink(eventName, deliveryId, json);
   }
   if (eventName === EVENT_MILESTONE) return parseMilestone(deliveryId, json);
+  if (eventName === EVENT_WORKFLOW_RUN) return parseWorkflow(deliveryId, json);
   return { kind: 'other', deliveryId, eventName };
 }
 
@@ -337,6 +397,13 @@ export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<
   ) {
     await input.applyPullRequest(result.payload);
   }
+  if (
+    input.applyWorkflow !== undefined &&
+    result.status === 'applied' &&
+    result.eventType === EVENT_TYPES.GITHUB_WORKFLOW_COMPLETED
+  ) {
+    await input.applyWorkflow(result.payload);
+  }
   return STATUS_OK;
 }
 
@@ -351,7 +418,7 @@ export async function acceptGithubWebhookHttp(
     const eventName = header(req, 'x-github-event');
     const deliveryId = header(req, 'x-github-delivery');
     const signature = header(req, 'x-hub-signature-256');
-    const status = await deps.isolate((journal, applyIssue, applyIssueLink, applyMilestone, applyPullRequest) =>
+    const status = await deps.isolate((journal, applyIssue, applyIssueLink, applyMilestone, applyPullRequest, applyWorkflow) =>
       acceptGithubWebhook({
         secret: deps.secret,
         eventName,
@@ -364,6 +431,7 @@ export async function acceptGithubWebhookHttp(
         applyIssueLink,
         applyMilestone,
         applyPullRequest,
+        applyWorkflow,
       }),
     );
     if (!res.writableEnded) {

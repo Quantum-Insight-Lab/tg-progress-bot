@@ -204,7 +204,12 @@ export const DOMAIN_ERROR = {
   PULL_REQUEST_TITLE_BLANK: 'pull_request_title_blank',
   PULL_REQUEST_AUTHOR_LOGIN: 'pull_request_author_login',
   PULL_REQUEST_STATE: 'pull_request_state',
+  PULL_REQUEST_UPDATED_AT: 'pull_request_updated_at',
+  PULL_REQUEST_MERGED_AT: 'pull_request_merged_at',
+  PULL_REQUEST_MERGED_BY_LOGIN: 'pull_request_merged_by_login',
   PULL_REQUEST_MIRROR: 'pull_request_mirror',
+  CI_STATUS: 'ci_status',
+  CI_BRANCH: 'ci_branch',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

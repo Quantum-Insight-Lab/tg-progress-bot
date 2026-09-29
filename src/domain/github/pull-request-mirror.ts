@@ -18,6 +18,9 @@ export interface PullRequestMirrorFact {
   title: string;
   authorLogin: string;
   state: string;
+  updatedAt: string;
+  mergedAt: string | null;
+  mergedByLogin: string | null;
 }
 
 /**
@@ -37,6 +40,10 @@ export async function savePullRequestMirror(
     title: fact.title,
     authorLogin: fact.authorLogin,
     state: fact.state,
+    ciStatus: existing === null ? null : existing.ciStatus,
+    updatedAt: fact.updatedAt,
+    mergedAt: fact.mergedAt,
+    mergedByLogin: fact.mergedByLogin,
   });
   await store.save(pullRequest);
   const stored = await store.find(pullRequest.repositoryId, pullRequest.pullRequestNumber);

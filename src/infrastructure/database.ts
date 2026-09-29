@@ -111,6 +111,12 @@ export interface RepositoriesTable {
   id: string;
   owner: string;
   name: string;
+  /** Пусто, пока workflow основной ветки не завершился. */
+  default_branch_ci: ColumnType<
+    'success' | 'failure' | 'cancelled' | 'other' | null,
+    'success' | 'failure' | 'cancelled' | 'other' | null | undefined,
+    'success' | 'failure' | 'cancelled' | 'other' | null
+  >;
 }
 
 /**
@@ -162,7 +168,8 @@ export interface MilestonesTable {
 /**
  * Pull request зеркала (E-14). Ключ — id.
  * Природный ключ — `repository_id` и `pull_request_number`, не проект и не задача.
- * `ci_status`, даты и логин слившего этой таблицей пока не заданы.
+ * `ci_status` пуст, пока workflow этого PR не завершился.
+ * `merged_at` и `merged_by_login` пусты, пока PR не смержен.
  */
 export interface PullRequestsTable {
   id: string;
@@ -171,6 +178,10 @@ export interface PullRequestsTable {
   title: string;
   author_login: string;
   state: 'open' | 'closed' | 'merged';
+  ci_status: 'success' | 'failure' | 'cancelled' | 'other' | null;
+  updated_at: Date;
+  merged_at: Date | null;
+  merged_by_login: string | null;
 }
 
 export interface Database {
