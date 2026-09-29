@@ -8,5 +8,6 @@
  * Pull request пишется из `github.pull_request_changed` по природному ключу.
  * CI пишется из `github.workflow_completed`: основная ветка и уже лежащие pull request.
  * Коммиты пишутся из `github.commits_pushed`: хвост репозитория, не вся история.
+ * Сверка раз в `RECONCILE_INTERVAL` догоняет пропущенную доставку и пишет `github.reconciled`.
  */
 export const githubMirrorPart = { id: 'github-mirror', scope: 'repository' } as const;

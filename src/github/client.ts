@@ -52,11 +52,17 @@ export function assertGithubAppCredentials(credentials: GithubAppCredentials): v
   }
 }
 
-function defaultListing(credentials: GithubAppCredentials): InstallationRepositoryListing {
-  const app = new App({
+/** Один конструктор App: список установки и сверка зеркала ходят через него. */
+export function createGithubInstallationApp(credentials: GithubAppCredentials): App {
+  assertGithubAppCredentials(credentials);
+  return new App({
     appId: credentials.appId.trim(),
     privateKey: normalizePem(credentials.privateKey),
   });
+}
+
+function defaultListing(credentials: GithubAppCredentials): InstallationRepositoryListing {
+  const app = createGithubInstallationApp(credentials);
   return {
     eachRepository: {
       async *iterator() {
