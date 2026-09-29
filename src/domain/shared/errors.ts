@@ -228,6 +228,14 @@ export const DOMAIN_ERROR = {
   PERIOD_TASK_STATUS: 'period_task_status',
   PERIOD_TASK_DUPLICATE: 'period_task_duplicate',
   PERIOD_FACT_KEY: 'period_fact_key',
+  REPORT_WORK_KEY: 'report_work_key',
+  REPORT_WORK_DUPLICATE: 'report_work_duplicate',
+  REPORT_WORK_NUMBER: 'report_work_number',
+  REPORT_WORK_TITLE: 'report_work_title',
+  REPORT_WORK_STATUS: 'report_work_status',
+  REPORT_WORK_PRIORITY: 'report_work_priority',
+  REPORT_WORK_CREATED: 'report_work_created',
+  REPORT_WORK_DAY: 'report_work_day',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
