@@ -216,6 +216,7 @@ export const DOMAIN_ERROR = {
   COMMIT_AUTHOR_LOGIN: 'commit_author_login',
   COMMIT_CREATED_AT: 'commit_created_at',
   COMMIT_MIRROR: 'commit_mirror',
+  GITHUB_FACT_KEY: 'github_fact_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
