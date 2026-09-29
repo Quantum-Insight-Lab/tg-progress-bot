@@ -20,6 +20,7 @@ import { orderPlan, taskPriority, taskStatus, tasksStandingInBlock } from '../do
 import { taskCanvasDay } from '../domain/tasks/task-day.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
+import { loadProjectShareRatio } from './repository-share.ts';
 
 /** Задача на канвасе этого исполнителя: первая строка абзаца и приоритет для второй. */
 export interface CanvasTaskLine {
@@ -37,6 +38,8 @@ export interface CanvasHome {
   canvasDate: string;
   tasks: readonly CanvasTaskLine[];
   plan: readonly CanvasTaskLine[];
+  /** Дробь доли. Пусто — процента нет, на канвасе «Нет данных». */
+  shareRatio: number | null;
 }
 
 export interface ShownCanvas {
@@ -314,6 +317,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
   const slot = await slotFor(db, input.projectId, input.assigneeId, canvasDate);
   const move = decideCanvasMove(input.destination, slot, input.now);
   const lines = await assigneeCanvasLines(db, input.projectId, input.assigneeId, canvasDate, project.timezone);
+  const shareRatio = await loadProjectShareRatio(db, input.projectId);
   if (move.kind === 'edit') {
     const causationId = requireEditCausation(input.causationId);
     const telegramChatId = slot.telegramChatId ?? '';
@@ -326,6 +330,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
           canvasDate: move.canvas.canvasDate,
           tasks: lines.tasks,
           plan: lines.plan,
+          shareRatio,
         },
         move.canvas.messageId,
       ),
@@ -360,6 +365,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
       canvasDate: move.canvasDate,
       tasks: lines.tasks,
       plan: lines.plan,
+      shareRatio,
     }),
   );
   if (sent.status === 'full') {
@@ -478,6 +484,7 @@ export async function ensureTodayCanvases(
       if (existing !== null) continue;
       const topicId = whole(member.topic_id, 'topic_id');
       const lines = await assigneeCanvasLines(db, member.project_id, member.user_id, canvasDate, member.timezone);
+      const shareRatio = await loadProjectShareRatio(db, member.project_id);
       const sent = sentOf(
         await send({
           telegramChatId: member.telegram_chat_id,
@@ -486,6 +493,7 @@ export async function ensureTodayCanvases(
           canvasDate,
           tasks: lines.tasks,
           plan: lines.plan,
+          shareRatio,
         }),
       );
       if (sent.status === 'full') {
