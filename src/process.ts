@@ -22,6 +22,7 @@ import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
 import { carryOpenCanvases } from './infrastructure/carry-canvas.ts';
 import { detectStaleTasks } from './infrastructure/detect-blocker.ts';
+import { noticeStalePullRequests } from './infrastructure/pr-stall.ts';
 import { remindStaleReviews } from './infrastructure/remind-review.ts';
 import {
   createBlockerAnswerActions,
@@ -144,7 +145,9 @@ let running: RunningProcess | undefined;
  * Слот A-28 переводит застоявшуюся задачу в `BLOCKED` и спрашивает исполнителя.
  * Слот A-29 напоминает руководителям о задаче на подтверждении.
  * Слот A-30 переносит незакрытые задачи на канвас новых суток.
- * Слот A-31 выставляет канвас на сегодня. Остальные слоты регистрируют свои issues.
+ * Слот A-31 выставляет канвас на сегодня.
+ * Слот A-35 замечает PR участника без движения и пишет `repo.pr_stalled`.
+ * Остальные слоты регистрируют свои issues.
  */
 export async function startProcess(config: ProcessConfig): Promise<RunningProcess> {
   if (running !== undefined) throw new Error('процесс уже запущен');
@@ -185,6 +188,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   let carryToday: ((now: Date) => Promise<void>) | undefined;
   let detectStale: ((now: Date) => Promise<void>) | undefined;
   let remindReviews: ((now: Date) => Promise<void>) | undefined;
+  let noticePullRequests: ((now: Date) => Promise<void>) | undefined;
   if (config.db !== undefined) {
     const database = config.db;
     const canvas = createCanvasPlacement(config.db, config.clock);
@@ -255,6 +259,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
           edit: deliverCanvas.edit,
         });
       });
+    noticePullRequests = (now) => noticeStalePullRequests(database, now);
     remindReviews = (now) =>
       remindStaleReviews(database, now, async (hit) => {
         await sendReviewReminder(bot.api, {
@@ -271,6 +276,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   if (remindReviews !== undefined) scheduler.register('A-29', remindReviews);
   if (carryToday !== undefined) scheduler.register('A-30', carryToday);
   if (ensureToday !== undefined) scheduler.register('A-31', ensureToday);
+  if (noticePullRequests !== undefined) scheduler.register('A-35', noticePullRequests);
   const routes: WebhookRoute[] = [];
   const githubWebhookSecret = config.githubWebhookSecret;
   if (githubWebhookSecret !== null && config.db !== undefined) {
