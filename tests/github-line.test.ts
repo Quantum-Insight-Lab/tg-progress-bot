@@ -8,6 +8,7 @@ import {
   CI_STATUS_SUCCESS,
 } from '../src/domain/github/ci-status.ts';
 import { githubCanvasLine, type GithubCanvasLine } from '../src/domain/github/canvas-line.ts';
+import { calendarDaysBetween, projectCalendarDate } from '../src/domain/shared/project-time.ts';
 import { DOMAIN_ERROR } from '../src/domain/shared/errors.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
@@ -23,7 +24,16 @@ import {
   readRepositoriesMigration,
 } from '../src/infrastructure/migrate.ts';
 import type { CanvasRichText } from '../src/projections/canvas-message.ts';
-import { githubLineParagraphs, githubLineText } from '../src/projections/github-line.ts';
+import { COMMITS_TAIL_DAYS } from '../src/config/constants.ts';
+import { commitKeptInTail } from '../src/domain/github/commit.ts';
+import { repositoryStallFacts } from '../src/domain/github/stall.ts';
+import {
+  GITHUB_LINE_DISCONNECTED,
+  GITHUB_LINE_NO_DATA,
+  githubLineParagraphs,
+  githubLineText,
+  githubSectionParagraphs,
+} from '../src/projections/github-line.ts';
 import { prepareCanvasMessage } from '../src/telegram/canvas-fit.ts';
 
 const canvasDate = '2026-09-17';
@@ -71,7 +81,7 @@ function painted(line: GithubCanvasLine | null): string[] {
   const prepared = prepareCanvasMessage({
     projectName: 'Общественный сенсор',
     canvasDate,
-    sections: { github: line === null ? [] : githubLineParagraphs(line) },
+    sections: { github: githubSectionParagraphs(line) },
   });
   if (prepared.status !== 'ready') throw new Error('канвас не собрался');
   return prepared.message.blocks.map((block) => visible(block.text));
@@ -126,7 +136,137 @@ describe('строка GitHub на канвасе', () => {
   it('R-357 на канвасе, если репозиторий подключён, — одна строка', () => {
     expect(githubLineParagraphs(mockLine)).toHaveLength(1);
     expect(lines).toEqual(['ПРОЕКТ: Общественный сенсор · 17.09', githubLine]);
-    expect(painted(null)).toEqual(['ПРОЕКТ: Общественный сенсор · 17.09']);
+    expect(lines.filter((block) => block.startsWith('GitHub '))).toHaveLength(1);
+  });
+
+  it('R-363 нет даты — строка milestone не печатается', () => {
+    const undated = githubCanvasLine({
+      ...mirror,
+      milestones: [
+        { milestoneNumber: 4, title: 'Без срока', state: 'open', dueOn: null },
+        { milestoneNumber: 1, title: 'Архив', state: 'closed', dueOn: null },
+      ],
+    });
+    expect(undated.milestone).toBeNull();
+    const text = githubLineText(undated);
+    const shown = painted(undated);
+    expect(text).not.toContain('milestone');
+    expect(text).not.toContain('Без срока');
+    expect(text).not.toContain('Архив');
+    expect(shown).toEqual([
+      'ПРОЕКТ: Общественный сенсор · 17.09',
+      'GitHub org/sensor: CI зелёный · открытых PR 2 · коммитов за сутки 3',
+    ]);
+    expect(shown.join('\n')).not.toContain('до ');
+  });
+
+  it('R-364 CI неизвестен — на этой строке «Нет данных»', () => {
+    const unknown = githubCanvasLine({ ...mirror, ci: null });
+    expect(unknown.ci).toBeNull();
+    const text = githubLineText(unknown);
+    expect(text).toContain(GITHUB_LINE_NO_DATA);
+    expect(text).toBe(
+      `GitHub org/sensor: ${GITHUB_LINE_NO_DATA} · открытых PR 2 · коммитов за сутки 3 · milestone Pilot до 12.10`,
+    );
+    expect(text).not.toContain('CI зелёный');
+    expect(text).not.toContain('CI красный');
+    expect(painted(unknown)[1]).toBe(text);
+  });
+
+  it('INV-12 неизвестный CI — «Нет данных» на строке GitHub и не блокер: задачи строка не называет', () => {
+    const unknown = githubCanvasLine({ ...mirror, ci: null });
+    const text = githubLineText(unknown);
+    expect(text).toContain(GITHUB_LINE_NO_DATA);
+    expect(text).not.toContain('CI красный');
+    const facts = repositoryStallFacts({
+      now: new Date('2026-09-17T12:00:00+03:00'),
+      repositories: [{ repositoryId, defaultBranchCi: null }],
+      projects: [{ projectId, repositoryId, timezone }],
+      members: [],
+      pullRequests: [],
+    });
+    expect(facts.lines).toEqual([]);
+    expect(facts.notices).toEqual([]);
+    const packed = JSON.stringify({ line: unknown, facts });
+    expect(packed).not.toContain('taskNumber');
+    expect(packed).not.toContain('taskId');
+    expect(packed).not.toContain('BLOCKED');
+  });
+
+  it('R-366 отдельного экрана GitHub нет', () => {
+    expect(githubLineParagraphs(mockLine)).toHaveLength(1);
+    expect(githubSectionParagraphs(null)).toHaveLength(1);
+    const shown = painted(mockLine);
+    expect(shown.filter((block) => block.includes('GitHub org/sensor'))).toEqual([githubLine]);
+    expect(shown).toHaveLength(2);
+    expect(githubLine).not.toContain('\n');
+  });
+
+  it('R-381 полный список PR в чат не вываливается', () => {
+    const titles = ['Первый запрос', 'Второй запрос', 'Третий запрос'];
+    const line = githubCanvasLine({
+      ...mirror,
+      pullRequests: titles.map(() => ({ state: 'open' })),
+    });
+    expect(line.openPullRequests).toBe(titles.length);
+    const text = githubLineText(line);
+    expect(text).toContain('открытых PR 3');
+    expect(githubLineParagraphs(line)).toHaveLength(1);
+    const shown = painted(line).join('\n');
+    for (const title of titles) expect(shown).not.toContain(title);
+    expect(shown).not.toContain('полный список');
+  });
+
+  it('R-182 строка GitHub показывает «репозиторий не подключён»', () => {
+    expect(githubSectionParagraphs(null)).toEqual([
+      { pieces: [{ kind: 'text', text: GITHUB_LINE_DISCONNECTED }] },
+    ]);
+    expect(painted(null)).toEqual(['ПРОЕКТ: Общественный сенсор · 17.09', GITHUB_LINE_DISCONNECTED]);
+    expect(painted(null).join('\n')).not.toContain('CI ');
+    expect(painted(null).join('\n')).not.toContain('открытых PR');
+  });
+
+  it('R-340 git-ветки на канвас не выводятся', () => {
+    const text = githubLineText(mockLine);
+    expect(Object.keys(mockLine).sort()).toEqual([
+      'ci',
+      'commitsOnDay',
+      'milestone',
+      'name',
+      'openPullRequests',
+      'owner',
+    ]);
+    expect(text).not.toContain('feature/');
+    expect(text).not.toContain('ветк');
+    expect(painted(mockLine).join('\n')).not.toContain('main');
+  });
+
+  it('R-341 метки сами по себе на канвас не выводятся', () => {
+    const text = githubLineText(mockLine);
+    expect(text).not.toContain('bug');
+    expect(text).not.toContain('метк');
+    expect('labels' in mockLine).toBe(false);
+    expect(painted(mockLine).join('\n')).not.toContain('label');
+  });
+
+  it('R-920 хвост коммитов кормит строку GitHub, журнал истории не печатается', () => {
+    const outside = new Date('2026-09-09T12:00:00+03:00');
+    const onDay = new Date('2026-09-17T15:00:00+03:00');
+    const now = new Date('2026-09-17T23:00:00+03:00');
+    expect(commitKeptInTail(outside.toISOString(), now)).toBe(false);
+    expect(commitKeptInTail(onDay.toISOString(), now)).toBe(true);
+    const aged = calendarDaysBetween(projectCalendarDate(outside, timezone), canvasDate);
+    expect(aged).toBeGreaterThan(COMMITS_TAIL_DAYS);
+    const line = githubCanvasLine({
+      ...mirror,
+      commits: [{ createdAt: outside }, { createdAt: onDay }, { createdAt: onDay }],
+    });
+    expect(line.commitsOnDay).toBe(2);
+    const text = githubLineText(line);
+    expect(text).toContain('коммитов за сутки 2');
+    expect(text).not.toContain('sha');
+    expect(text).not.toContain(outside.toISOString());
+    expect(painted(line).join('\n')).not.toContain('журнал');
   });
 
   it('R-358 состояние CI основной git-ветки', () => {
@@ -231,9 +371,9 @@ describe('строка GitHub читает зеркало репозитория
     await sql`
       INSERT INTO commits (id, repository_id, sha, message, author_login, created_at)
       VALUES
-        ('00000000-0000-4000-8000-0000000000b1'::uuid, ${repositoryId}, 'aaa', 'вчера', 'ada', '2026-09-16T17:00:00+03:00'),
+        ('00000000-0000-4000-8000-0000000000b1'::uuid, ${repositoryId}, 'aaa', 'ветка feature/login', 'ada', '2026-09-16T17:00:00+03:00'),
         ('00000000-0000-4000-8000-0000000000b2'::uuid, ${repositoryId}, 'bbb', 'утро', 'ada', '2026-09-17T01:00:00+03:00'),
-        ('00000000-0000-4000-8000-0000000000b3'::uuid, ${repositoryId}, 'ccc', 'день', 'ada', '2026-09-17T12:00:00+03:00'),
+        ('00000000-0000-4000-8000-0000000000b3'::uuid, ${repositoryId}, 'ccc', 'метка bug', 'ada', '2026-09-17T12:00:00+03:00'),
         ('00000000-0000-4000-8000-0000000000b4'::uuid, ${repositoryId}, 'ddd', 'вечер', 'ada', '2026-09-17T22:00:00+03:00'),
         ('00000000-0000-4000-8000-0000000000b5'::uuid, ${repositoryId}, 'eee', 'завтра', 'ada', '2026-09-18T10:00:00+03:00')
     `.execute(handle.db);
@@ -253,6 +393,9 @@ describe('строка GitHub читает зеркало репозитория
     expect(shown).toEqual(['ПРОЕКТ: Общественный сенсор · 17.09', githubLine]);
     expect(shown.join('\n')).not.toContain('полный список не печатается');
     expect(shown.join('\n')).not.toContain('утро');
+    expect(shown.join('\n')).not.toContain('ветка feature/login');
+    expect(shown.join('\n')).not.toContain('метка bug');
+    expect(painted(null)).toEqual(['ПРОЕКТ: Общественный сенсор · 17.09', GITHUB_LINE_DISCONNECTED]);
 
     const shared = await loadGithubCanvasLine(handle.db, otherProjectId, canvasDate, timezone);
     if (shared === null) throw new Error('репозиторий подключён');
@@ -265,5 +408,13 @@ describe('строка GitHub читает зеркало репозитория
     if (red === null) throw new Error('репозиторий подключён');
     expect(githubLineText(red)).toContain('CI красный');
     expect(githubLineText(red)).not.toContain('CI зелёный');
+
+    await sql`UPDATE repositories SET default_branch_ci = NULL WHERE id = ${repositoryId}`.execute(handle.db);
+    const unknown = await loadGithubCanvasLine(handle.db, projectId, canvasDate, timezone);
+    if (unknown === null) throw new Error('репозиторий подключён');
+    expect(githubLineText(unknown)).toContain(GITHUB_LINE_NO_DATA);
+    expect(githubLineText(unknown)).not.toContain('CI красный');
+    const journal = await sql<{ n: number }>`SELECT CAST(count(*) AS int) AS n FROM events`.execute(handle.db);
+    expect(Number(journal.rows[0]?.n ?? 0)).toBe(0);
   });
 });

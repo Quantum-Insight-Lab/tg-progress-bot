@@ -7,8 +7,10 @@ import { PULL_REQUEST_STATE_OPEN } from './pull-request.ts';
 /**
  * Строка GitHub канваса (P-9).
  * Считается на лету из зеркала репозитория: CI основной ветки, открытые PR,
- * коммиты календарных суток проекта и ближайший открытый milestone со сроком.
- * Задачи и блокеры это чтение не меняет. Ветки и метки в строку не входят.
+ * коммиты календарных суток из хвоста и ближайший открытый milestone со сроком.
+ * Пустой CI — статус неизвестен, в фактах остаётся пустым. Milestone без срока не берётся.
+ * Задачи и блокеры это чтение не меняет. Ветки, метки и полный список PR в строку не входят.
+ * Сообщение, sha и автор коммита сюда не попадают: хвост даёт только число за сутки.
  */
 
 /** Milestone, который печатается: открытый, со сроком. */
@@ -33,7 +35,10 @@ export interface GithubCanvasPullRequest {
   state: string;
 }
 
-/** Коммит хвоста. В сутки проекта попадает по `createdAt`. */
+/**
+ * Коммит хвоста. В сутки проекта попадает по `createdAt`.
+ * Сообщение и sha в строку не входят: это не журнал истории.
+ */
 export interface GithubCanvasCommit {
   createdAt: Date;
 }
@@ -54,6 +59,10 @@ function countOpenPullRequests(pullRequests: readonly GithubCanvasPullRequest[])
   return count;
 }
 
+/**
+ * Число коммитов хвоста за сутки канваса.
+ * Сообщение, sha и автор не читаются: в строку идёт только число, не журнал.
+ */
 function countCommitsOnDay(commits: readonly GithubCanvasCommit[], canvasDate: string, timezone: string): number {
   let count = 0;
   for (const commit of commits) {
