@@ -262,6 +262,7 @@ describe('ежедневный отчёт', () => {
 const sensorRepo: ReportRepositoryFacts = {
   repositoryId: '11',
   slug: 'org/sensor',
+  ci: 'success',
   commits: 6,
   mergedPullRequests: 1,
   closedIssueTitles: ['Не для блока репозитория'],
@@ -270,10 +271,15 @@ const sensorRepo: ReportRepositoryFacts = {
 const archiveRepo: ReportRepositoryFacts = {
   repositoryId: '22',
   slug: 'org/archive',
+  ci: 'success',
   commits: 4,
   mergedPullRequests: 2,
   closedIssueTitles: [],
 };
+
+function githubBlock(slug: string, facts: string, projects: string): string {
+  return [`GitHub ${slug}`, facts, `Проекты: ${projects}`].join('\n');
+}
 
 describe('состав отчёта по чату', () => {
   it('R-170 Отчёт в командный топик группы уходит один', () => {
@@ -370,7 +376,7 @@ describe('состав отчёта по чату', () => {
     const other = project(archiveBacklog, ['boris'], { repository: archiveRepo });
     const text = dailyReport(view('dm', 'ann', [own, other]));
     expect(text).toContain('Общественный сенсор');
-    expect(text).toContain('org/sensor · коммитов 6 · PR 1');
+    expect(text).toContain(githubBlock('org/sensor', 'CI зелёный · смержено PR 1 · коммитов 6', 'Общественный сенсор'));
     expect(text).not.toContain('org/archive');
     expect(text).not.toContain('Не для блока репозитория');
     expect(text).not.toContain('Полевой архив');
@@ -380,18 +386,19 @@ describe('состав отчёта по чату', () => {
     const first = project(sensorBacklog, ['ann'], { repository: sensorRepo });
     const second = project(archiveBacklog, ['ann'], { repository: archiveRepo });
     const separate = dailyReport(view('dm', 'ann', [first, second]));
-    expect(separate.split('\n\n').filter((part) => part.includes('· коммитов'))).toEqual([
-      'org/sensor · коммитов 6 · PR 1',
-      'org/archive · коммитов 4 · PR 2',
+    expect(separate.split('\n\n').filter((part) => part.startsWith('GitHub '))).toEqual([
+      githubBlock('org/sensor', 'CI зелёный · смержено PR 1 · коммитов 6', 'Общественный сенсор'),
+      githubBlock('org/archive', 'CI зелёный · смержено PR 2 · коммитов 4', 'Полевой архив'),
     ]);
     expect(separate).not.toContain('коммитов 10');
-    expect(separate).not.toContain('PR 3');
+    expect(separate).not.toContain('смержено PR 3');
 
     const twin = project({ ...archiveBacklog, projectName: 'Второе имя' }, ['ann'], { repository: sensorRepo });
     const shared = dailyReport(view('team', null, [first, twin]));
-    expect(shared.match(/org\/sensor · коммитов 6 · PR 1/g)).toHaveLength(1);
+    expect(shared.match(/GitHub org\/sensor/g)).toHaveLength(1);
+    expect(shared).toContain('Проекты: Общественный сенсор, Второе имя');
     expect(shared).not.toContain('коммитов 12');
-    expect(shared).not.toContain('PR 2');
+    expect(shared).not.toContain('смержено PR 2');
     expect(() =>
       dailyReport(
         view('team', null, [first, project(archiveBacklog, ['ann'], { repository: { ...sensorRepo, commits: 7 } })]),
@@ -423,7 +430,9 @@ describe('состав отчёта по чату', () => {
     expect(dm).not.toContain('Чужой чат');
     expect(dm).not.toContain('Сбор поля');
     expect(dm).toContain('Классификация сигнала');
-    expect(dm.match(/org\/sensor · коммитов 6 · PR 1/g)).toHaveLength(1);
+    expect(dm.match(/GitHub org\/sensor/g)).toHaveLength(1);
+    expect(dm).toContain('Проекты: Общественный сенсор');
+    expect(dm).not.toContain('Проекты: Общественный сенсор,');
     expect(dm).not.toContain('Не для блока репозитория');
     expect(dm).not.toContain('org/archive');
     expect(team).toContain('Общественный сенсор');
@@ -431,7 +440,8 @@ describe('состав отчёта по чату', () => {
     expect(team).not.toContain('Чужой чат');
     expect(team).toContain('Сбор поля');
     expect(team).toContain('— Борис');
-    expect(team.match(/org\/sensor · коммитов 6 · PR 1/g)).toHaveLength(1);
+    expect(team.match(/GitHub org\/sensor/g)).toHaveLength(1);
+    expect(team).toContain('Проекты: Общественный сенсор, Второй проект');
     expect(team).not.toContain('коммитов 12');
     const readings = reportReadings({ memberIds: ['ann', 'boris'], commandTopicId: 10, executorTopicIds: [21] });
     expect(readings.map((item) => item.place)).toEqual(['team', 'dm', 'dm']);
@@ -445,5 +455,68 @@ describe('состав отчёта по чату', () => {
     expect(text).toContain('коммитов 40');
     expect(text).not.toContain('Все проекты: 40');
     expect(text).not.toContain('коммитов 49');
+  });
+});
+
+describe('блок GitHub в отчёте', () => {
+  const sensorGithub = githubBlock('org/sensor', 'CI зелёный · смержено PR 1 · коммитов 6', 'Общественный сенсор');
+
+  it('R-684 «GitHub org/sensor»', () => {
+    const text = dailyReport(view('team', null, [project(sensorBacklog, ['ann'], { repository: sensorRepo })]));
+    expect(text).toContain(sensorGithub);
+    expect(text.indexOf('Общественный сенсор')).toBeLessThan(text.indexOf('GitHub org/sensor'));
+  });
+
+  it('R-693 «Блок GitHub один на репозиторий»', () => {
+    const first = project(sensorBacklog, ['ann'], { repository: sensorRepo });
+    const second = project(archiveBacklog, ['ann'], { repository: archiveRepo });
+    const twin = project({ ...archiveBacklog, projectName: 'Второе имя' }, ['ann'], { repository: sensorRepo });
+    const two = dailyReport(view('team', null, [first, second]));
+    expect(two.match(/GitHub /g)).toHaveLength(2);
+    const one = dailyReport(view('team', null, [first, twin]));
+    expect(one.match(/GitHub /g)).toHaveLength(1);
+  });
+
+  it('R-694 даже если им пользуются два проекта', () => {
+    const first = project(sensorBacklog, ['ann'], { repository: sensorRepo });
+    const twin = project({ ...archiveBacklog, projectName: 'Полевой архив' }, ['boris'], { repository: sensorRepo });
+    const text = dailyReport(view('team', null, [first, twin]));
+    expect(text.match(/GitHub org\/sensor/g)).toHaveLength(1);
+    expect(text).toContain('Проекты: Общественный сенсор, Полевой архив');
+    expect(text).toContain('смержено PR 1');
+    expect(text).toContain('коммитов 6');
+    expect(text).not.toContain('смержено PR 2');
+    expect(text).not.toContain('коммитов 12');
+  });
+
+  it('R-695 Закрытые issues в него не копируются', () => {
+    const repo: ReportRepositoryFacts = {
+      ...sensorRepo,
+      closedIssueTitles: ['Telegram-интерфейс', 'Не для блока репозитория'],
+    };
+    const text = dailyReport(view('team', null, [project(sensorBacklog, ['ann'], { repository: repo })]));
+    const github = text.split('\n\n').find((part) => part.startsWith('GitHub '));
+    expect(github).toBe(sensorGithub);
+    expect(github).not.toContain('#11');
+    expect(github).not.toContain('Telegram-интерфейс');
+    expect(github).not.toContain('Не для блока репозитория');
+    expect(text).toContain('Закрыто: #11 Telegram-интерфейс');
+  });
+
+  it('INV-26 два проекта одного репозитория дают один блок GitHub, коммиты и PR не складываются', () => {
+    const first = project(sensorBacklog, ['ann', 'boris'], { repository: sensorRepo });
+    const twin = project({ ...archiveBacklog, projectName: 'Второй проект' }, ['boris'], { repository: sensorRepo });
+    const team = dailyReport(view('team', null, [first, twin]));
+    const dm = dailyReport(view('dm', 'ann', [first, twin]));
+    expect(team.match(/GitHub org\/sensor/g)).toHaveLength(1);
+    expect(team).toContain('Проекты: Общественный сенсор, Второй проект');
+    expect(team.match(/коммитов 6/g)).toHaveLength(1);
+    expect(team.match(/смержено PR 1/g)).toHaveLength(1);
+    expect(dm.match(/GitHub org\/sensor/g)).toHaveLength(1);
+    expect(dm).toContain('Проекты: Общественный сенсор');
+    expect(dm).not.toContain('Второй проект');
+    expect(() =>
+      dailyReport(view('team', null, [first, project(archiveBacklog, ['ann'], { repository: { ...sensorRepo, ci: 'failure' } })])),
+    ).toThrow('коммиты и PR репозитория по проектам не складываются');
   });
 });
