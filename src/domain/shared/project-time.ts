@@ -41,6 +41,43 @@ export function projectCalendarDate(instant: Date, timezone: string): string {
   return `${String(year)}-${monthText}-${dayText}`;
 }
 
+function clockPart(bag: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): string {
+  const value = bag.find((part) => part.type === type)?.value;
+  if (value === undefined) throw new DomainError(DOMAIN_ERROR.SETTINGS_TIMEZONE, 'таймзона не распознана');
+  return value;
+}
+
+/**
+ * Календарный день и местное время `HH:MM` в таймзоне.
+ * Час отчёта группы читается отсюда, не из таймзоны проекта и не из часов сервера.
+ */
+export function projectClock(instant: Date, timezone: string): { date: string; time: string } {
+  const zone = timezone.trim();
+  if (zone.length === 0) throw new DomainError(DOMAIN_ERROR.PROJECT_TIMEZONE_BLANK, 'У проекта есть таймзона');
+  let bag: Intl.DateTimeFormatPart[];
+  try {
+    bag = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(instant);
+  } catch (error) {
+    if (error instanceof RangeError) throw new DomainError(DOMAIN_ERROR.SETTINGS_TIMEZONE, 'таймзона не распознана');
+    throw error;
+  }
+  const year = clockPart(bag, 'year');
+  const month = clockPart(bag, 'month');
+  const day = clockPart(bag, 'day');
+  let hour = clockPart(bag, 'hour');
+  if (hour === '24') hour = '00';
+  const minute = clockPart(bag, 'minute');
+  return { date: `${year}-${month}-${day}`, time: `${hour.padStart(1 + 1, '0')}:${minute.padStart(1 + 1, '0')}` };
+}
+
 const CALENDAR_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function utcMidnight(isoDate: string): number {

@@ -14,6 +14,7 @@ import { createChatBinding } from './infrastructure/chats.ts';
 import { createExecutorTopics } from './infrastructure/executor-topic.ts';
 import { createReportsTopics } from './infrastructure/reports-topic.ts';
 import { createChatSchedule } from './infrastructure/schedule.ts';
+import { createReportCommands, deliverDueReports } from './infrastructure/report-delivery.ts';
 import { createGithubLogin } from './infrastructure/github-login.ts';
 import { createMembership } from './infrastructure/membership.ts';
 import { createProjectCreation } from './infrastructure/projects.ts';
@@ -52,6 +53,7 @@ import { attachChatBinding, sendSupergroupRequest } from './telegram/chat-bindin
 import { attachExecutorTopic } from './telegram/executor-topic.ts';
 import { attachReportsTopic } from './telegram/reports-topic.ts';
 import { attachSchedule } from './telegram/schedule.ts';
+import { attachReport, renderReportDocuments } from './telegram/report.ts';
 import { attachProjectRepository, deliverProjectRepositoryStep } from './telegram/connect-repository.ts';
 import { attachInstallationRepositories } from './telegram/installation-repositories.ts';
 import { attachSettings } from './telegram/settings.ts';
@@ -171,6 +173,7 @@ let running: RunningProcess | undefined;
  * Слот A-30 переносит незакрытые задачи на канвас новых суток.
  * Слот A-31 выставляет канвас на сегодня.
  * Слот A-32 снимает снимок доли на календарные сутки проекта.
+ * Слот A-33 отправляет отчёт в командный топик в час группы.
  * Слот A-35 замечает PR участника без движения и пишет `repo.pr_stalled`.
  * Сверка зеркала идёт отдельно, раз в `RECONCILE_INTERVAL`, и пишет `github.reconciled`.
  * Остальные слоты регистрируют свои issues.
@@ -226,6 +229,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   let noticePullRequests: ((now: Date) => Promise<void>) | undefined;
   let takeSnapshots: ((now: Date) => Promise<void>) | undefined;
   let noticeDivergence: ((now: Date) => Promise<void>) | undefined;
+  let deliverReports: ((now: Date) => Promise<void>) | undefined;
   if (config.db !== undefined) {
     const database = config.db;
     const canvas = createCanvasPlacement(config.db, config.clock);
@@ -254,6 +258,15 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     });
     attachReportsTopic(bot, createReportsTopics(config.db, config.clock));
     attachSchedule(bot, createChatSchedule(config.db, config.clock));
+    attachReport(bot, createReportCommands(config.db, config.clock, renderReportDocuments));
+    deliverReports = (now) =>
+      deliverDueReports(database, now, renderReportDocuments, async (message) => {
+        if (message.topicId === null) {
+          await bot.api.sendMessage(message.telegramChatId, message.text);
+          return;
+        }
+        await bot.api.sendMessage(message.telegramChatId, message.text, { message_thread_id: message.topicId });
+      });
     attachSettings(bot, createProjectSettings(config.db, config.clock));
     attachProjectRepository(bot, projectRepository, installation);
     attachInstallationRepositories(bot, installation);
@@ -318,6 +331,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   if (noticePullRequests !== undefined) scheduler.register('A-35', noticePullRequests);
   if (takeSnapshots !== undefined) scheduler.register('A-32', takeSnapshots);
   if (noticeDivergence !== undefined) scheduler.register('A-36', noticeDivergence);
+  if (deliverReports !== undefined) scheduler.register('A-33', deliverReports);
   const routes: WebhookRoute[] = [];
   const githubWebhookSecret = config.githubWebhookSecret;
   if (githubWebhookSecret !== null && config.db !== undefined) {
