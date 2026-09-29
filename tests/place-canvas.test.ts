@@ -113,7 +113,7 @@ function canvasOf(date: string, messageId: number): Canvas {
 }
 
 function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = [], plan: readonly CanvasTaskLine[] = []): CanvasHome {
-  return { telegramChatId, topicId: 42, projectName: 'Альфа', canvasDate, tasks, plan, shareRatio: null };
+  return { telegramChatId, topicId: 42, projectName: 'Альфа', canvasDate, tasks, plan, backlogShare: null };
 }
 
 function openTask(title: string): CanvasTaskLine {
