@@ -1,11 +1,18 @@
 import type { CanvasParagraph } from './canvas-message.ts';
 
 /**
- * P-9. Строка GitHub на канвасе — один абзац.
+ * P-9. Строка GitHub на канвасе — один абзац, отдельного экрана нет.
  * Репозиторий, CI основной ветки, число открытых PR, коммиты за сутки,
  * ближайший открытый milestone со сроком.
- * Пустой CI словами этой строки не заменяется. Полный список PR не печатается.
+ * CI неизвестен — на этой строке «Нет данных». Без репозитория — «репозиторий не подключён».
+ * Полный список PR, git-ветки и метки не печатаются.
  */
+
+/** CI ещё неизвестен: на строке это слово, не выдуманный статус. */
+export const GITHUB_LINE_NO_DATA = 'Нет данных';
+
+/** Репозиторий к проекту не подключён. Строка на канвасе — эта фраза. */
+export const GITHUB_LINE_DISCONNECTED = 'репозиторий не подключён';
 
 /** Известный статус CI основной ветки. Пусто — ещё неизвестен. */
 export type GithubLineCi = 'success' | 'failure' | 'cancelled' | 'other' | null;
@@ -41,10 +48,10 @@ function dayMonth(iso: string): string {
   return `${day}.${month}`;
 }
 
-function ciText(ci: GithubLineCi): string | null {
+function ciText(ci: GithubLineCi): string {
   switch (ci) {
     case null:
-      return null;
+      return GITHUB_LINE_NO_DATA;
     case 'success':
       return 'CI зелёный';
     case 'failure':
@@ -65,9 +72,7 @@ export function githubLineText(line: GithubLineView): string {
   const owner = line.owner.trim();
   const name = line.name.trim();
   if (owner.length === 0 || name.length === 0) throw new Error('у строки GitHub есть репозиторий');
-  const parts: string[] = [];
-  const ci = ciText(line.ci);
-  if (ci !== null) parts.push(ci);
+  const parts: string[] = [ciText(line.ci)];
   parts.push(`открытых PR ${countText(line.openPullRequests)}`);
   parts.push(`коммитов за сутки ${countText(line.commitsOnDay)}`);
   if (line.milestone !== null) {
@@ -81,4 +86,14 @@ export function githubLineText(line: GithubLineView): string {
 /** Один абзац канваса. Пустой репозиторий сюда не передаётся. */
 export function githubLineParagraphs(line: GithubLineView): CanvasParagraph[] {
   return [{ pieces: [{ kind: 'text', text: githubLineText(line) }] }];
+}
+
+/**
+ * Блок GitHub канваса.
+ * Репозиторий есть — одна строка фактов. Нет — «репозиторий не подключён».
+ * Второго экрана со списками нет.
+ */
+export function githubSectionParagraphs(line: GithubLineView | null): CanvasParagraph[] {
+  if (line === null) return [{ pieces: [{ kind: 'text', text: GITHUB_LINE_DISCONNECTED }] }];
+  return githubLineParagraphs(line);
 }

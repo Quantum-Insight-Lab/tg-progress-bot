@@ -50,7 +50,7 @@ export interface CanvasHome {
   person: CanvasPerson;
   /** Срез issues репозитория: «Сделано», «В работе», «Далее». */
   issueSlice: CanvasIssueSlice;
-  /** Строка GitHub. Пусто — репозиторий не подключён, абзац не печатается. */
+  /** Строка GitHub. Пусто — репозиторий не подключён, на канвасе эта фраза. */
   github: GithubCanvasLine | null;
 }
 
