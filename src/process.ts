@@ -33,6 +33,7 @@ import {
 } from './infrastructure/tasks.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createEventJournal } from './infrastructure/event-journal.ts';
+import { mirrorGithubCommits } from './infrastructure/commit-mirror.ts';
 import { mirrorGithubIssueLink } from './infrastructure/issue-links.ts';
 import { mirrorGithubIssue } from './infrastructure/issue-mirror.ts';
 import { mirrorGithubMilestone } from './infrastructure/milestone-mirror.ts';
@@ -298,6 +299,9 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
                 },
                 async (payload) => {
                   await mirrorGithubWorkflow(trx, payload);
+                },
+                async (payload) => {
+                  await mirrorGithubCommits(trx, payload, config.clock.now(), randomUUID);
                 },
               ),
             ),
