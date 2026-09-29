@@ -123,6 +123,7 @@ function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = [], plan: 
     backlogShare: null,
     person: { name: 'Борис', place: { kind: 'unmatched' } },
     issueSlice: { done: [], inProgress: [], next: [] },
+    github: null,
   };
 }
 
