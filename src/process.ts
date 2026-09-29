@@ -62,6 +62,8 @@ import { attachStartCommand } from './telegram/start.ts';
 import { editCanvasMessage, sendCanvasMessage } from './telegram/canvas-message.ts';
 import { backlogShareParagraphs } from './projections/backlog-line.ts';
 import { blockersBlockParagraphs } from './projections/blockers-block.ts';
+import { divergenceLineParagraphs } from './projections/divergence-line.ts';
+import { dynamicsLineParagraphs } from './projections/dynamics-line.ts';
 import { githubSectionParagraphs } from './projections/github-line.ts';
 import { doneSliceParagraphs, inProgressSliceParagraphs, nextSliceParagraphs } from './projections/issue-slice.ts';
 import { personLineFromPlace, personLineParagraphs } from './projections/person-line.ts';
@@ -190,6 +192,8 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
         plan: planBlockParagraphs(home.plan),
         blockers: blockersBlockParagraphs(home.blockers),
         github: githubSectionParagraphs(home.github),
+        divergence: divergenceLineParagraphs(home.divergence),
+        dynamics: dynamicsLineParagraphs(home.dynamics),
       },
     });
   const deliverCanvas = {

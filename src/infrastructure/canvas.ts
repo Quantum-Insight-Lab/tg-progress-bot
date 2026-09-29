@@ -14,6 +14,7 @@ import {
 import type { GithubCanvasLine } from '../domain/github/canvas-line.ts';
 import type { BacklogShare } from '../domain/progress/backlog-share.ts';
 import type { CanvasIssueSlice } from '../domain/progress/canvas-issue-slice.ts';
+import type { RecordedSnapshot } from '../domain/progress/snapshot.ts';
 import type { Canvas } from '../domain/tasks/canvas.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
@@ -24,6 +25,8 @@ import { taskCanvasDay } from '../domain/tasks/task-day.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 import { loadCanvasBlockers, type CanvasBlockers } from './canvas-blockers.ts';
+import { loadCanvasDivergence } from './canvas-divergence.ts';
+import { loadCanvasDynamics } from './canvas-dynamics.ts';
 import { loadCanvasIssueSlice } from './canvas-issue-slice.ts';
 import { loadGithubCanvasLine } from './github-canvas.ts';
 import { loadCanvasPerson, type CanvasPerson } from './person-canvas.ts';
@@ -55,6 +58,10 @@ export interface CanvasHome {
   github: GithubCanvasLine | null;
   /** Блок «Блокеры»: причины его задач и строки застоя. Пустой на канвасе не печатается. */
   blockers: CanvasBlockers;
+  /** Сигнал расхождения за закрытые сутки перед датой канваса. Строка — только когда горит. */
+  divergence: boolean;
+  /** Точки динамики. Пропущенного снимка в списке нет. */
+  dynamics: readonly RecordedSnapshot[];
 }
 
 export interface ShownCanvas {
@@ -308,7 +315,7 @@ async function canvasFacts(
   canvasDate: string,
   timezone: string,
   now: Date,
-): Promise<Pick<CanvasHome, 'tasks' | 'plan' | 'backlogShare' | 'person' | 'issueSlice' | 'github' | 'blockers'>> {
+): Promise<Pick<CanvasHome, 'tasks' | 'plan' | 'backlogShare' | 'person' | 'issueSlice' | 'github' | 'blockers' | 'divergence' | 'dynamics'>> {
   const lines = await assigneeCanvasLines(db, projectId, assigneeId, canvasDate, timezone);
   return {
     tasks: lines.tasks,
@@ -318,6 +325,8 @@ async function canvasFacts(
     issueSlice: await loadCanvasIssueSlice(db, projectId),
     github: await loadGithubCanvasLine(db, projectId, canvasDate, timezone),
     blockers: await loadCanvasBlockers(db, projectId, assigneeId, now),
+    divergence: await loadCanvasDivergence(db, projectId, canvasDate, timezone),
+    dynamics: await loadCanvasDynamics(db, projectId, canvasDate),
   };
 }
 

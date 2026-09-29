@@ -125,6 +125,8 @@ function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = [], plan: 
     issueSlice: { done: [], inProgress: [], next: [] },
     github: null,
     blockers: { reasons: [], pullRequests: [], defaultBranchCiRed: false },
+    divergence: false,
+    dynamics: [],
   };
 }
 

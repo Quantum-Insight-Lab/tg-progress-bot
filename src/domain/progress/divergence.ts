@@ -194,6 +194,14 @@ export function closedProjectDate(now: Date, timezone: string): string {
   return previousCalendarDate(projectCalendarDate(now, timezone));
 }
 
+/**
+ * Сутки строки расхождения на канвасе: день перед датой канваса.
+ * Текущие сутки ещё идут, сигнал по ним рано показывать.
+ */
+export function canvasDivergenceDate(canvasDate: string): string {
+  return previousCalendarDate(canvasDate);
+}
+
 /** Ключ `divergence.detected`: проект и дата. Повтор в те же сутки не пишет второй факт. */
 export function divergenceDetectedKey(projectId: string, date: string): string {
   const id = projectIdOf(projectId);

@@ -1,7 +1,9 @@
+import { DYNAMICS_POINTS, DYNAMICS_STEP } from '../../config/constants.ts';
 import { EVENT_TYPES, emit, type EventJournal } from '../../events/index.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
 import { projectCalendarDate } from '../shared/project-time.ts';
 import type { BacklogShare } from './backlog-share.ts';
+import { previousCalendarDate } from './divergence.ts';
 import { projectShareRatio } from './no-data.ts';
 
 /** Снимок доли пишет система (A-32). */
@@ -119,6 +121,34 @@ export function progressDynamics(snapshots: readonly RecordedSnapshot[]): Record
     const progress = byDate.get(date);
     return { date, progress: progress ?? null };
   });
+}
+
+function rewindDays(date: string, days: number): string {
+  let cursor = date;
+  let left = days;
+  while (left > 0) {
+    cursor = previousCalendarDate(cursor);
+    left -= 1;
+  }
+  return cursor;
+}
+
+/**
+ * Даты строки динамики: `DYNAMICS_POINTS` точек с шагом `DYNAMICS_STEP`.
+ * Последняя — дата канваса, раньше неё — назад по шагу. Старые даты впереди.
+ * Снимок на эти даты берёт `dynamicsAt`: пропущенный день соседним числом не заменяется.
+ */
+export function dynamicsSampleDates(anchor: string): string[] {
+  if (DYNAMICS_POINTS < 1) return [];
+  let cursor = calendarDate(anchor);
+  const newestFirst: string[] = [cursor];
+  let taken = 1;
+  while (taken < DYNAMICS_POINTS) {
+    cursor = rewindDays(cursor, DYNAMICS_STEP);
+    newestFirst.push(cursor);
+    taken += 1;
+  }
+  return newestFirst.reverse();
 }
 
 /**
