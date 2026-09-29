@@ -236,6 +236,10 @@ export const DOMAIN_ERROR = {
   REPORT_WORK_PRIORITY: 'report_work_priority',
   REPORT_WORK_CREATED: 'report_work_created',
   REPORT_WORK_DAY: 'report_work_day',
+  REPORT_ACCESS: 'report_access',
+  REPORT_UNBOUND: 'report_unbound',
+  REPORT_CHAT: 'report_chat',
+  REPORT_IDEMPOTENCY_KEY: 'report_idempotency_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

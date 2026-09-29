@@ -200,6 +200,8 @@ function bodyFor(handler: GuardedHandler, updateId: number, account: { id: numbe
       return messageBody(updateId, account, `${PROJECT_REPOSITORY_HEADING}\nАльфа`);
     case 'task':
       return messageBody(updateId, account, '/task Секрет', true);
+    case 'report':
+      return messageBody(updateId, account, '/report', true);
     default: {
       const unreachable: never = handler;
       throw new Error(unreachable);
