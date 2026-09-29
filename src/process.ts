@@ -25,6 +25,7 @@ import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.
 import { carryOpenCanvases } from './infrastructure/carry-canvas.ts';
 import { detectStaleTasks } from './infrastructure/detect-blocker.ts';
 import { noticeStalePullRequests } from './infrastructure/pr-stall.ts';
+import { takeProgressSnapshots } from './infrastructure/progress-snapshot.ts';
 import { remindStaleReviews } from './infrastructure/remind-review.ts';
 import {
   createBlockerAnswerActions,
@@ -166,6 +167,7 @@ let running: RunningProcess | undefined;
  * Слот A-29 напоминает руководителям о задаче на подтверждении.
  * Слот A-30 переносит незакрытые задачи на канвас новых суток.
  * Слот A-31 выставляет канвас на сегодня.
+ * Слот A-32 снимает снимок доли на календарные сутки проекта.
  * Слот A-35 замечает PR участника без движения и пишет `repo.pr_stalled`.
  * Сверка зеркала идёт отдельно, раз в `RECONCILE_INTERVAL`, и пишет `github.reconciled`.
  * Остальные слоты регистрируют свои issues.
@@ -217,6 +219,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   let detectStale: ((now: Date) => Promise<void>) | undefined;
   let remindReviews: ((now: Date) => Promise<void>) | undefined;
   let noticePullRequests: ((now: Date) => Promise<void>) | undefined;
+  let takeSnapshots: ((now: Date) => Promise<void>) | undefined;
   if (config.db !== undefined) {
     const database = config.db;
     const canvas = createCanvasPlacement(config.db, config.clock);
@@ -288,6 +291,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
         });
       });
     noticePullRequests = (now) => noticeStalePullRequests(database, now);
+    takeSnapshots = (now) => takeProgressSnapshots(database, now);
     remindReviews = (now) =>
       remindStaleReviews(database, now, async (hit) => {
         await sendReviewReminder(bot.api, {
@@ -305,6 +309,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   if (carryToday !== undefined) scheduler.register('A-30', carryToday);
   if (ensureToday !== undefined) scheduler.register('A-31', ensureToday);
   if (noticePullRequests !== undefined) scheduler.register('A-35', noticePullRequests);
+  if (takeSnapshots !== undefined) scheduler.register('A-32', takeSnapshots);
   const routes: WebhookRoute[] = [];
   const githubWebhookSecret = config.githubWebhookSecret;
   if (githubWebhookSecret !== null && config.db !== undefined) {

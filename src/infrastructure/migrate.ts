@@ -115,3 +115,8 @@ export function readCiMirrorMigration(root = process.cwd()): string {
 export function readCommitsMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '023_commits.sql'), 'utf8');
 }
+
+/** Таблица `progress_snapshots`: доля проекта на сутки. Строка только добавляется. */
+export function readProgressSnapshotsMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '024_progress_snapshots.sql'), 'utf8');
+}
