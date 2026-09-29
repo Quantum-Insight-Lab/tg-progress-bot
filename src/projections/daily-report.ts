@@ -1,3 +1,4 @@
+import { REPORT_NEXT_TASKS } from '../config/constants.ts';
 import {
   REPORT_BACKLOG_GAP,
   reportProjectBacklogLines,
@@ -18,9 +19,12 @@ import {
 /**
  * P-12. Ежедневный отчёт: шапка «За сутки · дата», строка «Все проекты»,
  * затем блок на каждый проект адресата.
- * В личке блоки — проекты этого человека. В командном топике — каждый переданный проект.
+ * В личке — проекты этого человека и блоки их репозиториев.
+ * В командный топик одним текстом — все проекты этого чата.
+ * Топики исполнителей адресом отчёта не становятся.
+ * «Сейчас» и «Дальше» в личке — задачи этого человека, в командном топике — всех участников.
  * Доля «Все проекты» приходит посчитанной. Проекция её не усредняет и не заменяет нулём.
- * Блок репозитория сюда не входит.
+ * Коммиты и PR в эту долю не входят и по проектам не складываются: блок репозитория один.
  */
 
 /** Куда уходит один текст отчёта. Топик исполнителя сюда не входит. */
@@ -39,17 +43,33 @@ export const ALL_PROJECTS_LABEL = 'Все проекты';
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
+ * Репозиторий в составе отчёта.
+ * Счётчики — числа самого репозитория. Закрытые issues в блок не копируются.
+ */
+export interface ReportRepositoryFacts {
+  repositoryId: string;
+  slug: string;
+  commits: number;
+  mergedPullRequests: number;
+  closedIssueTitles: readonly string[];
+}
+
+/**
  * Проект внутри отчёта.
+ * `chatId` — группа, чей это проект. Чужой чат в текст не входит.
  * `memberIds` — кто видит его в личке. В командном топике блок печатается всё равно.
+ * `now` и `next` — задачи всех участников. Кому их печатать, решает адресат.
  */
 export interface DailyReportProject {
+  chatId: string;
   memberIds: readonly string[];
   backlog: ReportProjectBacklogView;
   tasks: ReportTaskCounters;
-  now: readonly ReportNowLineTask[];
-  next: readonly ReportNextLineTask[];
+  now: readonly (ReportNowLineTask & { assigneeId: string })[];
+  next: readonly (ReportNextLineTask & { assigneeId: string })[];
   risk: ReportRiskView;
   divergence: boolean;
+  repository: ReportRepositoryFacts | null;
 }
 
 /**
@@ -58,6 +78,7 @@ export interface DailyReportProject {
  * Доля «Все проекты» — на начало и конец, остаток на конец.
  */
 export interface DailyReportView {
+  chatId: string;
   date: string;
   audience: DailyReportAudience;
   /** Адресат лички. В командном топике не читается. */
@@ -88,6 +109,88 @@ function memberIdsOf(ids: readonly string[]): string[] {
   });
 }
 
+/** Куда человек читает отчёт. Топика исполнителя среди мест нет. */
+export interface ReportReading {
+  place: DailyReportAudience;
+  memberId: string | null;
+  threadId: number | null;
+}
+
+function chatIdOf(value: string): string {
+  const id = value.trim();
+  if (id.length === 0) throw new Error('у отчёта есть чат');
+  return id;
+}
+
+function assigneeIdOf(value: string): string {
+  const id = value.trim();
+  if (id.length === 0) throw new Error('у задачи отчёта есть исполнитель');
+  return id;
+}
+
+function threadIdOf(value: number): number {
+  if (!Number.isInteger(value) || value < 1) throw new Error('номер топика — целое больше нуля');
+  return value;
+}
+
+function countOf(value: number): number {
+  if (!Number.isInteger(value) || value < 0) throw new Error('счётчик репозитория — целое от нуля');
+  return value;
+}
+
+function workFor<T extends { assigneeId: string }>(
+  tasks: readonly T[],
+  audience: DailyReportAudience,
+  memberId: string | null,
+): T[] {
+  const scoped: T[] = [];
+  for (const task of tasks) {
+    const assigneeId = assigneeIdOf(task.assigneeId);
+    if (audience === DAILY_REPORT_TEAM || assigneeId === memberId) scoped.push(task);
+  }
+  return scoped;
+}
+
+function repositoryParagraph(repo: ReportRepositoryFacts): string {
+  const id = repo.repositoryId.trim();
+  const slug = repo.slug.trim();
+  if (id.length === 0 || slug.length === 0) throw new Error('у блока репозитория есть имя');
+  for (const title of repo.closedIssueTitles) {
+    if (title.trim().length === 0) throw new Error('у закрытого issue есть название');
+  }
+  const commits = countOf(repo.commits);
+  const pullRequests = countOf(repo.mergedPullRequests);
+  return `${slug} · коммитов ${String(commits)} · PR ${String(pullRequests)}`;
+}
+
+/**
+ * Блоки репозиториев выбранных проектов.
+ * Один репозиторий — один блок. Повтор тех же чисел не складывается во вторую копию.
+ */
+function repositoryParagraphs(projects: readonly DailyReportProject[]): string[] {
+  const seen = new Map<string, ReportRepositoryFacts>();
+  const lines: string[] = [];
+  for (const project of projects) {
+    const repo = project.repository;
+    if (repo === null) continue;
+    const id = repo.repositoryId.trim();
+    const previous = seen.get(id);
+    if (previous !== undefined) {
+      if (
+        previous.slug !== repo.slug ||
+        previous.commits !== repo.commits ||
+        previous.mergedPullRequests !== repo.mergedPullRequests
+      ) {
+        throw new Error('коммиты и PR репозитория по проектам не складываются');
+      }
+      continue;
+    }
+    seen.set(id, repo);
+    lines.push(repositoryParagraph(repo));
+  }
+  return lines;
+}
+
 function dayMonth(iso: string): string {
   const match = CALENDAR_DATE.exec(iso.trim());
   const day = match?.[3];
@@ -96,13 +199,18 @@ function dayMonth(iso: string): string {
   return `${day}.${month}`;
 }
 
-function projectBlock(project: DailyReportProject, showAssignee: boolean): string {
+function projectBlock(
+  project: DailyReportProject,
+  showAssignee: boolean,
+  audience: DailyReportAudience,
+  memberId: string | null,
+): string {
   const lines = [
     ...reportProjectBacklogLines(project.backlog),
     reportTasksLine(project.tasks),
     ...reportWorkLines({
-      now: project.now,
-      next: project.next,
+      now: workFor(project.now, audience, memberId),
+      next: workFor(project.next, audience, memberId).slice(0, REPORT_NEXT_TASKS),
       reasons: project.risk.reasons,
       defaultBranchCiRed: project.risk.defaultBranchCiRed,
       pullRequests: project.risk.pullRequests,
@@ -116,20 +224,63 @@ function projectBlock(project: DailyReportProject, showAssignee: boolean): strin
 /**
  * Один текст отчёта за сутки.
  * Сначала «За сутки · ДД.ММ», затем «Все проекты», когда доля есть.
- * Дальше блок каждого проекта: бэклог, задачи, «Сейчас», «Дальше», «Риск», расхождение.
- * В личке нет проектов других людей. Пустая общая доля строку не занимает.
+ * Дальше блок каждого проекта этого чата и один блок на каждый его репозиторий.
+ * В личке нет чужих проектов и чужих задач «Сейчас» и «Дальше».
+ * Пустая общая доля строку не занимает.
  */
 export function dailyReport(view: DailyReportView): string {
   const audience = audienceOf(view.audience);
+  const chatId = chatIdOf(view.chatId);
   const showAssignee = audience === DAILY_REPORT_TEAM;
   const memberId = audience === DAILY_REPORT_DM ? memberOf(view.memberId) : null;
-  const blocks = view.projects.map((project) => ({
+  const projects = view.projects.map((project) => ({
+    project,
+    chatId: chatIdOf(project.chatId),
     memberIds: memberIdsOf(project.memberIds),
-    text: projectBlock(project, showAssignee),
   }));
-  const chosen = memberId === null ? blocks : blocks.filter((block) => block.memberIds.includes(memberId));
+  for (const item of projects) {
+    for (const task of [...item.project.now, ...item.project.next]) assigneeIdOf(task.assigneeId);
+  }
+  const inChat = projects.filter((item) => item.chatId === chatId);
+  const chosen = memberId === null ? inChat : inChat.filter((item) => item.memberIds.includes(memberId));
+  const blocks = chosen.map((item) => projectBlock(item.project, showAssignee, audience, memberId));
   const head = [`${DAILY_REPORT_HEADING}${REPORT_BACKLOG_GAP}${dayMonth(view.date)}`];
   const change = reportShareChange(view.shareAtStart, view.shareAtEnd, view.remainderAtEnd);
   if (change !== null) head.push(`${ALL_PROJECTS_LABEL}: ${change}`);
-  return [head.join('\n'), ...chosen.map((block) => block.text)].join('\n\n');
+  return [head.join('\n'), ...blocks, ...repositoryParagraphs(chosen.map((item) => item.project))].join('\n\n');
+}
+
+/**
+ * Два места чтения: личка каждого участника и один командный топик.
+ * Топики исполнителей в список не входят. На несколько проектов чата командный адрес один.
+ */
+export function reportReadings(input: {
+  memberIds: readonly string[];
+  commandTopicId: number;
+  executorTopicIds: readonly number[];
+}): readonly ReportReading[] {
+  const commandTopicId = threadIdOf(input.commandTopicId);
+  const executorTopicIds = input.executorTopicIds.map(threadIdOf);
+  if (executorTopicIds.includes(commandTopicId)) {
+    throw new Error('топик исполнителя отчёт не получает');
+  }
+  const members: string[] = [];
+  const seen = new Set<string>();
+  for (const value of input.memberIds) {
+    const id = value.trim();
+    if (id.length === 0) throw new Error('у участника проекта есть id');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    members.push(id);
+  }
+  const readings: ReportReading[] = [
+    { place: DAILY_REPORT_TEAM, memberId: null, threadId: commandTopicId },
+    ...members.map((memberId): ReportReading => ({ place: DAILY_REPORT_DM, memberId, threadId: null })),
+  ];
+  for (const reading of readings) {
+    if (reading.threadId !== null && executorTopicIds.includes(reading.threadId)) {
+      throw new Error('топик исполнителя отчёт не получает');
+    }
+  }
+  return readings;
 }

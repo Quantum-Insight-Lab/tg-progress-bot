@@ -3,8 +3,10 @@ import { overallBacklogShare, type IssueRow, type ProjectMemberSlice } from '../
 import { DIVERGENCE_LINE } from '../src/projections/divergence-line.ts';
 import {
   dailyReport,
+  reportReadings,
   type DailyReportProject,
   type DailyReportView,
+  type ReportRepositoryFacts,
 } from '../src/projections/daily-report.ts';
 import type { ReportProjectBacklogView } from '../src/projections/report-backlog-block.ts';
 
@@ -35,9 +37,10 @@ const emptyRisk = { reasons: [], defaultBranchCiRed: false, pullRequests: [] };
 function project(
   backlog: ReportProjectBacklogView,
   memberIds: readonly string[],
-  extra: Partial<Pick<DailyReportProject, 'tasks' | 'now' | 'next' | 'risk' | 'divergence'>> = {},
+  extra: Partial<Pick<DailyReportProject, 'chatId' | 'tasks' | 'now' | 'next' | 'risk' | 'divergence' | 'repository'>> = {},
 ): DailyReportProject {
   return {
+    chatId: extra.chatId ?? 'group',
     memberIds,
     backlog,
     tasks: extra.tasks ?? quietTasks,
@@ -45,13 +48,14 @@ function project(
     next: extra.next ?? [],
     risk: extra.risk ?? emptyRisk,
     divergence: extra.divergence ?? false,
+    repository: extra.repository ?? null,
   };
 }
 
 const sensor = project(sensorBacklog, ['ann'], {
   tasks: { confirmed: 1, created: 2, cancelled: 0, blocked: 1 },
-  now: [{ number: 7, title: 'Классификация сигнала', day: 3, assigneeName: 'Андрей' }],
-  next: [{ number: 14, title: 'Подготовить тестовые данные' }],
+  now: [{ number: 7, title: 'Классификация сигнала', day: 3, assigneeName: 'Андрей', assigneeId: 'ann' }],
+  next: [{ number: 14, title: 'Подготовить тестовые данные', assigneeId: 'ann' }],
   risk: {
     reasons: [{ text: 'нет стабильного доступа к одному из источников данных' }],
     defaultBranchCiRed: false,
@@ -68,7 +72,7 @@ const overall = {
 };
 
 function view(audience: DailyReportView['audience'], memberId: string | null, projects: readonly DailyReportProject[]): DailyReportView {
-  return { date: '2026-09-17', audience, memberId, ...overall, projects };
+  return { chatId: 'group', date: '2026-09-17', audience, memberId, ...overall, projects };
 }
 
 const teamText = [
@@ -248,5 +252,198 @@ describe('ежедневный отчёт', () => {
     expect(() => dailyReport(view('dm', '  ', [sensor]))).toThrow('личный отчёт адресован человеку');
     expect(() => dailyReport(view('dm', null, [sensor]))).toThrow('личный отчёт адресован человеку');
     expect(() => dailyReport(view('team', null, [project(sensorBacklog, [' '])]))).toThrow('у участника проекта есть id');
+    expect(() => dailyReport({ ...view('team', null, [sensor]), chatId: ' ' })).toThrow('у отчёта есть чат');
+    expect(() =>
+      dailyReport(view('team', null, [project(sensorBacklog, ['ann'], { now: [{ number: 7, title: 'Классификация сигнала', day: 3, assigneeName: 'Андрей', assigneeId: ' ' }] })])),
+    ).toThrow('у задачи отчёта есть исполнитель');
+  });
+});
+
+const sensorRepo: ReportRepositoryFacts = {
+  repositoryId: '11',
+  slug: 'org/sensor',
+  commits: 6,
+  mergedPullRequests: 1,
+  closedIssueTitles: ['Не для блока репозитория'],
+};
+
+const archiveRepo: ReportRepositoryFacts = {
+  repositoryId: '22',
+  slug: 'org/archive',
+  commits: 4,
+  mergedPullRequests: 2,
+  closedIssueTitles: [],
+};
+
+describe('состав отчёта по чату', () => {
+  it('R-170 Отчёт в командный топик группы уходит один', () => {
+    const text = dailyReport(view('team', null, [sensor, archive]));
+    expect(text.match(/За сутки/g)).toHaveLength(1);
+    const readings = reportReadings({
+      memberIds: ['ann', 'boris', 'ann'],
+      commandTopicId: 10,
+      executorTopicIds: [21, 22],
+    });
+    expect(readings.filter((item) => item.place === 'team')).toEqual([
+      { place: 'team', memberId: null, threadId: 10 },
+    ]);
+  });
+
+  it('R-659 В командный топик тем же составом уходят сразу все проекты этого чата', () => {
+    const foreign = project({ ...archiveBacklog, projectName: 'Чужой чат' }, ['ann'], { chatId: 'elsewhere' });
+    const text = dailyReport(view('team', null, [sensor, archive, foreign]));
+    expect(text).toContain('Все проекты: 37% → 39% · осталось 41 из 67');
+    expect(text).toContain('Общественный сенсор');
+    expect(text).toContain('Полевой архив');
+    expect(text).not.toContain('Чужой чат');
+    expect(text.match(/За сутки/g)).toHaveLength(1);
+  });
+
+  it('R-662 Топики исполнителей отчёт не получают', () => {
+    const readings = reportReadings({
+      memberIds: ['ann', 'boris'],
+      commandTopicId: 10,
+      executorTopicIds: [21, 22],
+    });
+    expect(readings.map((item) => item.threadId)).toEqual([10, null, null]);
+    expect(readings.some((item) => item.threadId === 21 || item.threadId === 22)).toBe(false);
+    expect(() => reportReadings({ memberIds: ['ann'], commandTopicId: 21, executorTopicIds: [21] })).toThrow(
+      'топик исполнителя отчёт не получает',
+    );
+  });
+
+  it('R-690 В личном отчёте «Сейчас» и «Дальше» — задачи этого человека', () => {
+    const shared = project(sensorBacklog, ['ann', 'boris'], {
+      tasks: sensor.tasks,
+      now: [
+        { number: 7, title: 'Классификация сигнала', day: 3, assigneeName: 'Андрей', assigneeId: 'ann' },
+        { number: 8, title: 'Сбор поля', day: 2, assigneeName: 'Борис', assigneeId: 'boris' },
+      ],
+      next: [
+        { number: 14, title: 'Подготовить тестовые данные', assigneeId: 'ann' },
+        { number: 15, title: 'Разобрать архив', assigneeId: 'boris' },
+        { number: 16, title: 'Первый запас', assigneeId: 'ann' },
+        { number: 17, title: 'Второй запас', assigneeId: 'ann' },
+        { number: 18, title: 'Третий запас', assigneeId: 'ann' },
+      ],
+    });
+    const text = dailyReport(view('dm', 'ann', [shared, archive]));
+    expect(text).toContain('Сейчас: 7 — Классификация сигнала, 3-й день');
+    expect(text).toContain('Дальше: 14 — Подготовить тестовые данные');
+    expect(text).toContain('Дальше: 16 — Первый запас');
+    expect(text).toContain('Дальше: 17 — Второй запас');
+    expect(text).not.toContain('Дальше: 18');
+    expect(text).not.toContain('Сбор поля');
+    expect(text).not.toContain('Разобрать архив');
+    expect(text).not.toContain('Борис');
+    expect(text).not.toContain('Андрей');
+  });
+
+  it('R-691 В командном топике — задачи всех участников этих проектов', () => {
+    const shared = project(sensorBacklog, ['ann', 'boris'], {
+      tasks: sensor.tasks,
+      now: [
+        { number: 7, title: 'Классификация сигнала', day: 3, assigneeName: 'Андрей', assigneeId: 'ann' },
+        { number: 8, title: 'Сбор поля', day: 2, assigneeName: 'Борис', assigneeId: 'boris' },
+      ],
+      next: [
+        { number: 14, title: 'Подготовить тестовые данные', assigneeId: 'ann' },
+        { number: 15, title: 'Разобрать архив', assigneeId: 'boris' },
+      ],
+    });
+    const text = dailyReport(view('team', null, [shared]));
+    expect(text).toContain('Сейчас: 7 — Классификация сигнала — Андрей, 3-й день');
+    expect(text).toContain('Сейчас: 8 — Сбор поля — Борис, 2-й день');
+    expect(text).toContain('Дальше: 14 — Подготовить тестовые данные');
+    expect(text).toContain('Дальше: 15 — Разобрать архив');
+  });
+
+  it('R-753 Отчёт читают в двух местах', () => {
+    const readings = reportReadings({ memberIds: ['ann'], commandTopicId: 10, executorTopicIds: [21] });
+    expect(readings.map((item) => item.place)).toEqual(['team', 'dm']);
+    expect(readings.find((item) => item.place === 'dm')).toEqual({ place: 'dm', memberId: 'ann', threadId: null });
+    expect(readings.find((item) => item.place === 'team')?.threadId).toBe(10);
+  });
+
+  it('R-756 и блоки их репозиториев', () => {
+    const own = project(sensorBacklog, ['ann'], { repository: sensorRepo, tasks: sensor.tasks, now: sensor.now, next: sensor.next });
+    const other = project(archiveBacklog, ['boris'], { repository: archiveRepo });
+    const text = dailyReport(view('dm', 'ann', [own, other]));
+    expect(text).toContain('Общественный сенсор');
+    expect(text).toContain('org/sensor · коммитов 6 · PR 1');
+    expect(text).not.toContain('org/archive');
+    expect(text).not.toContain('Не для блока репозитория');
+    expect(text).not.toContain('Полевой архив');
+  });
+
+  it('R-721 и в сумму по проектам не складываются', () => {
+    const first = project(sensorBacklog, ['ann'], { repository: sensorRepo });
+    const second = project(archiveBacklog, ['ann'], { repository: archiveRepo });
+    const separate = dailyReport(view('dm', 'ann', [first, second]));
+    expect(separate.split('\n\n').filter((part) => part.includes('· коммитов'))).toEqual([
+      'org/sensor · коммитов 6 · PR 1',
+      'org/archive · коммитов 4 · PR 2',
+    ]);
+    expect(separate).not.toContain('коммитов 10');
+    expect(separate).not.toContain('PR 3');
+
+    const twin = project({ ...archiveBacklog, projectName: 'Второе имя' }, ['ann'], { repository: sensorRepo });
+    const shared = dailyReport(view('team', null, [first, twin]));
+    expect(shared.match(/org\/sensor · коммитов 6 · PR 1/g)).toHaveLength(1);
+    expect(shared).not.toContain('коммитов 12');
+    expect(shared).not.toContain('PR 2');
+    expect(() =>
+      dailyReport(
+        view('team', null, [first, project(archiveBacklog, ['ann'], { repository: { ...sensorRepo, commits: 7 } })]),
+      ),
+    ).toThrow('коммиты и PR репозитория по проектам не складываются');
+  });
+
+  it('INV-26 в личке задачи человека и один блок репозитория, в командном топике все проекты чата', () => {
+    const own = project(sensorBacklog, ['ann', 'boris'], {
+      tasks: sensor.tasks,
+      now: [
+        { number: 7, title: 'Классификация сигнала', day: 3, assigneeName: 'Андрей', assigneeId: 'ann' },
+        { number: 8, title: 'Сбор поля', day: 2, assigneeName: 'Борис', assigneeId: 'boris' },
+      ],
+      next: sensor.next,
+      repository: sensorRepo,
+    });
+    const twin = project({ ...archiveBacklog, projectName: 'Второй проект' }, ['boris'], {
+      repository: sensorRepo,
+    });
+    const foreign = project({ ...archiveBacklog, projectName: 'Чужой чат' }, ['ann'], {
+      chatId: 'elsewhere',
+      repository: archiveRepo,
+    });
+    const dm = dailyReport(view('dm', 'ann', [own, twin, foreign]));
+    const team = dailyReport(view('team', null, [own, twin, foreign]));
+    expect(dm).toContain('Общественный сенсор');
+    expect(dm).not.toContain('Второй проект');
+    expect(dm).not.toContain('Чужой чат');
+    expect(dm).not.toContain('Сбор поля');
+    expect(dm).toContain('Классификация сигнала');
+    expect(dm.match(/org\/sensor · коммитов 6 · PR 1/g)).toHaveLength(1);
+    expect(dm).not.toContain('Не для блока репозитория');
+    expect(dm).not.toContain('org/archive');
+    expect(team).toContain('Общественный сенсор');
+    expect(team).toContain('Второй проект');
+    expect(team).not.toContain('Чужой чат');
+    expect(team).toContain('Сбор поля');
+    expect(team).toContain('— Борис');
+    expect(team.match(/org\/sensor · коммитов 6 · PR 1/g)).toHaveLength(1);
+    expect(team).not.toContain('коммитов 12');
+    const readings = reportReadings({ memberIds: ['ann', 'boris'], commandTopicId: 10, executorTopicIds: [21] });
+    expect(readings.map((item) => item.place)).toEqual(['team', 'dm', 'dm']);
+    expect(readings.some((item) => item.threadId === 21)).toBe(false);
+  });
+
+  it('INV-01 коммиты и PR не входят в строку «Все проекты»', () => {
+    const loud = project(sensorBacklog, ['ann'], { repository: { ...sensorRepo, commits: 40, mergedPullRequests: 9 } });
+    const text = dailyReport(view('team', null, [loud, archive]));
+    expect(text).toContain('Все проекты: 37% → 39% · осталось 41 из 67');
+    expect(text).toContain('коммитов 40');
+    expect(text).not.toContain('Все проекты: 40');
+    expect(text).not.toContain('коммитов 49');
   });
 });
