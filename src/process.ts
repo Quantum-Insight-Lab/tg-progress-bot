@@ -33,6 +33,7 @@ import {
 } from './infrastructure/tasks.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createEventJournal } from './infrastructure/event-journal.ts';
+import { mirrorGithubIssueLink } from './infrastructure/issue-links.ts';
 import { mirrorGithubIssue } from './infrastructure/issue-mirror.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { attachAccessGuard } from './telegram/access-guard.ts';
@@ -278,9 +279,15 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
           clock: config.clock,
           isolate: (run) =>
             database.transaction().execute((trx) =>
-              run(createEventJournal(trx), async (payload) => {
-                await mirrorGithubIssue(trx, payload, randomUUID());
-              }),
+              run(
+                createEventJournal(trx),
+                async (payload) => {
+                  await mirrorGithubIssue(trx, payload, randomUUID());
+                },
+                async (payload) => {
+                  await mirrorGithubIssueLink(trx, payload);
+                },
+              ),
             ),
         }),
     });

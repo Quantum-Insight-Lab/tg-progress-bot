@@ -90,3 +90,8 @@ export function readIssuesMigration(root = process.cwd()): string {
 export function readIssueMirrorMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '018_issue_mirror.sql'), 'utf8');
 }
+
+/** Таблица `issue_dependencies`: пара issues и вид связи. Проекта в строке нет. */
+export function readIssueDependenciesMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '019_issue_dependencies.sql'), 'utf8');
+}
