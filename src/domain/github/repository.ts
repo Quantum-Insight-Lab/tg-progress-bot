@@ -41,13 +41,19 @@ function blank(value: string): boolean {
 }
 
 /** id GitHub — непустое число без лидирующего нуля. */
-export function defineRepository(input: { id: string; owner: string; name: string }): Repository {
-  const id = input.id.trim();
-  const owner = input.owner.trim();
-  const name = input.name.trim();
-  if (!/^[1-9][0-9]*$/.test(id)) {
+export function githubRepositoryId(id: string): string {
+  const trimmed = id.trim();
+  if (!/^[1-9][0-9]*$/.test(trimmed)) {
     throw new DomainError(DOMAIN_ERROR.REPOSITORY_ID, 'id репозитория — id GitHub');
   }
+  return trimmed;
+}
+
+/** Репозиторий установки: id GitHub, owner и name. */
+export function defineRepository(input: { id: string; owner: string; name: string }): Repository {
+  const id = githubRepositoryId(input.id);
+  const owner = input.owner.trim();
+  const name = input.name.trim();
   if (blank(owner)) throw new DomainError(DOMAIN_ERROR.REPOSITORY_OWNER_BLANK, 'у репозитория есть owner');
   if (blank(name)) throw new DomainError(DOMAIN_ERROR.REPOSITORY_NAME_BLANK, 'у репозитория есть name');
   return { id, owner, name };

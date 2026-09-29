@@ -1,8 +1,14 @@
-import { createServer, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { webhookCallback, type Bot } from 'grammy';
 
 /** Путь приёма обновлений, если окружение его не задаёт. `setWebhook` — в развёртывании. */
 export const TELEGRAM_WEBHOOK_PATH = '/telegram/webhook';
+
+/** Дополнительный POST-путь на том же порту. Адаптеры друг друга не импортируют. */
+export interface WebhookRoute {
+  path: string;
+  handle(req: IncomingMessage, res: ServerResponse): Promise<void>;
+}
 
 export interface WebhookListenOptions {
   bot: Bot;
@@ -11,6 +17,7 @@ export interface WebhookListenOptions {
   path: string;
   port: number;
   host: string;
+  routes?: readonly WebhookRoute[];
 }
 
 export interface WebhookServer {
@@ -54,23 +61,48 @@ function closeServer(server: Server): Promise<void> {
  * Приём обновлений Bot API через webhook (B-2). Опрос обновлений не включается:
  * после этой настройки grammY не даёт запустить long polling.
  */
+function fail(res: ServerResponse): void {
+  if (!res.writableEnded) {
+    res.statusCode = 500;
+    res.end();
+  }
+}
+
 export async function startTelegramWebhook(options: WebhookListenOptions): Promise<WebhookServer> {
   if (options.secretToken.length === 0) throw new Error('секрет webhook пуст');
   if (!options.path.startsWith('/')) throw new Error('путь webhook');
+  const routes = options.routes ?? [];
+  for (const route of routes) {
+    if (!route.path.startsWith('/')) throw new Error('путь webhook');
+    if (route.path === options.path) throw new Error('путь webhook занят');
+  }
   const handle = webhookCallback(options.bot, 'http', { secretToken: options.secretToken });
   const server = createServer((req, res) => {
-    if (req.method !== 'POST' || pathnameOf(req.url) !== options.path) {
+    if (req.method !== 'POST') {
       res.statusCode = 404;
       res.end();
       return;
     }
-    void handle(req, res).then(
+    const path = pathnameOf(req.url);
+    if (path === options.path) {
+      void handle(req, res).then(
+        () => undefined,
+        () => {
+          fail(res);
+        },
+      );
+      return;
+    }
+    const route = routes.find((item) => item.path === path);
+    if (route === undefined) {
+      res.statusCode = 404;
+      res.end();
+      return;
+    }
+    void route.handle(req, res).then(
       () => undefined,
       () => {
-        if (!res.writableEnded) {
-          res.statusCode = 500;
-          res.end();
-        }
+        fail(res);
       },
     );
   });
