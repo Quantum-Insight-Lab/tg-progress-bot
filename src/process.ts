@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Kysely } from 'kysely';
 import type { InstallationRepositorySource } from './domain/github/repository.ts';
 import { unconfiguredInstallationSource } from './domain/github/repository.ts';
@@ -32,6 +33,7 @@ import {
 } from './infrastructure/tasks.ts';
 import { createUserRegistration } from './infrastructure/users.ts';
 import { createEventJournal } from './infrastructure/event-journal.ts';
+import { mirrorGithubIssue } from './infrastructure/issue-mirror.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { attachAccessGuard } from './telegram/access-guard.ts';
 import { createTelegramBot, type TelegramBotInfo } from './telegram/bot.ts';
@@ -267,10 +269,20 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   const routes: WebhookRoute[] = [];
   const githubWebhookSecret = config.githubWebhookSecret;
   if (githubWebhookSecret !== null && config.db !== undefined) {
-    const journal = createEventJournal(config.db);
+    const database = config.db;
     routes.push({
       path: GITHUB_WEBHOOK_PATH,
-      handle: (req, res) => acceptGithubWebhookHttp(req, res, { secret: githubWebhookSecret, journal, clock: config.clock }),
+      handle: (req, res) =>
+        acceptGithubWebhookHttp(req, res, {
+          secret: githubWebhookSecret,
+          clock: config.clock,
+          isolate: (run) =>
+            database.transaction().execute((trx) =>
+              run(createEventJournal(trx), async (payload) => {
+                await mirrorGithubIssue(trx, payload, randomUUID());
+              }),
+            ),
+        }),
     });
   }
   const webhook: WebhookServer = await startTelegramWebhook({

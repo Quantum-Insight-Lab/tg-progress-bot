@@ -115,7 +115,7 @@ export interface RepositoriesTable {
 
 /**
  * Issue зеркала (E-10). Ключ — id.
- * `state_reason` пуст у открытого. Природный ключ репозитория и номера этой таблицей не задаётся.
+ * `state_reason` пуст у открытого. Природный ключ — `repository_id` и `issue_number`, не проект.
  */
 export interface IssuesTable {
   id: string;
@@ -127,6 +127,12 @@ export interface IssuesTable {
   closed_by_login: string | null;
   updated_at: Date;
   closed_at: Date | null;
+}
+
+/** Assignee issue (E-11): логин на issue. Ключ — `issue_id` и `login`. Проекта в строке нет. */
+export interface IssueAssigneesTable {
+  issue_id: string;
+  login: string;
 }
 
 export interface Database {
@@ -141,4 +147,5 @@ export interface Database {
   blockers: BlockersTable;
   repositories: RepositoriesTable;
   issues: IssuesTable;
+  issue_assignees: IssueAssigneesTable;
 }

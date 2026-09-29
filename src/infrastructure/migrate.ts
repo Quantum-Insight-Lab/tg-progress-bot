@@ -85,3 +85,8 @@ export function readBlockersMigration(root = process.cwd()): string {
 export function readIssuesMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '017_issues.sql'), 'utf8');
 }
+
+/** Природный ключ issue и поля `issue_assignees`. Проекта в этих таблицах нет. */
+export function readIssueMirrorMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '018_issue_mirror.sql'), 'utf8');
+}

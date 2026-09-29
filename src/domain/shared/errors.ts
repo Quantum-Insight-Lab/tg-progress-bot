@@ -187,6 +187,8 @@ export const DOMAIN_ERROR = {
   ISSUE_CLOSED_BY_LOGIN: 'issue_closed_by_login',
   ISSUE_UPDATED_AT: 'issue_updated_at',
   ISSUE_CLOSED_AT: 'issue_closed_at',
+  ISSUE_MIRROR: 'issue_mirror',
+  ISSUE_ASSIGNEE_LOGIN: 'issue_assignee_login',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
