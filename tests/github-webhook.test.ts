@@ -32,7 +32,7 @@ import { acceptGithubWebhook, GITHUB_WEBHOOK_PATH, verifyGithubWebhookSignature 
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import { createEventJournal } from '../src/infrastructure/event-journal.ts';
-import { readEventsMigration, readPullRequestsMigration, readRepositoriesMigration } from '../src/infrastructure/migrate.ts';
+import { readCiMirrorMigration, readEventsMigration, readPullRequestsMigration, readRepositoriesMigration } from '../src/infrastructure/migrate.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
@@ -106,6 +106,7 @@ async function openPullRequestJournal(): Promise<JournalHandle & { journal: Retu
   await pglite.exec(readEventsMigration());
   await pglite.exec(readRepositoriesMigration());
   await pglite.exec(readPullRequestsMigration());
+  await pglite.exec(readCiMirrorMigration());
   await pglite.exec(`INSERT INTO repositories (id, owner, name) VALUES ('42', 'acme', 'bot')`);
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),

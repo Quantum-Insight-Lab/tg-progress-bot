@@ -4,6 +4,10 @@ import { definePullRequest, type PullRequest } from '../domain/github/pull-reque
 import type { PayloadByType } from '../events/index.ts';
 import type { Database } from './database.ts';
 
+function iso(value: Date | string): string {
+  return new Date(value).toISOString();
+}
+
 function storeOf(trx: Transaction<Database>): PullRequestMirrorStore {
   return {
     async find(repositoryId, pullRequestNumber) {
@@ -21,6 +25,10 @@ function storeOf(trx: Transaction<Database>): PullRequestMirrorStore {
         title: row.title,
         authorLogin: row.author_login,
         state: row.state,
+        ciStatus: row.ci_status,
+        updatedAt: iso(row.updated_at),
+        mergedAt: row.merged_at === null ? null : iso(row.merged_at),
+        mergedByLogin: row.merged_by_login,
       });
     },
     async save(pullRequest: PullRequest) {
@@ -33,12 +41,19 @@ function storeOf(trx: Transaction<Database>): PullRequestMirrorStore {
           title: pullRequest.title,
           author_login: pullRequest.authorLogin,
           state: pullRequest.state,
+          ci_status: pullRequest.ciStatus,
+          updated_at: new Date(pullRequest.updatedAt),
+          merged_at: pullRequest.mergedAt === null ? null : new Date(pullRequest.mergedAt),
+          merged_by_login: pullRequest.mergedByLogin,
         })
         .onConflict((conflict) =>
           conflict.columns(['repository_id', 'pull_request_number']).doUpdateSet({
             title: pullRequest.title,
             author_login: pullRequest.authorLogin,
             state: pullRequest.state,
+            updated_at: new Date(pullRequest.updatedAt),
+            merged_at: pullRequest.mergedAt === null ? null : new Date(pullRequest.mergedAt),
+            merged_by_login: pullRequest.mergedByLogin,
           }),
         )
         .execute();
@@ -59,5 +74,8 @@ export async function mirrorGithubPullRequest(
     title: payload.title,
     authorLogin: payload.author_login,
     state: payload.state,
+    updatedAt: payload.updated_at,
+    mergedAt: payload.merged_at,
+    mergedByLogin: payload.merged_by_login,
   });
 }

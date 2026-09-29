@@ -27,7 +27,7 @@ import { acceptGithubWebhook } from '../src/github/webhook.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import { createEventJournal } from '../src/infrastructure/event-journal.ts';
-import { readEventsMigration, readProjectsMigration, readPullRequestsMigration, readRepositoriesMigration } from '../src/infrastructure/migrate.ts';
+import { readCiMirrorMigration, readEventsMigration, readProjectsMigration, readPullRequestsMigration, readRepositoriesMigration } from '../src/infrastructure/migrate.ts';
 import { mirrorGithubPullRequest } from '../src/infrastructure/pull-request-mirror.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
@@ -45,6 +45,10 @@ const openPullRequest: PullRequest = {
   title: 'Черновик',
   authorLogin: 'ada',
   state: PULL_REQUEST_STATE_OPEN,
+  ciStatus: null,
+  updatedAt,
+  mergedAt: null,
+  mergedByLogin: null,
 };
 
 const mergedPullRequest: PullRequest = {
@@ -54,6 +58,10 @@ const mergedPullRequest: PullRequest = {
   title: 'Сдано',
   authorLogin: 'meg',
   state: PULL_REQUEST_STATE_MERGED,
+  ciStatus: null,
+  updatedAt,
+  mergedAt: updatedAt,
+  mergedByLogin: 'meg',
 };
 
 const WRITE_CALLS = [
@@ -110,6 +118,7 @@ async function openPullRequests(): Promise<Handle> {
   await pglite.exec(readProjectsMigration());
   await pglite.exec(readRepositoriesMigration());
   await pglite.exec(readPullRequestsMigration());
+  await pglite.exec(readCiMirrorMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
@@ -152,14 +161,21 @@ async function columnNames(db: Kysely<Database>): Promise<string[]> {
 async function insertPullRequest(db: Kysely<Database>, pullRequest: PullRequest): Promise<void> {
   const row = definePullRequest(pullRequest);
   await sql`
-    INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state)
+    INSERT INTO pull_requests (
+      id, repository_id, pull_request_number, title, author_login, state,
+      ci_status, updated_at, merged_at, merged_by_login
+    )
     VALUES (
       ${row.id}::uuid,
       ${row.repositoryId},
       ${row.pullRequestNumber},
       ${row.title},
       ${row.authorLogin},
-      ${row.state}
+      ${row.state},
+      ${row.ciStatus},
+      ${row.updatedAt}::timestamptz,
+      ${row.mergedAt}::timestamptz,
+      ${row.mergedByLogin}
     )
   `.execute(db);
 }
@@ -196,15 +212,18 @@ describe('E-14 pull request — таблица pull_requests', () => {
     opened.push(handle);
     expect(await columnNames(handle.db)).toEqual([
       'author_login',
+      'ci_status',
       'id',
+      'merged_at',
+      'merged_by_login',
       'pull_request_number',
       'repository_id',
       'state',
       'title',
+      'updated_at',
     ]);
     expect(await columnNames(handle.db)).not.toContain('project_id');
     expect(await columnNames(handle.db)).not.toContain('task_id');
-    expect(await columnNames(handle.db)).not.toContain('ci_status');
     await insertPullRequest(handle.db, openPullRequest);
     await insertPullRequest(handle.db, mergedPullRequest);
     const rows = await sql<{
@@ -250,32 +269,32 @@ describe('E-14 pull request — таблица pull_requests', () => {
     opened.push(handle);
     await insertPullRequest(handle.db, openPullRequest);
     await expect(sql`
-      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state)
-      VALUES (${openPullRequest.id}::uuid, ${otherRepositoryId}, 9, 'Другой', 'ada', 'open')
+      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state, updated_at)
+      VALUES (${openPullRequest.id}::uuid, ${otherRepositoryId}, 9, 'Другой', 'ada', 'open', ${updatedAt}::timestamptz)
     `.execute(handle.db)).rejects.toThrow(/pull_requests_pkey|23505/);
     await expect(sql`
-      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state)
-      VALUES ('00000000-0000-4000-8000-0000000000d3'::uuid, ${repositoryId}, 7, 'Дубль', 'ada', 'open')
+      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state, updated_at)
+      VALUES ('00000000-0000-4000-8000-0000000000d3'::uuid, ${repositoryId}, 7, 'Дубль', 'ada', 'open', ${updatedAt}::timestamptz)
     `.execute(handle.db)).rejects.toThrow(/pull_requests_repository_number_unique|23505/);
     await expect(sql`
-      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state)
-      VALUES ('00000000-0000-4000-8000-0000000000d4'::uuid, '99', 1, 'Нет репозитория', 'ada', 'open')
+      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state, updated_at)
+      VALUES ('00000000-0000-4000-8000-0000000000d4'::uuid, '99', 1, 'Нет репозитория', 'ada', 'open', ${updatedAt}::timestamptz)
     `.execute(handle.db)).rejects.toThrow(/pull_requests_repository_id_fkey|23503/);
     await expect(sql`
-      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state)
-      VALUES ('00000000-0000-4000-8000-0000000000d5'::uuid, ${repositoryId}, 0, 'Ноль', 'ada', 'open')
+      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state, updated_at)
+      VALUES ('00000000-0000-4000-8000-0000000000d5'::uuid, ${repositoryId}, 0, 'Ноль', 'ada', 'open', ${updatedAt}::timestamptz)
     `.execute(handle.db)).rejects.toThrow(/pull_requests_number_positive|23514/);
     await expect(sql`
-      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state)
-      VALUES ('00000000-0000-4000-8000-0000000000d6'::uuid, ${repositoryId}, 2, '   ', 'ada', 'open')
+      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state, updated_at)
+      VALUES ('00000000-0000-4000-8000-0000000000d6'::uuid, ${repositoryId}, 2, '   ', 'ada', 'open', ${updatedAt}::timestamptz)
     `.execute(handle.db)).rejects.toThrow(/pull_requests_title_not_blank|23514/);
     await expect(sql`
-      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state)
-      VALUES ('00000000-0000-4000-8000-0000000000d7'::uuid, ${repositoryId}, 2, 'Автор', '   ', 'open')
+      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state, updated_at)
+      VALUES ('00000000-0000-4000-8000-0000000000d7'::uuid, ${repositoryId}, 2, 'Автор', '   ', 'open', ${updatedAt}::timestamptz)
     `.execute(handle.db)).rejects.toThrow(/pull_requests_author_login_not_blank|23514/);
     await expect(sql`
-      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state)
-      VALUES ('00000000-0000-4000-8000-0000000000d8'::uuid, ${repositoryId}, 2, 'Состояние', 'ada', 'draft')
+      INSERT INTO pull_requests (id, repository_id, pull_request_number, title, author_login, state, updated_at)
+      VALUES ('00000000-0000-4000-8000-0000000000d8'::uuid, ${repositoryId}, 2, 'Состояние', 'ada', 'draft', ${updatedAt}::timestamptz)
     `.execute(handle.db)).rejects.toThrow(/pull_requests_state|23514/);
     expect(await pullRequestCount(handle.db)).toBe(1);
   });

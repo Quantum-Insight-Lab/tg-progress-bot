@@ -105,3 +105,8 @@ export function readMilestonesMigration(root = process.cwd()): string {
 export function readPullRequestsMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '021_pull_requests.sql'), 'utf8');
 }
+
+/** CI зеркала: `repositories.default_branch_ci` и поля состояния pull request. */
+export function readCiMirrorMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '022_ci_mirror.sql'), 'utf8');
+}
