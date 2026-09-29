@@ -95,3 +95,8 @@ export function readIssueMirrorMigration(root = process.cwd()): string {
 export function readIssueDependenciesMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '019_issue_dependencies.sql'), 'utf8');
 }
+
+/** Таблица milestones: поля зеркала, природный ключ и срок. Проекта и задачи в строке нет. */
+export function readMilestonesMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '020_milestones.sql'), 'utf8');
+}

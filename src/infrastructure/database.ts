@@ -145,6 +145,20 @@ export interface IssueDependenciesTable {
   link_type: 'blocked_by' | 'sub_issue';
 }
 
+/**
+ * Milestone зеркала (E-13). Ключ — id.
+ * Природный ключ — `repository_id` и `milestone_number`, не проект и не задача.
+ * `due_on` пуст, пока в GitHub срока нет.
+ */
+export interface MilestonesTable {
+  id: string;
+  repository_id: string;
+  milestone_number: number;
+  title: string;
+  state: 'open' | 'closed';
+  due_on: string | null;
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
@@ -159,4 +173,5 @@ export interface Database {
   issues: IssuesTable;
   issue_assignees: IssueAssigneesTable;
   issue_dependencies: IssueDependenciesTable;
+  milestones: MilestonesTable;
 }

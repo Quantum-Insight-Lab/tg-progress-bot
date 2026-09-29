@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { GithubDelivery, IssueDelivery, IssueLinkDelivery, PullRequestDelivery } from '../domain/github/delivery.ts';
+import type { GithubDelivery, IssueDelivery, IssueLinkDelivery, MilestoneDelivery, PullRequestDelivery } from '../domain/github/delivery.ts';
 import {
   ISSUE_LINK_ADDED,
   ISSUE_LINK_BLOCKED_BY,
@@ -21,6 +21,7 @@ const EVENT_ISSUES = 'issues';
 const EVENT_PULL_REQUEST = 'pull_request';
 const EVENT_ISSUE_DEPENDENCIES = 'issue_dependencies';
 const EVENT_SUB_ISSUES = 'sub_issues';
+const EVENT_MILESTONE = 'milestone';
 const STATUS_OK = 200;
 const STATUS_BAD = 400;
 const STATUS_UNAUTHORIZED = 401;
@@ -37,6 +38,8 @@ export interface GithubWebhookRequest {
   applyIssue?: (payload: PayloadByType['github.issue_changed']) => Promise<void>;
   /** Пишет связь issues после новой доставки. Повтор ключа сюда не приходит. */
   applyIssueLink?: (payload: PayloadByType['github.issue_links_changed']) => Promise<void>;
+  /** Пишет milestone после новой доставки. Повтор ключа сюда не приходит. */
+  applyMilestone?: (payload: PayloadByType['github.milestone_changed']) => Promise<void>;
 }
 
 export interface GithubWebhookHttpDeps {
@@ -47,6 +50,7 @@ export interface GithubWebhookHttpDeps {
       journal: EventJournal,
       applyIssue: (payload: PayloadByType['github.issue_changed']) => Promise<void>,
       applyIssueLink: (payload: PayloadByType['github.issue_links_changed']) => Promise<void>,
+      applyMilestone: (payload: PayloadByType['github.milestone_changed']) => Promise<void>,
     ) => Promise<number>,
   ) => Promise<number>;
 }
@@ -245,6 +249,31 @@ function parseIssueLink(eventName: string, deliveryId: string, body: Record<stri
   return linkDelivery(deliveryId, body, repository, issueNumber, dependsOn, ISSUE_LINK_SUB_ISSUE, sub);
 }
 
+function parseMilestone(deliveryId: string, body: Record<string, unknown>): MilestoneDelivery | null {
+  if (!isRecord(body.milestone)) return null;
+  const repository = repositoryId(body);
+  const number = numberValue(body.milestone.number);
+  const title = text(body.milestone.title);
+  const state = text(body.milestone.state);
+  if (repository === null || number === null || title === null || state === null) return null;
+  const due = body.milestone.due_on;
+  let dueOn: string | null = null;
+  if (due !== null && due !== undefined) {
+    dueOn = text(due);
+    if (dueOn === null) return null;
+  }
+  return {
+    kind: 'milestone',
+    deliveryId,
+    repositoryId: repository,
+    number,
+    title,
+    state,
+    dueOn,
+    senderLogin: isRecord(body.sender) ? login(body.sender) : null,
+  };
+}
+
 function parseDelivery(eventName: string, deliveryId: string, json: unknown): GithubDelivery | null {
   if (!isRecord(json)) return null;
   if (eventName === EVENT_ISSUES) return parseIssue(deliveryId, json);
@@ -252,6 +281,7 @@ function parseDelivery(eventName: string, deliveryId: string, json: unknown): Gi
   if (eventName === EVENT_ISSUE_DEPENDENCIES || eventName === EVENT_SUB_ISSUES) {
     return parseIssueLink(eventName, deliveryId, json);
   }
+  if (eventName === EVENT_MILESTONE) return parseMilestone(deliveryId, json);
   return { kind: 'other', deliveryId, eventName };
 }
 
@@ -290,6 +320,13 @@ export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<
   ) {
     await input.applyIssueLink(result.payload);
   }
+  if (
+    input.applyMilestone !== undefined &&
+    result.status === 'applied' &&
+    result.eventType === EVENT_TYPES.GITHUB_MILESTONE_CHANGED
+  ) {
+    await input.applyMilestone(result.payload);
+  }
   return STATUS_OK;
 }
 
@@ -304,7 +341,7 @@ export async function acceptGithubWebhookHttp(
     const eventName = header(req, 'x-github-event');
     const deliveryId = header(req, 'x-github-delivery');
     const signature = header(req, 'x-hub-signature-256');
-    const status = await deps.isolate((journal, applyIssue, applyIssueLink) =>
+    const status = await deps.isolate((journal, applyIssue, applyIssueLink, applyMilestone) =>
       acceptGithubWebhook({
         secret: deps.secret,
         eventName,
@@ -315,6 +352,7 @@ export async function acceptGithubWebhookHttp(
         clock: deps.clock,
         applyIssue,
         applyIssueLink,
+        applyMilestone,
       }),
     );
     if (!res.writableEnded) {
