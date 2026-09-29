@@ -12,6 +12,7 @@ import {
   type CanvasSlotState,
 } from '../domain/tasks/place-canvas.ts';
 import type { BacklogShare } from '../domain/progress/backlog-share.ts';
+import type { CanvasIssueSlice } from '../domain/progress/canvas-issue-slice.ts';
 import type { Canvas } from '../domain/tasks/canvas.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
@@ -21,6 +22,7 @@ import { orderPlan, taskPriority, taskStatus, tasksStandingInBlock } from '../do
 import { taskCanvasDay } from '../domain/tasks/task-day.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
+import { loadCanvasIssueSlice } from './canvas-issue-slice.ts';
 import { loadCanvasPerson, type CanvasPerson } from './person-canvas.ts';
 import { loadProjectBacklogShare } from './repository-share.ts';
 
@@ -44,6 +46,8 @@ export interface CanvasHome {
   backlogShare: BacklogShare | null;
   /** Строка этого человека: место в бэклоге или отсутствие логина. */
   person: CanvasPerson;
+  /** Срез issues репозитория: «Сделано», «В работе», «Далее». */
+  issueSlice: CanvasIssueSlice;
 }
 
 export interface ShownCanvas {
@@ -296,13 +300,14 @@ async function canvasFacts(
   assigneeId: string,
   canvasDate: string,
   timezone: string,
-): Promise<Pick<CanvasHome, 'tasks' | 'plan' | 'backlogShare' | 'person'>> {
+): Promise<Pick<CanvasHome, 'tasks' | 'plan' | 'backlogShare' | 'person' | 'issueSlice'>> {
   const lines = await assigneeCanvasLines(db, projectId, assigneeId, canvasDate, timezone);
   return {
     tasks: lines.tasks,
     plan: lines.plan,
     backlogShare: await loadProjectBacklogShare(db, projectId),
     person: await loadCanvasPerson(db, projectId, assigneeId),
+    issueSlice: await loadCanvasIssueSlice(db, projectId),
   };
 }
 

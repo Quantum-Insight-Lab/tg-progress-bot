@@ -59,6 +59,7 @@ import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
 import { editCanvasMessage, sendCanvasMessage } from './telegram/canvas-message.ts';
 import { backlogShareParagraphs } from './projections/backlog-line.ts';
+import { doneSliceParagraphs, inProgressSliceParagraphs, nextSliceParagraphs } from './projections/issue-slice.ts';
 import { personLineFromPlace, personLineParagraphs } from './projections/person-line.ts';
 import { planBlockParagraphs } from './projections/plan-block.ts';
 import { tasksBlockParagraphs } from './projections/tasks-block.ts';
@@ -177,6 +178,9 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
       sections: {
         backlog: backlogShareParagraphs(home.backlogShare),
         person: personLineParagraphs(personLineFromPlace(home.person)),
+        done: doneSliceParagraphs(home.issueSlice.done),
+        inProgress: inProgressSliceParagraphs(home.issueSlice.inProgress),
+        next: nextSliceParagraphs(home.issueSlice.next),
         tasks: tasksBlockParagraphs(home.tasks),
         plan: planBlockParagraphs(home.plan),
       },
