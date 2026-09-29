@@ -1,8 +1,12 @@
+import { REPORT_LIST_LIMIT } from '../config/constants.ts';
+
 /**
  * P-13. Строки бэклога в блоке проекта отчёта.
  * Имя проекта, «Бэклог: было → стало · осталось», «Закрыто», «Открыто новых».
  * Числа и списки приходят из фактов периода. Проекция их не пересчитывает.
  * Пустой процент не заменяется нулём: нет доли — строки «Бэклог» нет.
+ * «Нет данных» вместо пустой строки не печатается.
+ * «Закрыто» длиннее `REPORT_LIST_LIMIT` — число и до этого лимита названий.
  * Дата подтверждения задачи остаётся в отчёте календарным днём, даже когда
  * сама задача с канваса уже ушла.
  */
@@ -130,11 +134,28 @@ function confirmationDates(days: readonly string[]): string | null {
   return printed.join(REPORT_BACKLOG_GAP);
 }
 
+/** Связка числа и названий, когда закрытых больше лимита. Как в макете недели. */
+const CLOSED_AMONG = ', среди них ';
+
+/**
+ * «Закрыто»: все названия, пока их не больше лимита.
+ * Длиннее — число и первые названия, не длиннее `REPORT_LIST_LIMIT`.
+ * Пустой список строку не занимает.
+ */
+function closedLine(issues: readonly ReportBacklogIssue[]): string | null {
+  if (issues.length === 0) return null;
+  const names = issues.map(issueName);
+  if (names.length <= REPORT_LIST_LIMIT) return `${REPORT_CLOSED_LABEL}: ${names.join(', ')}`;
+  const shown = names.slice(0, REPORT_LIST_LIMIT).join(', ');
+  return `${REPORT_CLOSED_LABEL}: ${String(names.length)}${CLOSED_AMONG}${shown}`;
+}
+
 /**
  * Строки бэклога одного проекта.
  * «Бэклог» — только когда доля есть на обеих границах и остаток есть на конец.
- * «Закрыто» — названия issues. «Открыто новых» — сколько таких issues, без названий.
+ * «Закрыто» — названия issues, не длиннее лимита. «Открыто новых» — сколько таких issues, без названий.
  * Пустые списки строку не занимают. Дата подтверждения дописывается днём `ДД.ММ`.
+ * Нет доли — строки нет, слова «Нет данных» нет.
  */
 export function reportProjectBacklogLines(view: ReportProjectBacklogView): readonly string[] {
   const lines: string[] = [projectTitle(view.projectName)];
@@ -145,9 +166,8 @@ export function reportProjectBacklogLines(view: ReportProjectBacklogView): reado
       `${REPORT_BACKLOG_LABEL}: ${percentText(view.shareAtStart)}${SHARE_ARROW}${percentText(view.shareAtEnd)}${REPORT_BACKLOG_GAP}${remainderText(view.remainderAtEnd)}`,
     );
   }
-  if (view.closed.length > 0) {
-    lines.push(`${REPORT_CLOSED_LABEL}: ${view.closed.map(issueName).join(', ')}`);
-  }
+  const closed = closedLine(view.closed);
+  if (closed !== null) lines.push(closed);
   if (view.openedNew.length > 0) {
     for (const issue of view.openedNew) issueName(issue);
     lines.push(`${REPORT_OPENED_LABEL}: ${String(view.openedNew.length)}`);
