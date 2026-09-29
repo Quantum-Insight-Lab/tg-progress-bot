@@ -224,6 +224,10 @@ export const DOMAIN_ERROR = {
   DIVERGENCE_FACT: 'divergence_fact',
   PERIOD_ISSUE_DUPLICATE: 'period_issue_duplicate',
   PERIOD_ISSUE_SPAN: 'period_issue_span',
+  PERIOD_TASK_KEY: 'period_task_key',
+  PERIOD_TASK_STATUS: 'period_task_status',
+  PERIOD_TASK_DUPLICATE: 'period_task_duplicate',
+  PERIOD_FACT_KEY: 'period_fact_key',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
