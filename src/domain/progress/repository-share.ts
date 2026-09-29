@@ -170,6 +170,27 @@ export function projectRepositoryReadings(
 }
 
 /**
+ * Общий процент — та же формула по issues репозиториев.
+ * Репозиторий, на котором сидят несколько проектов, входит один раз.
+ * Проект без репозитория в список не попадает.
+ * Среднее арифметическое долей проектов здесь не считается.
+ */
+export function overallBacklogShare(
+  projects: readonly ProjectMemberSlice[],
+  issues: readonly IssueRow[],
+): BacklogShare {
+  const seen = new Set<string>();
+  const combined: IssueRow[] = [];
+  for (const reading of projectRepositoryReadings(projects, issues)) {
+    if (reading.repositoryId === null || reading.share === null) continue;
+    if (seen.has(reading.repositoryId)) continue;
+    seen.add(reading.repositoryId);
+    combined.push(...reading.lineup);
+  }
+  return backlogShare(combined);
+}
+
+/**
  * Отдельного процента у milestone нет.
  * Название и срок на долю бэклога не влияют.
  */

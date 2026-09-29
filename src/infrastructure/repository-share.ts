@@ -1,4 +1,5 @@
 import { sql, type Kysely } from 'kysely';
+import type { BacklogShare } from '../domain/progress/backlog-share.ts';
 import { projectShareRatio } from '../domain/progress/no-data.ts';
 import {
   projectRepositoryReadings,
@@ -59,11 +60,11 @@ async function columnPresent(db: Kysely<Database>, table: string, column: string
 }
 
 /**
- * Процент проекта для строки канваса.
- * Колонки репозитория нет — репозиторий не подключён, числа нет.
- * Пустой знаменатель тоже даёт пусто, не ноль.
+ * Доля проекта для строки канваса.
+ * Колонки репозитория нет или репозиторий не подключён — доли нет.
+ * Пустой знаменатель остаётся долей с пустым `ratio`, не нулём.
  */
-export async function loadProjectShareRatio(db: Kysely<Database>, projectId: string): Promise<number | null> {
+export async function loadProjectBacklogShare(db: Kysely<Database>, projectId: string): Promise<BacklogShare | null> {
   if (!(await columnPresent(db, 'projects', 'repository_id'))) return null;
   const linked = await db
     .selectFrom('projects')
@@ -89,5 +90,14 @@ export async function loadProjectShareRatio(db: Kysely<Database>, projectId: str
     }
   }
   const reading = projectRepositoryReadings([{ projectId, repositoryId, memberKeys: [] }], issues)[0];
-  return projectShareRatio(reading?.share ?? null);
+  return reading?.share ?? null;
+}
+
+/**
+ * Процент проекта для строки канваса.
+ * Колонки репозитория нет — репозиторий не подключён, числа нет.
+ * Пустой знаменатель тоже даёт пусто, не ноль.
+ */
+export async function loadProjectShareRatio(db: Kysely<Database>, projectId: string): Promise<number | null> {
+  return projectShareRatio(await loadProjectBacklogShare(db, projectId));
 }
