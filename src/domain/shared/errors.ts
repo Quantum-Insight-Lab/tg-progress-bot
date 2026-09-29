@@ -220,6 +220,8 @@ export const DOMAIN_ERROR = {
   SNAPSHOT_DATE: 'snapshot_date',
   SNAPSHOT_PROGRESS: 'snapshot_progress',
   SNAPSHOT_ID_BLANK: 'snapshot_id_blank',
+  DIVERGENCE_DATE: 'divergence_date',
+  DIVERGENCE_FACT: 'divergence_fact',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
