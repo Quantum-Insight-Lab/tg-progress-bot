@@ -21,6 +21,7 @@ import { orderPlan, taskPriority, taskStatus, tasksStandingInBlock } from '../do
 import { taskCanvasDay } from '../domain/tasks/task-day.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
+import { loadCanvasPerson, type CanvasPerson } from './person-canvas.ts';
 import { loadProjectBacklogShare } from './repository-share.ts';
 
 /** Задача на канвасе этого исполнителя: первая строка абзаца и приоритет для второй. */
@@ -41,6 +42,8 @@ export interface CanvasHome {
   plan: readonly CanvasTaskLine[];
   /** Доля репозитория. Пусто — процента нет, на канвасе «Нет данных». */
   backlogShare: BacklogShare | null;
+  /** Строка этого человека: место в бэклоге или отсутствие логина. */
+  person: CanvasPerson;
 }
 
 export interface ShownCanvas {
@@ -287,6 +290,22 @@ function noteFull(
   );
 }
 
+async function canvasFacts(
+  db: Kysely<Database>,
+  projectId: string,
+  assigneeId: string,
+  canvasDate: string,
+  timezone: string,
+): Promise<Pick<CanvasHome, 'tasks' | 'plan' | 'backlogShare' | 'person'>> {
+  const lines = await assigneeCanvasLines(db, projectId, assigneeId, canvasDate, timezone);
+  return {
+    tasks: lines.tasks,
+    plan: lines.plan,
+    backlogShare: await loadProjectBacklogShare(db, projectId),
+    person: await loadCanvasPerson(db, projectId, assigneeId),
+  };
+}
+
 function rejectedFull(recorded: 'applied' | 'duplicate'): never {
   if (recorded === 'duplicate') throw new DomainError(DOMAIN_ERROR.CANVAS_DUPLICATE, 'canvas.full уже записан');
   throw new DomainError(DOMAIN_ERROR.CANVAS_FULL, 'канвас заполнен');
@@ -317,8 +336,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
   const canvasDate = projectCalendarDate(input.now, project.timezone);
   const slot = await slotFor(db, input.projectId, input.assigneeId, canvasDate);
   const move = decideCanvasMove(input.destination, slot, input.now);
-  const lines = await assigneeCanvasLines(db, input.projectId, input.assigneeId, canvasDate, project.timezone);
-  const backlogShare = await loadProjectBacklogShare(db, input.projectId);
+  const facts = await canvasFacts(db, input.projectId, input.assigneeId, canvasDate, project.timezone);
   if (move.kind === 'edit') {
     const causationId = requireEditCausation(input.causationId);
     const telegramChatId = slot.telegramChatId ?? '';
@@ -329,9 +347,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
           topicId: move.canvas.topicId,
           projectName: project.name,
           canvasDate: move.canvas.canvasDate,
-          tasks: lines.tasks,
-          plan: lines.plan,
-          backlogShare,
+          ...facts,
         },
         move.canvas.messageId,
       ),
@@ -364,9 +380,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
       topicId: move.topicId,
       projectName: project.name,
       canvasDate: move.canvasDate,
-      tasks: lines.tasks,
-      plan: lines.plan,
-      backlogShare,
+      ...facts,
     }),
   );
   if (sent.status === 'full') {
@@ -484,17 +498,14 @@ export async function ensureTodayCanvases(
       const existing = await readCanvas(db, member.project_id, member.user_id, canvasDate);
       if (existing !== null) continue;
       const topicId = whole(member.topic_id, 'topic_id');
-      const lines = await assigneeCanvasLines(db, member.project_id, member.user_id, canvasDate, member.timezone);
-      const backlogShare = await loadProjectBacklogShare(db, member.project_id);
+      const facts = await canvasFacts(db, member.project_id, member.user_id, canvasDate, member.timezone);
       const sent = sentOf(
         await send({
           telegramChatId: member.telegram_chat_id,
           topicId,
           projectName: member.project_name,
           canvasDate,
-          tasks: lines.tasks,
-          plan: lines.plan,
-          backlogShare,
+          ...facts,
         }),
       );
       if (sent.status === 'full') {
