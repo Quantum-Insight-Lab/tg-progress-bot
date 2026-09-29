@@ -151,6 +151,21 @@ function closedLine(issues: readonly ReportBacklogIssue[]): string | null {
 }
 
 /**
+ * «N% → M% · осталось X из Y».
+ * Нет доли на одной из границ или нет остатка — пусто, не ноль и не «Нет данных».
+ */
+export function reportShareChange(
+  shareAtStart: ReportBacklogShare,
+  shareAtEnd: ReportBacklogShare,
+  remainderAtEnd: ReportBacklogRemainder | null,
+): string | null {
+  const startKnown = shareKnown(shareAtStart);
+  const endKnown = shareKnown(shareAtEnd);
+  if (!startKnown || !endKnown || remainderAtEnd === null) return null;
+  return `${percentText(shareAtStart)}${SHARE_ARROW}${percentText(shareAtEnd)}${REPORT_BACKLOG_GAP}${remainderText(remainderAtEnd)}`;
+}
+
+/**
  * Строки бэклога одного проекта.
  * «Бэклог» — только когда доля есть на обеих границах и остаток есть на конец.
  * «Закрыто» — названия issues, не длиннее лимита. «Открыто новых» — сколько таких issues, без названий.
@@ -159,13 +174,8 @@ function closedLine(issues: readonly ReportBacklogIssue[]): string | null {
  */
 export function reportProjectBacklogLines(view: ReportProjectBacklogView): readonly string[] {
   const lines: string[] = [projectTitle(view.projectName)];
-  const startKnown = shareKnown(view.shareAtStart);
-  const endKnown = shareKnown(view.shareAtEnd);
-  if (startKnown && endKnown && view.remainderAtEnd !== null) {
-    lines.push(
-      `${REPORT_BACKLOG_LABEL}: ${percentText(view.shareAtStart)}${SHARE_ARROW}${percentText(view.shareAtEnd)}${REPORT_BACKLOG_GAP}${remainderText(view.remainderAtEnd)}`,
-    );
-  }
+  const change = reportShareChange(view.shareAtStart, view.shareAtEnd, view.remainderAtEnd);
+  if (change !== null) lines.push(`${REPORT_BACKLOG_LABEL}: ${change}`);
   const closed = closedLine(view.closed);
   if (closed !== null) lines.push(closed);
   if (view.openedNew.length > 0) {
