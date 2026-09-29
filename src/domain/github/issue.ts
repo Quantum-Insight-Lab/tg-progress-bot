@@ -25,8 +25,7 @@ export type IssueStateReason = (typeof ISSUE_STATE_REASONS)[number];
 
 /**
  * Issue зеркала (E-10): единица бэклога репозитория.
- * Ключ — id. Природный ключ репозитория и номера этой записью не задаётся.
- * Проекта в строке нет.
+ * Ключ — id. Природный ключ — репозиторий и номер, не проект.
  */
 export interface Issue {
   id: string;
@@ -136,4 +135,16 @@ export function defineIssue(input: {
         ? null
         : timestamp(input.closedAt, DOMAIN_ERROR.ISSUE_CLOSED_AT, 'Дата закрытия либо пуста, либо задана'),
   };
+}
+
+/** Природный ключ issue: репозиторий и номер. Проекта в ключе нет. */
+export function issueNaturalKey(
+  repositoryId: string,
+  issueNumber: number,
+): { repositoryId: string; issueNumber: number } {
+  const id = githubRepositoryId(repositoryId);
+  if (!Number.isInteger(issueNumber) || issueNumber < 1) {
+    throw new DomainError(DOMAIN_ERROR.ISSUE_NUMBER, 'Номер issue — положительное число GitHub');
+  }
+  return { repositoryId: id, issueNumber };
 }

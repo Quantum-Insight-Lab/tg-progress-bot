@@ -4,7 +4,7 @@ import type { GithubDelivery, IssueDelivery, PullRequestDelivery } from '../doma
 import { recordGithubDelivery } from '../domain/github/delivery.ts';
 import { DomainError } from '../domain/shared/errors.ts';
 import type { Clock } from '../domain/shared/clock.ts';
-import { EventRejected } from '../events/index.ts';
+import { EVENT_TYPES, EventRejected, type PayloadByType } from '../events/index.ts';
 import type { EventJournal } from '../events/journal.ts';
 
 /** Путь приёма доставки GitHub App. Регистрация hook — в развёртывании. */
@@ -25,12 +25,19 @@ export interface GithubWebhookRequest {
   body: Buffer;
   journal: EventJournal;
   clock: Clock;
+  /** Пишет зеркало issue после новой доставки. Повтор ключа сюда не приходит. */
+  applyIssue?: (payload: PayloadByType['github.issue_changed']) => Promise<void>;
 }
 
 export interface GithubWebhookHttpDeps {
   secret: string;
-  journal: EventJournal;
   clock: Clock;
+  isolate: (
+    run: (
+      journal: EventJournal,
+      applyIssue: (payload: PayloadByType['github.issue_changed']) => Promise<void>,
+    ) => Promise<number>,
+  ) => Promise<number>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -176,11 +183,19 @@ export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<
   }
   const delivery = parseDelivery(eventName, deliveryId, json);
   if (delivery === null) return STATUS_BAD;
+  let result: Awaited<ReturnType<typeof recordGithubDelivery>>;
   try {
-    await recordGithubDelivery(input.journal, input.clock, delivery);
+    result = await recordGithubDelivery(input.journal, input.clock, delivery);
   } catch (error) {
     if (error instanceof DomainError || error instanceof EventRejected) return STATUS_BAD;
     throw error;
+  }
+  if (
+    input.applyIssue !== undefined &&
+    result.status === 'applied' &&
+    result.eventType === EVENT_TYPES.GITHUB_ISSUE_CHANGED
+  ) {
+    await input.applyIssue(result.payload);
   }
   return STATUS_OK;
 }
@@ -193,15 +208,21 @@ export async function acceptGithubWebhookHttp(
 ): Promise<void> {
   try {
     const body = await readBody(req);
-    const status = await acceptGithubWebhook({
-      secret: deps.secret,
-      eventName: header(req, 'x-github-event'),
-      deliveryId: header(req, 'x-github-delivery'),
-      signature: header(req, 'x-hub-signature-256'),
-      body,
-      journal: deps.journal,
-      clock: deps.clock,
-    });
+    const eventName = header(req, 'x-github-event');
+    const deliveryId = header(req, 'x-github-delivery');
+    const signature = header(req, 'x-hub-signature-256');
+    const status = await deps.isolate((journal, applyIssue) =>
+      acceptGithubWebhook({
+        secret: deps.secret,
+        eventName,
+        deliveryId,
+        signature,
+        body,
+        journal,
+        clock: deps.clock,
+        applyIssue,
+      }),
+    );
     if (!res.writableEnded) {
       res.statusCode = status;
       res.end();
