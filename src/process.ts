@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { Kysely } from 'kysely';
+import type { GithubReconcileSource } from './domain/github/reconcile.ts';
 import type { InstallationRepositorySource } from './domain/github/repository.ts';
 import { unconfiguredInstallationSource } from './domain/github/repository.ts';
 import type { Clock } from './domain/shared/clock.ts';
 import { createGithubAppClient, readGithubAppCredentials } from './github/client.ts';
+import { createGithubReconcileSource } from './github/reconcile.ts';
 import { acceptGithubWebhookHttp, GITHUB_WEBHOOK_PATH } from './github/webhook.ts';
 import type { Database } from './infrastructure/database.ts';
 import { createScheduler, startSchedulerLoop, type Scheduler } from './infrastructure/scheduler.ts';
@@ -39,6 +41,7 @@ import { mirrorGithubIssueLink } from './infrastructure/issue-links.ts';
 import { mirrorGithubIssue } from './infrastructure/issue-mirror.ts';
 import { mirrorGithubMilestone } from './infrastructure/milestone-mirror.ts';
 import { mirrorGithubPullRequest } from './infrastructure/pull-request-mirror.ts';
+import { reconcileGithubMirror, reconcileIntervalMs, startReconcileLoop } from './infrastructure/reconcile.ts';
 import { mirrorGithubWorkflow } from './infrastructure/workflow-mirror.ts';
 import { createProgressEngine, type ProgressEngine } from './progress-engine.ts';
 import { attachAccessGuard } from './telegram/access-guard.ts';
@@ -86,6 +89,11 @@ export interface ProcessConfig {
   botInfo?: TelegramBotInfo;
   /** Задаётся в тестах. Боевой вход читает GitHub App из окружения и не берёт личный токен. */
   installationSource?: InstallationRepositorySource;
+  /**
+   * Чтение GitHub для сверки. Пусто — сверка выключена.
+   * Без поля боевой вход берёт GitHub App из окружения, а если его нет — не опрашивает.
+   */
+  reconcileSource?: GithubReconcileSource | null;
 }
 
 export interface RunningProcess {
@@ -131,6 +139,13 @@ export function readProcessConfig(env: NodeJS.ProcessEnv, clock: Clock): Process
   };
 }
 
+function reconcileSourceOf(config: ProcessConfig): GithubReconcileSource | null {
+  if (config.reconcileSource !== undefined) return config.reconcileSource;
+  const credentials = readGithubAppCredentials(process.env);
+  if (credentials === null) return null;
+  return createGithubReconcileSource(credentials);
+}
+
 function installationSourceOf(config: ProcessConfig): InstallationRepositorySource {
   if (config.installationSource !== undefined) return config.installationSource;
   const credentials = readGithubAppCredentials(process.env);
@@ -147,6 +162,7 @@ let running: RunningProcess | undefined;
  * Слот A-30 переносит незакрытые задачи на канвас новых суток.
  * Слот A-31 выставляет канвас на сегодня.
  * Слот A-35 замечает PR участника без движения и пишет `repo.pr_stalled`.
+ * Сверка зеркала идёт отдельно, раз в `RECONCILE_INTERVAL`, и пишет `github.reconciled`.
  * Остальные слоты регистрируют свои issues.
  */
 export async function startProcess(config: ProcessConfig): Promise<RunningProcess> {
@@ -323,6 +339,12 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     routes,
   });
   const loop = startSchedulerLoop(scheduler, config.schedulerIntervalMs);
+  const reconcileSource = reconcileSourceOf(config);
+  const database = config.db;
+  const reconcileLoop =
+    database !== undefined && reconcileSource !== null
+      ? startReconcileLoop((now) => reconcileGithubMirror(database, reconcileSource, now), config.clock, reconcileIntervalMs())
+      : undefined;
   let stopped = false;
   running = {
     bot,
@@ -332,6 +354,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     async stop() {
       if (stopped) return;
       stopped = true;
+      reconcileLoop?.stop();
       loop.stop();
       await webhook.close();
     },
