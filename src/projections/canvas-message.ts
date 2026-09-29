@@ -38,6 +38,30 @@ export interface CanvasRichMessage {
   blocks: CanvasParagraphBlock[];
 }
 
+/** Галочка `- [ ]` в rich message — рисунок: у неё нет `callback_data`. */
+export const CANVAS_CHECKBOX_OPEN = '- [ ]';
+
+/** Отмеченный рисунок. Нажатие боту тоже не приходит. */
+export const CANVAS_CHECKBOX_DONE = '- [x]';
+
+/** Видимый текст абзаца: обычный текст и подписи кнопок. */
+export function canvasParagraphChars(paragraph: CanvasParagraph): number {
+  let chars = 0;
+  for (const piece of paragraph.pieces) {
+    chars += piece.kind === 'text' ? piece.text.length : piece.label.length;
+  }
+  return chars;
+}
+
+function assertCheckboxDrawing(paragraph: CanvasParagraph): void {
+  for (const piece of paragraph.pieces) {
+    if (piece.kind !== 'action') continue;
+    if (piece.label === CANVAS_CHECKBOX_OPEN || piece.label === CANVAS_CHECKBOX_DONE) {
+      throw new Error('галочка - [ ] в rich message — рисунок без callback_data');
+    }
+  }
+}
+
 function linkButton(label: string, callbackData: string): CanvasTextButton {
   return {
     type: 'button',
@@ -131,6 +155,7 @@ export function renderCanvas(input: {
 
 /** Абзацы канваса. Кнопка действия лежит в тексте абзаца, отдельным блоком кнопок не выносится. */
 export function renderCanvasMessage(paragraphs: readonly CanvasParagraph[]): CanvasRichMessage {
+  for (const paragraph of paragraphs) assertCheckboxDrawing(paragraph);
   return {
     blocks: paragraphs.map((paragraph) => ({
       type: 'paragraph',

@@ -42,9 +42,9 @@ import { attachParticipants } from './telegram/members.ts';
 import { attachNewProject } from './telegram/new-project.ts';
 import { attachStartCommand } from './telegram/start.ts';
 import { editCanvasMessage, sendCanvasMessage } from './telegram/canvas-message.ts';
-import { renderCanvas } from './projections/canvas-message.ts';
 import { planBlockParagraphs } from './projections/plan-block.ts';
 import { tasksBlockParagraphs } from './projections/tasks-block.ts';
+import { prepareCanvasMessage } from './telegram/canvas-fit.ts';
 import { attachTaskCommand } from './telegram/task-command.ts';
 import { attachTaskMark } from './telegram/task-mark.ts';
 import { attachTaskPlan } from './telegram/task-plan.ts';
@@ -124,35 +124,36 @@ let running: RunningProcess | undefined;
 export async function startProcess(config: ProcessConfig): Promise<RunningProcess> {
   if (running !== undefined) throw new Error('процесс уже запущен');
   const bot = config.botInfo === undefined ? createTelegramBot(config.botToken) : createTelegramBot(config.botToken, config.botInfo);
+  const paint = (home: CanvasHome) =>
+    prepareCanvasMessage({
+      projectName: home.projectName,
+      canvasDate: home.canvasDate,
+      sections: {
+        tasks: tasksBlockParagraphs(home.tasks),
+        plan: planBlockParagraphs(home.plan),
+      },
+    });
   const deliverCanvas = {
-    async send(home: CanvasHome): Promise<number> {
-      return sendCanvasMessage(
+    async send(home: CanvasHome) {
+      const painted = paint(home);
+      if (painted.status === 'full') return { status: 'full' as const };
+      const messageId = await sendCanvasMessage(
         bot.api,
         { chatId: home.telegramChatId, messageThreadId: home.topicId },
-        renderCanvas({
-          projectName: home.projectName,
-          canvasDate: home.canvasDate,
-          sections: {
-            tasks: tasksBlockParagraphs(home.tasks),
-            plan: planBlockParagraphs(home.plan),
-          },
-        }),
+        painted.message,
       );
+      return { status: 'sent' as const, messageId, shrunk: painted.shrunk };
     },
-    async edit(home: CanvasHome, messageId: number): Promise<void> {
+    async edit(home: CanvasHome, messageId: number) {
+      const painted = paint(home);
+      if (painted.status === 'full') return { status: 'full' as const };
       await editCanvasMessage(
         bot.api,
         { chatId: home.telegramChatId, messageThreadId: home.topicId },
         messageId,
-        renderCanvas({
-          projectName: home.projectName,
-          canvasDate: home.canvasDate,
-          sections: {
-            tasks: tasksBlockParagraphs(home.tasks),
-            plan: planBlockParagraphs(home.plan),
-          },
-        }),
+        painted.message,
       );
+      return { status: 'edited' as const, shrunk: painted.shrunk };
     },
   };
   let ensureToday: ((now: Date) => Promise<void>) | undefined;
@@ -178,7 +179,9 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     });
     attachExecutorTopic(bot, createExecutorTopics(config.db, config.clock), {
       posted(input) {
-        return canvas.showForTopic({ ...input, causationId: null, send: deliverCanvas.send, edit: deliverCanvas.edit }).then(() => undefined);
+        return canvas
+          .showForTopic({ ...input, causationId: null, cause: input.cause ?? null, send: deliverCanvas.send, edit: deliverCanvas.edit })
+          .then(() => undefined);
       },
     });
     attachReportsTopic(bot, createReportsTopics(config.db, config.clock));
@@ -187,13 +190,14 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachProjectRepository(bot, projectRepository, installation);
     attachInstallationRepositories(bot, installation);
     const redrawTaskCanvas = {
-      redraw(input: { projectId: string; assigneeId: string; causationId: string }) {
+      redraw(input: { projectId: string; assigneeId: string; causationId: string; cause?: string }) {
         return canvas
           .show({
             projectId: input.projectId,
             assigneeId: input.assigneeId,
             destination: CANVAS_DESTINATION_TOPIC,
             causationId: input.causationId,
+            cause: input.cause ?? null,
             send: deliverCanvas.send,
             edit: deliverCanvas.edit,
           })

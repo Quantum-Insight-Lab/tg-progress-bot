@@ -2,7 +2,7 @@ import type { Bot } from 'grammy';
 import type { TaskReviewing, TaskReviewResult } from '../domain/tasks/review-task.ts';
 import { TASK_TRANSITION_CONFIRM, TASK_TRANSITION_RETURN } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
-import type { CanvasRedraw, TaskCommandPlace } from './task-command.ts';
+import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const REVIEW_DATA = new RegExp(`^task:(${TASK_TRANSITION_CONFIRM}|${TASK_TRANSITION_RETURN}):([1-9]\\d*)$`);
 
@@ -75,6 +75,7 @@ export function attachTaskReview(bot: Bot, actions: TaskReviewing, canvas?: Canv
     const from = ctx.from;
     const message = ctx.callbackQuery.message;
     const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+    let notice: { text: string } | undefined;
     try {
       if (parsed === null || from.is_bot) return;
       const reviewed = await replyToTaskReview(
@@ -95,13 +96,16 @@ export function attachTaskReview(bot: Bot, actions: TaskReviewing, canvas?: Canv
             projectId: reviewed.task.projectId,
             assigneeId: reviewed.task.assigneeId,
             causationId: reviewed.eventId,
+            cause: String(ctx.update.update_id),
           });
         } catch (error) {
-          if (!(error instanceof DomainError) || error.code !== DOMAIN_ERROR.CANVAS_DUPLICATE) throw error;
+          const failure = canvasRedrawFailure(error);
+          if (failure === null) throw error;
+          if (failure === 'full') notice = { text: CANVAS_FULL_REPLY };
         }
       }
     } finally {
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery(notice);
     }
   });
 }

@@ -43,14 +43,29 @@ function replyOf(error: DomainError): string | null {
     case DOMAIN_ERROR.TASK_ASSIGNEE_ROLE:
     case DOMAIN_ERROR.TASK_AMBIGUOUS:
       return TASK_OWN_TOPIC;
+    case DOMAIN_ERROR.CANVAS_FULL:
+      return CANVAS_FULL_REPLY;
+    case DOMAIN_ERROR.CANVAS_DUPLICATE:
+      return null;
     default:
       throw error;
   }
 }
 
+/** Ответ человеку, когда задачи в лимит rich message уже не влезают. */
+export const CANVAS_FULL_REPLY = 'канвас заполнен';
+
 /** После `task.created` канвас того же дня правится или появляется, если его ещё не было. */
 export interface CanvasRedraw {
-  redraw(input: { projectId: string; assigneeId: string; causationId: string }): Promise<void>;
+  redraw(input: { projectId: string; assigneeId: string; causationId: string; cause?: string }): Promise<void>;
+}
+
+/** Повтор правки молчит. Отказ «канвас заполнен» доходит до человека. */
+export function canvasRedrawFailure(error: unknown): 'duplicate' | 'full' | null {
+  if (!(error instanceof DomainError)) return null;
+  if (error.code === DOMAIN_ERROR.CANVAS_DUPLICATE) return 'duplicate';
+  if (error.code === DOMAIN_ERROR.CANVAS_FULL) return 'full';
+  return null;
 }
 
 /**
@@ -80,6 +95,7 @@ export async function replyToTaskCommand(
         projectId: created.task.projectId,
         assigneeId: created.task.assigneeId,
         causationId: created.eventId,
+        cause: idempotencyKey,
       });
     }
     return taskCreatedReply(created.task.number, created.task.title);

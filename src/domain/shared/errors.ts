@@ -157,6 +157,8 @@ export const DOMAIN_ERROR = {
   CANVAS_AMBIGUOUS: 'canvas_ambiguous',
   CANVAS_DUPLICATE: 'canvas_duplicate',
   CANVAS_CAUSATION: 'canvas_causation',
+  CANVAS_FULL: 'canvas_full',
+  CANVAS_FULL_CAUSE: 'canvas_full_cause',
   CANVAS_ITEM_ID_BLANK: 'canvas_item_id_blank',
   CANVAS_ITEM_CANVAS_BLANK: 'canvas_item_canvas_blank',
   CANVAS_ITEM_TASK_BLANK: 'canvas_item_task_blank',

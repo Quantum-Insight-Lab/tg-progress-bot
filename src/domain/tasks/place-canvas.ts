@@ -47,6 +47,19 @@ export interface EditedCanvas {
   canvas: Canvas;
   causationId: string;
   occurredAt: Date;
+  shrunk: boolean;
+}
+
+/** Причина `canvas.full` у слота A-31: новых суток, без апдейта Telegram. */
+export const CANVAS_FULL_SCHEDULE = 'schedule';
+
+export interface FullCanvas {
+  canvasId: string | null;
+  projectId: string;
+  assigneeId: string;
+  canvasDate: string;
+  cause: string;
+  occurredAt: Date;
 }
 
 /** Ключ `canvas.posted`: проект, исполнитель и дата. Повтор не создаёт второе сообщение. */
@@ -57,6 +70,15 @@ export function postedCanvasKey(projectId: string, assigneeId: string, canvasDat
 /** Ключ `canvas.edited`: канвас и причина правки. */
 export function editedCanvasKey(canvasId: string, causationId: string): string {
   return `${canvasId}+${causationId}`;
+}
+
+/**
+ * Ключ `canvas.full`: слот и причина.
+ * Апдейт — `telegram update_id`. Слот A-31 — `schedule`.
+ * Голый `update_id` занят событием того же апдейта.
+ */
+export function fullCanvasKey(projectId: string, assigneeId: string, canvasDate: string, cause: string): string {
+  return `${projectId}+${assigneeId}+${canvasDate}+${cause}`;
 }
 
 function topicReady(topicId: number | null): topicId is number {
@@ -140,7 +162,7 @@ export function requireEditCausation(value: string | null): string {
 
 /**
  * Правка того же сообщения. Строку канваса не заменяет и задачи не снимает.
- * `shrunk` здесь ложь: ужатие — отдельная issue. Повтор той же причины второго события не пишет.
+ * `shrunk` — срезы, блокеры или динамика уже ужаты. Повтор той же причины второго события не пишет.
  */
 export async function recordEditedCanvas(journal: EventJournal, input: EditedCanvas): Promise<Canvas> {
   const canvas = defineCanvas(input.canvas);
@@ -151,7 +173,7 @@ export async function recordEditedCanvas(journal: EventJournal, input: EditedCan
     idempotencyKey: editedCanvasKey(canvas.id, causationId),
     payload: {
       canvas_id: canvas.id,
-      shrunk: false,
+      shrunk: input.shrunk,
     },
     actor: { id: CANVAS_ACTOR_ID, role: CANVAS_ACTOR_ROLE },
     subject: { entity: CANVAS_SUBJECT, id: canvas.id },
@@ -163,4 +185,45 @@ export async function recordEditedCanvas(journal: EventJournal, input: EditedCan
     throw new DomainError(DOMAIN_ERROR.CANVAS_DUPLICATE, 'canvas.edited уже записан');
   }
   return canvas;
+}
+
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function filled(value: string): string {
+  const trimmed = value.trim();
+  return trimmed;
+}
+
+/**
+ * Отказ: канвас заполнен. Строку `canvases` не создаёт и сообщение не шлёт.
+ * `canvas_id` пуст, пока сообщения нет. Повтор той же причины второго события не пишет.
+ */
+export async function recordFullCanvas(journal: EventJournal, input: FullCanvas): Promise<'applied' | 'duplicate'> {
+  const projectId = filled(input.projectId);
+  const assigneeId = filled(input.assigneeId);
+  const canvasDate = filled(input.canvasDate);
+  const cause = filled(input.cause);
+  if (projectId.length === 0) throw new DomainError(DOMAIN_ERROR.CANVAS_PROJECT_BLANK, 'У канваса есть проект');
+  if (assigneeId.length === 0) throw new DomainError(DOMAIN_ERROR.CANVAS_ASSIGNEE_BLANK, 'У канваса есть исполнитель');
+  if (!CALENDAR_DATE.test(canvasDate)) throw new DomainError(DOMAIN_ERROR.CANVAS_DATE, 'Дата канваса — календарный день');
+  if (cause.length === 0) throw new DomainError(DOMAIN_ERROR.CANVAS_FULL_CAUSE, 'отказ канваса ссылается на причину');
+  const canvasId = filled(input.canvasId ?? '');
+  const subjectId = canvasId.length === 0 ? fullCanvasKey(projectId, assigneeId, canvasDate, cause) : canvasId;
+  const published = await emit(journal, {
+    type: EVENT_TYPES.CANVAS_FULL,
+    source: CANVAS_SOURCE,
+    idempotencyKey: fullCanvasKey(projectId, assigneeId, canvasDate, cause),
+    payload: {
+      canvas_id: canvasId.length === 0 ? null : canvasId,
+      project_id: projectId,
+      assignee_id: assigneeId,
+      canvas_date: canvasDate,
+    },
+    actor: { id: CANVAS_ACTOR_ID, role: CANVAS_ACTOR_ROLE },
+    subject: { entity: CANVAS_SUBJECT, id: subjectId },
+    occurredAt: input.occurredAt,
+    causationId: null,
+    correlationId: null,
+  });
+  return published.status === 'duplicate' ? 'duplicate' : 'applied';
 }

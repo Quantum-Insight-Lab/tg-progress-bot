@@ -912,4 +912,126 @@ describe('канвас выставляется в топик', () => {
     expect(gate.sent[0]?.tasks).toEqual([openTask('Первая')]);
     expect(gate.edited).toEqual([]);
   });
+
+  it('INV-23 отказ не создаёт второе сообщение и пишет canvas.full', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await setTopic(fixture.db, fixture.borisId, 42);
+    const gate = io();
+    const cause = '9001';
+    await expect(
+      showCanvas(fixture.db, {
+        projectId: fixture.alphaId,
+        assigneeId: fixture.borisId,
+        destination: CANVAS_DESTINATION_TOPIC,
+        now: noon,
+        causationId: null,
+        cause,
+        send: async () => ({ status: 'full' }),
+        edit: gate.edit,
+      }),
+    ).rejects.toMatchObject({ code: DOMAIN_ERROR.CANVAS_FULL });
+    expect(await canvasesOf(fixture.db)).toEqual([]);
+    expect(gate.edited).toEqual([]);
+    const full = await eventTypes(fixture.db, EVENT_TYPES.CANVAS_FULL);
+    expect(full).toHaveLength(1);
+    expect(full[0]?.key).toBe(`${fixture.alphaId}+${fixture.borisId}+2026-09-28+${cause}`);
+    expect(full[0]?.payload).toEqual({
+      canvas_id: null,
+      project_id: fixture.alphaId,
+      assignee_id: fixture.borisId,
+      canvas_date: '2026-09-28',
+    });
+    await expect(
+      showCanvas(fixture.db, {
+        projectId: fixture.alphaId,
+        assigneeId: fixture.borisId,
+        destination: CANVAS_DESTINATION_TOPIC,
+        now: noon,
+        causationId: null,
+        cause,
+        send: async () => ({ status: 'full' }),
+        edit: gate.edit,
+      }),
+    ).rejects.toMatchObject({ code: DOMAIN_ERROR.CANVAS_DUPLICATE });
+    expect(await canvasesOf(fixture.db)).toEqual([]);
+  });
+
+  it('INV-09 правка с ужатием не снимает задачи; отказ на правке не заводит второе сообщение', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await setTopic(fixture.db, fixture.borisId, 42);
+    const actions = createTaskActions(fixture.db, clock);
+    await actions.create({
+      telegramUserId: String(borisAccount.id),
+      chat: 'supergroup',
+      telegramChatId,
+      topicId: 42,
+      title: 'Остаётся',
+      idempotencyKey: 'stay',
+    });
+    const gate = io();
+    const posted = await showCanvas(fixture.db, {
+      projectId: fixture.alphaId,
+      assigneeId: fixture.borisId,
+      destination: CANVAS_DESTINATION_TOPIC,
+      now: noon,
+      causationId: null,
+      send: gate.send,
+      edit: gate.edit,
+    });
+    await showCanvas(fixture.db, {
+      projectId: fixture.alphaId,
+      assigneeId: fixture.borisId,
+      destination: CANVAS_DESTINATION_TOPIC,
+      now: noon,
+      causationId: causationA,
+      send: gate.send,
+      edit: async () => ({ status: 'edited', shrunk: true }),
+    });
+    const edited = await eventTypes(fixture.db, EVENT_TYPES.CANVAS_EDITED);
+    expect(edited.map((row) => row.payload)).toEqual([{ canvas_id: posted.canvas.id, shrunk: true }]);
+    expect(await taskStatuses(fixture.db)).toEqual([TASK_STATUS_IN_PROGRESS]);
+    const before = await canvasesOf(fixture.db);
+    await expect(
+      showCanvas(fixture.db, {
+        projectId: fixture.alphaId,
+        assigneeId: fixture.borisId,
+        destination: CANVAS_DESTINATION_TOPIC,
+        now: noon,
+        causationId: causationB,
+        cause: '9002',
+        send: gate.send,
+        edit: async () => ({ status: 'full' }),
+      }),
+    ).rejects.toMatchObject({ code: DOMAIN_ERROR.CANVAS_FULL });
+    expect(await canvasesOf(fixture.db)).toEqual(before);
+    expect(await taskStatuses(fixture.db)).toEqual([TASK_STATUS_IN_PROGRESS]);
+    const full = await eventTypes(fixture.db, EVENT_TYPES.CANVAS_FULL);
+    expect(full[0]?.payload).toMatchObject({ canvas_id: posted.canvas.id, canvas_date: '2026-09-28' });
+  });
+
+  it('INV-24 дата canvas.full — сутки проекта', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    await setTopic(fixture.db, fixture.borisId, 42);
+    const edge = new Date('2026-09-28T21:30:00.000Z');
+    const refuse = (cause: string) =>
+      showCanvas(fixture.db, {
+        projectId: fixture.alphaId,
+        assigneeId: fixture.borisId,
+        destination: CANVAS_DESTINATION_TOPIC,
+        now: edge,
+        causationId: null,
+        cause,
+        send: async () => ({ status: 'full' }),
+        edit: async () => ({ status: 'full' }),
+      });
+    await expect(refuse('moscow')).rejects.toMatchObject({ code: DOMAIN_ERROR.CANVAS_FULL });
+    await setTimezone(fixture.db, fixture.alphaId, 'Pacific/Honolulu');
+    await expect(refuse('honolulu')).rejects.toMatchObject({ code: DOMAIN_ERROR.CANVAS_FULL });
+    const full = await eventTypes(fixture.db, EVENT_TYPES.CANVAS_FULL);
+    expect(full.map((row) => (row.payload as { canvas_date: string }).canvas_date).sort()).toEqual(['2026-09-28', '2026-09-29']);
+    expect(await canvasesOf(fixture.db)).toEqual([]);
+  });
 });
