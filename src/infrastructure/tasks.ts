@@ -40,8 +40,10 @@ import {
   type TaskStore,
   type TopicOwner,
 } from '../domain/tasks/create-task.ts';
+import { closeBlocker, defineBlocker, isOpenBlocker } from '../domain/tasks/blocker.ts';
 import type { TaskPriority } from '../domain/tasks/status.ts';
 import { defineTask, type Task } from '../domain/tasks/task.ts';
+import { closesBlockerOnExit } from '../domain/tasks/transition.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
@@ -180,7 +182,61 @@ async function writeStatus(trx: Transaction<Database>, task: Task, from: Task['s
     .where('id', '=', task.id)
     .where('status', '=', from)
     .executeTakeFirst();
-  return updated.numUpdatedRows > 0n;
+  const saved = updated.numUpdatedRows > 0n;
+  if (saved && closesBlockerOnExit(from, task.status)) {
+    await resolveOpenBlockers(trx, task.id, task.updatedAt);
+  }
+  return saved;
+}
+
+interface BlockerRow {
+  id: string;
+  task_id: string;
+  reason: string | null;
+  asked_at: Date | string;
+  resolved_at: Date | string | null;
+}
+
+async function resolveOpenBlockers(trx: Transaction<Database>, taskId: string, resolvedAt: string): Promise<void> {
+  const rows = await trx
+    .selectFrom('blockers')
+    .select(['id', 'task_id', 'reason', 'asked_at', 'resolved_at'])
+    .where('task_id', '=', taskId)
+    .where('resolved_at', 'is', null)
+    .forUpdate()
+    .execute();
+  for (const row of rows) {
+    const closed = closeBlocker(blockerFromRow(row), resolvedAt);
+    if (closed.resolvedAt === null) continue;
+    await trx
+      .updateTable('blockers')
+      .set({ resolved_at: new Date(closed.resolvedAt) })
+      .where('id', '=', closed.id)
+      .where('resolved_at', 'is', null)
+      .execute();
+  }
+}
+
+function blockerFromRow(row: BlockerRow) {
+  return defineBlocker({
+    id: row.id,
+    taskId: row.task_id,
+    reason: row.reason,
+    askedAt: iso(row.asked_at),
+    resolvedAt: row.resolved_at === null ? null : iso(row.resolved_at),
+  });
+}
+
+async function taskHasOpenBlocker(trx: Transaction<Database>, taskId: string): Promise<boolean> {
+  const rows = await trx
+    .selectFrom('blockers')
+    .select(['id', 'task_id', 'reason', 'asked_at', 'resolved_at'])
+    .where('task_id', '=', taskId)
+    .execute();
+  for (const row of rows) {
+    if (isOpenBlocker(blockerFromRow(row))) return true;
+  }
+  return false;
 }
 
 function lockTasksInTopic(trx: Transaction<Database>, telegramChatId: string, topicId: number, taskNumber: number): Promise<Task[]> {
@@ -241,9 +297,7 @@ function reviewStore(trx: Transaction<Database>): TaskReviewStore {
       return Number(result.rows[0]?.n ?? 0);
     },
     async openBlocker(taskId) {
-      // Строку `blockers` пишет акт блокера. Пока её нет, открытого блокера нет.
-      void taskId;
-      return false;
+      return taskHasOpenBlocker(trx, taskId);
     },
     async seen(idempotencyKey) {
       const row = await trx

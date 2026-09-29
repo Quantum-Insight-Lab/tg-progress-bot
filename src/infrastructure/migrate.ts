@@ -75,3 +75,8 @@ export function readCanvasesMigration(root = process.cwd()): string {
 export function readCanvasItemsMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '015_canvas_items.sql'), 'utf8');
 }
+
+/** Таблица блокеров задач: причина, вопрос и закрытие. Строк CI и PR нет. */
+export function readBlockersMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '016_blockers.sql'), 'utf8');
+}

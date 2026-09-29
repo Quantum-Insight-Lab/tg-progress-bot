@@ -30,6 +30,7 @@ import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import { createChatBinding } from '../src/infrastructure/chats.ts';
 import { createCanvasPlacement, type CanvasHome } from '../src/infrastructure/canvas.ts';
 import {
+  readBlockersMigration,
   readCanvasesMigration,
   readChatsMigration,
   readEventsMigration,
@@ -114,6 +115,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readProjectMembersMigration());
   await pglite.exec(readMemberTopicMigration());
   await pglite.exec(readTasksMigration());
+  await pglite.exec(readBlockersMigration());
   await pglite.exec(readCanvasesMigration());
   const db = new Kysely<Database>({ dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }) });
   return {
