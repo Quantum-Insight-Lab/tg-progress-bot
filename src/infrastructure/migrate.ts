@@ -80,3 +80,8 @@ export function readCanvasItemsMigration(root = process.cwd()): string {
 export function readBlockersMigration(root = process.cwd()): string {
   return readFileSync(join(root, 'migrations', '016_blockers.sql'), 'utf8');
 }
+
+/** Таблица issues: поля зеркала и constraint'ы состояния. Природный ключ этой миграцией не задаётся. */
+export function readIssuesMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '017_issues.sql'), 'utf8');
+}

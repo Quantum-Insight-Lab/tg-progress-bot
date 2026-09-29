@@ -179,6 +179,14 @@ export const DOMAIN_ERROR = {
   GITHUB_DELIVERY_DATE: 'github_delivery_date',
   GITHUB_DELIVERY_LOGIN: 'github_delivery_login',
   GITHUB_DELIVERY_TITLE: 'github_delivery_title',
+  ISSUE_ID_BLANK: 'issue_id_blank',
+  ISSUE_NUMBER: 'issue_number',
+  ISSUE_TITLE_BLANK: 'issue_title_blank',
+  ISSUE_STATE: 'issue_state',
+  ISSUE_STATE_REASON: 'issue_state_reason',
+  ISSUE_CLOSED_BY_LOGIN: 'issue_closed_by_login',
+  ISSUE_UPDATED_AT: 'issue_updated_at',
+  ISSUE_CLOSED_AT: 'issue_closed_at',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];
