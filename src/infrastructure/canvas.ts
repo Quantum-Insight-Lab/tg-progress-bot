@@ -23,6 +23,7 @@ import { orderPlan, taskPriority, taskStatus, tasksStandingInBlock } from '../do
 import { taskCanvasDay } from '../domain/tasks/task-day.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
+import { loadCanvasBlockers, type CanvasBlockers } from './canvas-blockers.ts';
 import { loadCanvasIssueSlice } from './canvas-issue-slice.ts';
 import { loadGithubCanvasLine } from './github-canvas.ts';
 import { loadCanvasPerson, type CanvasPerson } from './person-canvas.ts';
@@ -52,6 +53,8 @@ export interface CanvasHome {
   issueSlice: CanvasIssueSlice;
   /** Строка GitHub. Пусто — репозиторий не подключён, на канвасе эта фраза. */
   github: GithubCanvasLine | null;
+  /** Блок «Блокеры»: причины его задач и строки застоя. Пустой на канвасе не печатается. */
+  blockers: CanvasBlockers;
 }
 
 export interface ShownCanvas {
@@ -304,7 +307,8 @@ async function canvasFacts(
   assigneeId: string,
   canvasDate: string,
   timezone: string,
-): Promise<Pick<CanvasHome, 'tasks' | 'plan' | 'backlogShare' | 'person' | 'issueSlice' | 'github'>> {
+  now: Date,
+): Promise<Pick<CanvasHome, 'tasks' | 'plan' | 'backlogShare' | 'person' | 'issueSlice' | 'github' | 'blockers'>> {
   const lines = await assigneeCanvasLines(db, projectId, assigneeId, canvasDate, timezone);
   return {
     tasks: lines.tasks,
@@ -313,6 +317,7 @@ async function canvasFacts(
     person: await loadCanvasPerson(db, projectId, assigneeId),
     issueSlice: await loadCanvasIssueSlice(db, projectId),
     github: await loadGithubCanvasLine(db, projectId, canvasDate, timezone),
+    blockers: await loadCanvasBlockers(db, projectId, assigneeId, now),
   };
 }
 
@@ -346,7 +351,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
   const canvasDate = projectCalendarDate(input.now, project.timezone);
   const slot = await slotFor(db, input.projectId, input.assigneeId, canvasDate);
   const move = decideCanvasMove(input.destination, slot, input.now);
-  const facts = await canvasFacts(db, input.projectId, input.assigneeId, canvasDate, project.timezone);
+  const facts = await canvasFacts(db, input.projectId, input.assigneeId, canvasDate, project.timezone, input.now);
   if (move.kind === 'edit') {
     const causationId = requireEditCausation(input.causationId);
     const telegramChatId = slot.telegramChatId ?? '';
@@ -508,7 +513,7 @@ export async function ensureTodayCanvases(
       const existing = await readCanvas(db, member.project_id, member.user_id, canvasDate);
       if (existing !== null) continue;
       const topicId = whole(member.topic_id, 'topic_id');
-      const facts = await canvasFacts(db, member.project_id, member.user_id, canvasDate, member.timezone);
+      const facts = await canvasFacts(db, member.project_id, member.user_id, canvasDate, member.timezone, now);
       const sent = sentOf(
         await send({
           telegramChatId: member.telegram_chat_id,
