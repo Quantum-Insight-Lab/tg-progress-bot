@@ -31,6 +31,9 @@ export const TASK_TRANSITION_RESUME = 'resume';
 /** «Отменить»: задача переходит в `CANCELLED`, пока она не `DONE`. */
 export const TASK_TRANSITION_CANCEL = 'cancel';
 
+/** Застой: `IN_PROGRESS` без галочки дольше порога уходит в `BLOCKED`. */
+export const TASK_TRANSITION_STALE = 'stale';
+
 /**
  * Кто нажал «подтвердить» или «вернуть».
  * Роль — строка участника этого проекта. Контекст проектов сюда не импортируется.
@@ -66,6 +69,7 @@ const TASK_TRANSITIONS: readonly TransitionRow[] = [
   { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_IN_PROGRESS, to: TASK_STATUS_CANCELLED },
   { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_BLOCKED, to: TASK_STATUS_CANCELLED },
   { act: TASK_TRANSITION_CANCEL, from: TASK_STATUS_REVIEW, to: TASK_STATUS_CANCELLED },
+  { act: TASK_TRANSITION_STALE, from: TASK_STATUS_IN_PROGRESS, to: TASK_STATUS_BLOCKED },
 ];
 
 export interface TaskTransition {
