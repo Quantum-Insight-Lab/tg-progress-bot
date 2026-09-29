@@ -20,7 +20,9 @@ import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
 import { carryOpenCanvases } from './infrastructure/carry-canvas.ts';
 import { detectStaleTasks } from './infrastructure/detect-blocker.ts';
+import { remindStaleReviews } from './infrastructure/remind-review.ts';
 import {
+  createBlockerAnswerActions,
   createTaskActions,
   createTaskCancelActions,
   createTaskMarkActions,
@@ -52,6 +54,8 @@ import { attachTaskPlan } from './telegram/task-plan.ts';
 import { attachTaskReview } from './telegram/task-review.ts';
 import { attachTaskCancel } from './telegram/task-cancel.ts';
 import { sendBlockerQuestion } from './telegram/blocker-question.ts';
+import { attachBlockerAnswer } from './telegram/blocker-answer.ts';
+import { sendReviewReminder } from './telegram/review-reminder.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from './telegram/webhook.ts';
 
 const DEFAULT_HOST = '0.0.0.0';
@@ -121,6 +125,7 @@ let running: RunningProcess | undefined;
 /**
  * Один процесс backend: webhook Telegram, планировщик актов системы, Progress Engine.
  * Слот A-28 переводит застоявшуюся задачу в `BLOCKED` и спрашивает исполнителя.
+ * Слот A-29 напоминает руководителям о задаче на подтверждении.
  * Слот A-30 переносит незакрытые задачи на канвас новых суток.
  * Слот A-31 выставляет канвас на сегодня. Остальные слоты регистрируют свои issues.
  */
@@ -162,6 +167,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   let ensureToday: ((now: Date) => Promise<void>) | undefined;
   let carryToday: ((now: Date) => Promise<void>) | undefined;
   let detectStale: ((now: Date) => Promise<void>) | undefined;
+  let remindReviews: ((now: Date) => Promise<void>) | undefined;
   if (config.db !== undefined) {
     const database = config.db;
     const canvas = createCanvasPlacement(config.db, config.clock);
@@ -213,6 +219,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachTaskPlan(bot, createTaskPlanActions(config.db, config.clock), redrawTaskCanvas);
     attachTaskReview(bot, createTaskReviewActions(config.db, config.clock), redrawTaskCanvas);
     attachTaskCancel(bot, createTaskCancelActions(config.db, config.clock), redrawTaskCanvas);
+    attachBlockerAnswer(bot, createBlockerAnswerActions(config.db, config.clock), redrawTaskCanvas);
     detectStale = (now) =>
       detectStaleTasks(database, now, async (hit) => {
         await sendBlockerQuestion(bot.api, {
@@ -231,10 +238,20 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
           edit: deliverCanvas.edit,
         });
       });
+    remindReviews = (now) =>
+      remindStaleReviews(database, now, async (hit) => {
+        await sendReviewReminder(bot.api, {
+          chatId: hit.telegramChatId,
+          messageThreadId: hit.topicId,
+          taskNumber: hit.taskNumber,
+          leads: hit.leads,
+        });
+      });
   }
   const engine = createProgressEngine();
   const scheduler = createScheduler(config.clock);
   if (detectStale !== undefined) scheduler.register('A-28', detectStale);
+  if (remindReviews !== undefined) scheduler.register('A-29', remindReviews);
   if (carryToday !== undefined) scheduler.register('A-30', carryToday);
   if (ensureToday !== undefined) scheduler.register('A-31', ensureToday);
   const webhook: WebhookServer = await startTelegramWebhook({

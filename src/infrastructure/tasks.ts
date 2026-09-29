@@ -41,6 +41,16 @@ import {
   type TopicOwner,
 } from '../domain/tasks/create-task.ts';
 import { closeBlocker, defineBlocker, isOpenBlocker, type Blocker } from '../domain/tasks/blocker.ts';
+import {
+  declareBlockerReason,
+  pressNoBlocker,
+  type BlockerAnswerStore,
+  type BlockerAnswering,
+  type BlockerReasonReply,
+  type BlockerReasonResult,
+  type NoBlockerPress,
+  type NoBlockerResult,
+} from '../domain/tasks/blocker-answer.ts';
 import { publishBlockerDetected, type BlockerDetectStore } from '../domain/tasks/detect-blocker.ts';
 import type { TaskPriority } from '../domain/tasks/status.ts';
 import { defineTask, type Task } from '../domain/tasks/task.ts';
@@ -498,6 +508,58 @@ export function commitBlockerDetected(
   },
 ): Promise<{ applied: boolean; eventId: string }> {
   return publishBlockerDetected(detectStore(trx), createEventJournal(trx), input);
+}
+
+function answerStore(trx: Transaction<Database>): BlockerAnswerStore {
+  return {
+    async sender(telegramUserId) {
+      return findSender(trx, telegramUserId);
+    },
+    tasksInTopic(telegramChatId, topicId, taskNumber) {
+      return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
+    },
+    async openBlocker(taskId) {
+      const row = await trx
+        .selectFrom('blockers')
+        .select(['id', 'task_id', 'reason', 'asked_at', 'resolved_at'])
+        .where('task_id', '=', taskId)
+        .where('resolved_at', 'is', null)
+        .orderBy('asked_at', 'desc')
+        .limit(1)
+        .forUpdate()
+        .executeTakeFirst();
+      if (row === undefined) return null;
+      return blockerFromRow(row);
+    },
+    seen(idempotencyKey) {
+      return seenEvent(trx, idempotencyKey);
+    },
+    async saveReason(blocker) {
+      if (blocker.reason === null) return false;
+      const updated = await trx
+        .updateTable('blockers')
+        .set({ reason: blocker.reason })
+        .where('id', '=', blocker.id)
+        .where('resolved_at', 'is', null)
+        .executeTakeFirst();
+      return updated.numUpdatedRows > 0n;
+    },
+    saveStatus(task, from) {
+      return writeStatus(trx, task, from);
+    },
+  };
+}
+
+/** Причина блокера и «нет блокера»: правка и событие коммитятся одной транзакцией. */
+export function createBlockerAnswerActions(db: Kysely<Database>, clock: Clock): BlockerAnswering {
+  return {
+    declare(input: BlockerReasonReply): Promise<BlockerReasonResult> {
+      return db.transaction().execute((trx) => declareBlockerReason(answerStore(trx), createEventJournal(trx), clock, input));
+    },
+    dismiss(input: NoBlockerPress): Promise<NoBlockerResult> {
+      return db.transaction().execute((trx) => pressNoBlocker(answerStore(trx), createEventJournal(trx), clock, input));
+    },
+  };
 }
 
 /** `/task`: строка `tasks` и `task.created` коммитятся одной транзакцией. */

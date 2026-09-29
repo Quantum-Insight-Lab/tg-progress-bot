@@ -79,6 +79,14 @@ export function isOpenBlocker(blocker: Blocker): boolean {
   return blocker.resolvedAt === null;
 }
 
+/** Причина — текст ответа. Пишется только в открытый блокер. */
+export function withBlockerReason(blocker: Blocker, reason: string): Blocker {
+  if (!isOpenBlocker(blocker)) {
+    throw new DomainError(DOMAIN_ERROR.BLOCKER_ABSENT, 'причина пишется, пока блокер открыт');
+  }
+  return defineBlocker({ ...blocker, reason });
+}
+
 /**
  * Закрыть блокер в момент выхода задачи из `BLOCKED`.
  * Уже закрытый сохраняет свой `resolvedAt`.

@@ -1,0 +1,235 @@
+import { sql, type Kysely, type Transaction } from 'kysely';
+import { LEAD_ROLE } from '../domain/projects/member.ts';
+import { type TaskJournalMark } from '../domain/tasks/detect-blocker.ts';
+import { decideReviewReminder, publishReviewReminded } from '../domain/tasks/remind-review.ts';
+import { taskStatus } from '../domain/tasks/status.ts';
+import { defineTask, type Task } from '../domain/tasks/task.ts';
+import type { Database } from './database.ts';
+import { createEventJournal } from './event-journal.ts';
+
+/** Напоминание, которое A-29 уже записал. Доставка — снаружи транзакции. */
+export interface RemindedReview {
+  taskId: string;
+  eventId: string;
+  telegramChatId: string;
+  topicId: number;
+  taskNumber: number;
+  leads: readonly { telegramUserId: string; name: string }[];
+}
+
+interface CandidateRow {
+  id: string;
+  project_id: string;
+  number: number | string;
+  title: string;
+  status: string;
+  priority: string;
+  assignee_id: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+  completed_at: Date | string | null;
+  timezone: string;
+  topic_id: string | null;
+  telegram_chat_id: string | null;
+}
+
+interface MarkRow {
+  event_type: string;
+  created_at: Date | string;
+}
+
+interface LeadRow {
+  id: string;
+  telegram_user_id: string;
+  name: string;
+}
+
+function instant(value: Date | string): Date {
+  if (value instanceof Date) return value;
+  return new Date(value);
+}
+
+function iso(value: Date | string): string {
+  return instant(value).toISOString();
+}
+
+function taskNumber(value: number | string): number {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value;
+  if (typeof value === 'string' && /^[1-9]\d*$/.test(value)) return Number(value);
+  throw new Error('номер задачи повреждён');
+}
+
+function topicId(value: string | null): number | null {
+  if (value === null || !/^[1-9]\d*$/.test(value)) return null;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) return null;
+  return parsed;
+}
+
+function taskOf(row: CandidateRow): Task {
+  return defineTask({
+    id: row.id,
+    projectId: row.project_id,
+    number: taskNumber(row.number),
+    title: row.title,
+    status: taskStatus(row.status),
+    priority: row.priority,
+    assigneeId: row.assignee_id,
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+    completedAt: row.completed_at === null ? null : iso(row.completed_at),
+  });
+}
+
+async function candidates(db: Kysely<Database> | Transaction<Database>): Promise<CandidateRow[]> {
+  const found = await sql<CandidateRow>`
+    SELECT tasks.id::text AS id,
+           tasks.project_id::text AS project_id,
+           tasks.number,
+           tasks.title,
+           tasks.status,
+           tasks.priority,
+           tasks.assignee_id::text AS assignee_id,
+           tasks.created_at,
+           tasks.updated_at,
+           tasks.completed_at,
+           projects.timezone,
+           project_members.topic_id::text AS topic_id,
+           chats.telegram_chat_id::text AS telegram_chat_id
+    FROM tasks
+    JOIN projects ON projects.id = tasks.project_id
+    JOIN project_members
+      ON project_members.project_id = tasks.project_id
+     AND project_members.user_id = tasks.assignee_id
+    LEFT JOIN chats ON chats.id = projects.chat_id
+    WHERE tasks.status = 'REVIEW'
+    ORDER BY tasks.id
+  `.execute(db);
+  return found.rows;
+}
+
+async function marksOf(db: Kysely<Database> | Transaction<Database>, taskId: string): Promise<TaskJournalMark[]> {
+  const found = await sql<MarkRow>`
+    SELECT event_type, created_at
+    FROM events
+    WHERE payload->>'task_id' = ${taskId}
+    ORDER BY created_at, id
+  `.execute(db);
+  return found.rows.map((row) => ({ type: row.event_type, occurredAt: instant(row.created_at) }));
+}
+
+async function leadsOf(db: Kysely<Database> | Transaction<Database>, projectId: string): Promise<LeadRow[]> {
+  const found = await sql<LeadRow>`
+    SELECT users.id::text AS id,
+           users.telegram_user_id::text AS telegram_user_id,
+           users.name
+    FROM project_members
+    JOIN users ON users.id = project_members.user_id
+    WHERE project_members.project_id = ${projectId}::uuid
+      AND project_members.role = ${LEAD_ROLE}
+    ORDER BY users.id
+  `.execute(db);
+  return found.rows;
+}
+
+async function lockTask(trx: Transaction<Database>, taskId: string): Promise<CandidateRow | null> {
+  const found = await sql<CandidateRow>`
+    SELECT tasks.id::text AS id,
+           tasks.project_id::text AS project_id,
+           tasks.number,
+           tasks.title,
+           tasks.status,
+           tasks.priority,
+           tasks.assignee_id::text AS assignee_id,
+           tasks.created_at,
+           tasks.updated_at,
+           tasks.completed_at,
+           projects.timezone,
+           project_members.topic_id::text AS topic_id,
+           chats.telegram_chat_id::text AS telegram_chat_id
+    FROM tasks
+    JOIN projects ON projects.id = tasks.project_id
+    JOIN project_members
+      ON project_members.project_id = tasks.project_id
+     AND project_members.user_id = tasks.assignee_id
+    LEFT JOIN chats ON chats.id = projects.chat_id
+    WHERE tasks.id = ${taskId}::uuid
+    FOR UPDATE OF tasks
+  `.execute(trx);
+  return found.rows[0] ?? null;
+}
+
+async function remindOne(db: Kysely<Database>, taskId: string, now: Date): Promise<RemindedReview | null> {
+  return db.transaction().execute(async (trx) => {
+    const row = await lockTask(trx, taskId);
+    if (row === null) return null;
+    const topic = topicId(row.topic_id);
+    const chatId = row.telegram_chat_id;
+    if (topic === null || chatId === null || chatId.length === 0) return null;
+    const task = taskOf(row);
+    const leads = await leadsOf(trx, task.projectId);
+    const decision = decideReviewReminder({
+      status: task.status,
+      taskId: task.id,
+      timezone: row.timezone,
+      marks: await marksOf(trx, task.id),
+      leadIds: leads.map((lead) => lead.id),
+      now,
+    });
+    if (decision === null) return null;
+    const recorded = await publishReviewReminded(
+      {
+        seen(idempotencyKey) {
+          return trx
+            .selectFrom('events')
+            .select(['id'])
+            .where('idempotency_key', '=', idempotencyKey)
+            .executeTakeFirst()
+            .then((found) => (found === undefined ? null : { eventId: found.id }));
+        },
+      },
+      createEventJournal(trx),
+      {
+        taskId: task.id,
+        leadIds: decision.leadIds,
+        idempotencyKey: decision.idempotencyKey,
+        occurredAt: now,
+      },
+    );
+    if (!recorded.applied) return null;
+    return {
+      taskId: task.id,
+      eventId: recorded.eventId,
+      telegramChatId: chatId,
+      topicId: topic,
+      taskNumber: task.number,
+      leads: leads.map((lead) => ({ telegramUserId: lead.telegram_user_id, name: lead.name })),
+    };
+  });
+}
+
+/**
+ * A-29 по всем `REVIEW`. Сбой одной задачи не отменяет остальные, затем всплывает.
+ * Без топика исполнителя напоминание некуда писать.
+ */
+export async function remindStaleReviews(
+  db: Kysely<Database>,
+  now: Date,
+  notify: (hit: RemindedReview) => Promise<void>,
+): Promise<void> {
+  const rows = await candidates(db);
+  const failures: unknown[] = [];
+  for (const row of rows) {
+    try {
+      const hit = await remindOne(db, row.id, now);
+      if (hit === null) continue;
+      await notify(hit);
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length === 0) return;
+  const first = failures[0];
+  if (first instanceof Error) throw first;
+  throw new Error('напоминание не записано');
+}
