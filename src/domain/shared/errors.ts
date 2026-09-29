@@ -189,6 +189,10 @@ export const DOMAIN_ERROR = {
   ISSUE_CLOSED_AT: 'issue_closed_at',
   ISSUE_MIRROR: 'issue_mirror',
   ISSUE_ASSIGNEE_LOGIN: 'issue_assignee_login',
+  ISSUE_LINK_TYPE: 'issue_link_type',
+  ISSUE_LINK_ACTION: 'issue_link_action',
+  ISSUE_LINK_SELF: 'issue_link_self',
+  ISSUE_LINK_ISSUE: 'issue_link_issue',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

@@ -1,6 +1,12 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { GithubDelivery, IssueDelivery, PullRequestDelivery } from '../domain/github/delivery.ts';
+import type { GithubDelivery, IssueDelivery, IssueLinkDelivery, PullRequestDelivery } from '../domain/github/delivery.ts';
+import {
+  ISSUE_LINK_ADDED,
+  ISSUE_LINK_BLOCKED_BY,
+  ISSUE_LINK_REMOVED,
+  ISSUE_LINK_SUB_ISSUE,
+} from '../domain/github/issue-dependency.ts';
 import { recordGithubDelivery } from '../domain/github/delivery.ts';
 import { DomainError } from '../domain/shared/errors.ts';
 import type { Clock } from '../domain/shared/clock.ts';
@@ -13,6 +19,8 @@ export const GITHUB_WEBHOOK_PATH = '/github/webhook';
 const SIGNATURE_PREFIX = 'sha256=';
 const EVENT_ISSUES = 'issues';
 const EVENT_PULL_REQUEST = 'pull_request';
+const EVENT_ISSUE_DEPENDENCIES = 'issue_dependencies';
+const EVENT_SUB_ISSUES = 'sub_issues';
 const STATUS_OK = 200;
 const STATUS_BAD = 400;
 const STATUS_UNAUTHORIZED = 401;
@@ -27,6 +35,8 @@ export interface GithubWebhookRequest {
   clock: Clock;
   /** Пишет зеркало issue после новой доставки. Повтор ключа сюда не приходит. */
   applyIssue?: (payload: PayloadByType['github.issue_changed']) => Promise<void>;
+  /** Пишет связь issues после новой доставки. Повтор ключа сюда не приходит. */
+  applyIssueLink?: (payload: PayloadByType['github.issue_links_changed']) => Promise<void>;
 }
 
 export interface GithubWebhookHttpDeps {
@@ -36,6 +46,7 @@ export interface GithubWebhookHttpDeps {
     run: (
       journal: EventJournal,
       applyIssue: (payload: PayloadByType['github.issue_changed']) => Promise<void>,
+      applyIssueLink: (payload: PayloadByType['github.issue_links_changed']) => Promise<void>,
     ) => Promise<number>,
   ) => Promise<number>;
 }
@@ -158,10 +169,89 @@ function parsePullRequest(deliveryId: string, body: Record<string, unknown>): Pu
   };
 }
 
+function githubIssueNumber(value: unknown): number | 'absent' | 'invalid' {
+  if (value === undefined || value === null) return 'absent';
+  if (!isRecord(value)) return 'invalid';
+  if (value.number === undefined || value.number === null) return 'absent';
+  const number = numberValue(value.number);
+  if (number === null) return 'invalid';
+  return number;
+}
+
+function sameRepository(repository: string, repo: unknown): boolean {
+  if (repo === undefined || repo === null) return true;
+  if (!isRecord(repo)) return false;
+  if (typeof repo.id === 'string') return repo.id.trim() === repository;
+  const numeric = numberValue(repo.id);
+  if (numeric === null) return false;
+  return String(numeric) === repository;
+}
+
+function linkDelivery(
+  deliveryId: string,
+  body: Record<string, unknown>,
+  repository: string,
+  issueNumber: number,
+  dependsOnIssueNumber: number,
+  linkType: IssueLinkDelivery['linkType'],
+  action: IssueLinkDelivery['action'],
+): IssueLinkDelivery {
+  return {
+    kind: 'issue_link',
+    deliveryId,
+    repositoryId: repository,
+    issueNumber,
+    dependsOnIssueNumber,
+    linkType,
+    action,
+    senderLogin: isRecord(body.sender) ? login(body.sender) : null,
+  };
+}
+
+/**
+ * `blocked by`: issue — заблокированный, depends on — блокирующий.
+ * `sub_issue`: issue — родитель, depends on — подзадача.
+ * Чужой репозиторий и неполное тело не становятся фактом этого зеркала.
+ */
+function parseIssueLink(eventName: string, deliveryId: string, body: Record<string, unknown>): GithubDelivery | null {
+  const actionName = text(body.action)?.trim().toLowerCase() ?? '';
+  const repository = repositoryId(body);
+  if (repository === null) return null;
+  const blocked = actionName === 'blocked_by_added' || actionName === 'blocking_added'
+    ? ISSUE_LINK_ADDED
+    : actionName === 'blocked_by_removed' || actionName === 'blocking_removed'
+      ? ISSUE_LINK_REMOVED
+      : null;
+  const sub = actionName === 'sub_issue_added' || actionName === 'parent_issue_added'
+    ? ISSUE_LINK_ADDED
+    : actionName === 'sub_issue_removed' || actionName === 'parent_issue_removed'
+      ? ISSUE_LINK_REMOVED
+      : null;
+  if (eventName === EVENT_ISSUE_DEPENDENCIES) {
+    if (blocked === null) return { kind: 'other', deliveryId, eventName };
+    if (!sameRepository(repository, body.blocking_issue_repo)) return { kind: 'other', deliveryId, eventName };
+    const issueNumber = githubIssueNumber(body.blocked_issue);
+    const dependsOn = githubIssueNumber(body.blocking_issue);
+    if (issueNumber === 'absent' || dependsOn === 'absent') return { kind: 'other', deliveryId, eventName };
+    if (issueNumber === 'invalid' || dependsOn === 'invalid') return null;
+    return linkDelivery(deliveryId, body, repository, issueNumber, dependsOn, ISSUE_LINK_BLOCKED_BY, blocked);
+  }
+  if (sub === null) return { kind: 'other', deliveryId, eventName };
+  if (!sameRepository(repository, body.parent_issue_repo)) return { kind: 'other', deliveryId, eventName };
+  const issueNumber = githubIssueNumber(body.parent_issue);
+  const dependsOn = githubIssueNumber(body.sub_issue);
+  if (issueNumber === 'absent' || dependsOn === 'absent') return { kind: 'other', deliveryId, eventName };
+  if (issueNumber === 'invalid' || dependsOn === 'invalid') return null;
+  return linkDelivery(deliveryId, body, repository, issueNumber, dependsOn, ISSUE_LINK_SUB_ISSUE, sub);
+}
+
 function parseDelivery(eventName: string, deliveryId: string, json: unknown): GithubDelivery | null {
   if (!isRecord(json)) return null;
   if (eventName === EVENT_ISSUES) return parseIssue(deliveryId, json);
   if (eventName === EVENT_PULL_REQUEST) return parsePullRequest(deliveryId, json);
+  if (eventName === EVENT_ISSUE_DEPENDENCIES || eventName === EVENT_SUB_ISSUES) {
+    return parseIssueLink(eventName, deliveryId, json);
+  }
   return { kind: 'other', deliveryId, eventName };
 }
 
@@ -190,12 +280,15 @@ export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<
     if (error instanceof DomainError || error instanceof EventRejected) return STATUS_BAD;
     throw error;
   }
-  if (
-    input.applyIssue !== undefined &&
-    result.status === 'applied' &&
-    result.eventType === EVENT_TYPES.GITHUB_ISSUE_CHANGED
-  ) {
+  if (input.applyIssue !== undefined && result.status === 'applied' && result.eventType === EVENT_TYPES.GITHUB_ISSUE_CHANGED) {
     await input.applyIssue(result.payload);
+  }
+  if (
+    input.applyIssueLink !== undefined &&
+    result.status === 'applied' &&
+    result.eventType === EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED
+  ) {
+    await input.applyIssueLink(result.payload);
   }
   return STATUS_OK;
 }
@@ -211,7 +304,7 @@ export async function acceptGithubWebhookHttp(
     const eventName = header(req, 'x-github-event');
     const deliveryId = header(req, 'x-github-delivery');
     const signature = header(req, 'x-hub-signature-256');
-    const status = await deps.isolate((journal, applyIssue) =>
+    const status = await deps.isolate((journal, applyIssue, applyIssueLink) =>
       acceptGithubWebhook({
         secret: deps.secret,
         eventName,
@@ -221,6 +314,7 @@ export async function acceptGithubWebhookHttp(
         journal,
         clock: deps.clock,
         applyIssue,
+        applyIssueLink,
       }),
     );
     if (!res.writableEnded) {

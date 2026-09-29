@@ -135,6 +135,16 @@ export interface IssueAssigneesTable {
   login: string;
 }
 
+/**
+ * Связь issues (E-12): `blocked_by` или `sub_issue`.
+ * Ключ — `issue_id`, `depends_on_issue_id` и `link_type`. Проекта в строке нет.
+ */
+export interface IssueDependenciesTable {
+  issue_id: string;
+  depends_on_issue_id: string;
+  link_type: 'blocked_by' | 'sub_issue';
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
@@ -148,4 +158,5 @@ export interface Database {
   repositories: RepositoriesTable;
   issues: IssuesTable;
   issue_assignees: IssueAssigneesTable;
+  issue_dependencies: IssueDependenciesTable;
 }

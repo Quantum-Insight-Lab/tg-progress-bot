@@ -1,4 +1,5 @@
 import type { Transaction } from 'kysely';
+import { issueAssigneeSet } from '../domain/github/issue-assignee.ts';
 import { saveIssueMirror, type IssueMirrorStore } from '../domain/github/issue-mirror.ts';
 import { defineIssue, type Issue } from '../domain/github/issue.ts';
 import type { PayloadByType } from '../events/index.ts';
@@ -59,16 +60,31 @@ function storeOf(trx: Transaction<Database>): IssueMirrorStore {
   };
 }
 
+/** Текущий набор логинов issue. Пустой список снимает все назначения. */
+async function replaceAssignees(
+  trx: Transaction<Database>,
+  issueId: string,
+  logins: readonly string[],
+): Promise<void> {
+  const assignees = issueAssigneeSet(issueId, logins);
+  await trx.deleteFrom('issue_assignees').where('issue_id', '=', issueId).execute();
+  if (assignees.length === 0) return;
+  await trx
+    .insertInto('issue_assignees')
+    .values(assignees.map((assignee) => ({ issue_id: assignee.issueId, login: assignee.login })))
+    .execute();
+}
+
 /**
- * Кладёт факт `github.issue_changed` в зеркало репозитория.
- * Назначения в `issue_assignees` этим шагом не пишутся.
+ * Кладёт факт `github.issue_changed` в зеркало репозитория
+ * и заменяет набор assignees этим фактом.
  */
 export async function mirrorGithubIssue(
   trx: Transaction<Database>,
   payload: PayloadByType['github.issue_changed'],
   id: string,
 ): Promise<Issue> {
-  return saveIssueMirror(storeOf(trx), {
+  const issue = await saveIssueMirror(storeOf(trx), {
     id,
     repositoryId: payload.repository_id,
     issueNumber: payload.issue_number,
@@ -78,4 +94,6 @@ export async function mirrorGithubIssue(
     closedByLogin: payload.closed_by_login,
     updatedAt: payload.updated_at,
   });
+  await replaceAssignees(trx, issue.id, payload.assignees);
+  return issue;
 }

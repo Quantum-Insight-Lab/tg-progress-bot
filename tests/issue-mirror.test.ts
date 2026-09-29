@@ -191,7 +191,10 @@ describe('зеркало issue по webhook', () => {
       ...filesIn('src/github'),
       'src/domain/github/issue-mirror.ts',
       'src/domain/github/issue-assignee.ts',
+      'src/domain/github/issue-dependency.ts',
+      'src/domain/github/issue-link.ts',
       'src/infrastructure/issue-mirror.ts',
+      'src/infrastructure/issue-links.ts',
     ]);
     for (const needle of WRITE_CALLS) expect(source).not.toContain(needle);
   });
@@ -332,7 +335,7 @@ describe('E-11 issue_assignees — поля', () => {
     const handle = await openMirror();
     opened.push(handle);
     expect(await columnNames(handle.db, 'issue_assignees')).toEqual(['issue_id', 'login']);
-    await deliver(handle.db, issueDelivery({ state: 'open', stateReason: null, closedByLogin: null }));
+    await deliver(handle.db, issueDelivery({ state: 'open', stateReason: null, closedByLogin: null, assignees: [] }));
     const stored = await sql<{ id: string }>`SELECT id::text AS id FROM issues`.execute(handle.db);
     const id = stored.rows[0]?.id ?? issueId;
     const assignee = defineIssueAssignee({ issueId: id, login: 'ada' });

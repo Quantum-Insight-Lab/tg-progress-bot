@@ -2,6 +2,7 @@ import { emit, EVENT_TYPES, payloadSchemaByType, type PayloadByType } from '../.
 import type { EventJournal } from '../../events/journal.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { issueLinkAction, issueLinkType, type IssueLinkAction, type IssueLinkType } from './issue-dependency.ts';
 import { githubRepositoryId } from './repository.ts';
 
 /** Факт пришёл из GitHub, не из кнопки бота. */
@@ -51,9 +52,21 @@ export interface PullRequestDelivery {
   senderLogin: string | null;
 }
 
+/** Связь `blocked by` или sub-issue из доставки webhook. */
+export interface IssueLinkDelivery {
+  kind: 'issue_link';
+  deliveryId: string;
+  repositoryId: string;
+  issueNumber: number;
+  dependsOnIssueNumber: number;
+  linkType: IssueLinkType;
+  action: IssueLinkAction;
+  senderLogin: string | null;
+}
+
 /**
  * Подписанная доставка, для которой этот шаг не публикует факт.
- * События push, milestone, workflow и связей — в своих issues.
+ * События push, milestone и workflow — в своих issues.
  */
 export interface OtherDelivery {
   kind: 'other';
@@ -61,7 +74,7 @@ export interface OtherDelivery {
   eventName: string;
 }
 
-export type GithubDelivery = IssueDelivery | PullRequestDelivery | OtherDelivery;
+export type GithubDelivery = IssueDelivery | PullRequestDelivery | IssueLinkDelivery | OtherDelivery;
 
 export type GithubDeliveryResult =
   | { status: 'ignored' }
@@ -74,6 +87,11 @@ export type GithubDeliveryResult =
       status: 'applied' | 'duplicate';
       eventType: typeof EVENT_TYPES.GITHUB_PULL_REQUEST_CHANGED;
       payload: PayloadByType['github.pull_request_changed'];
+    }
+  | {
+      status: 'applied' | 'duplicate';
+      eventType: typeof EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED;
+      payload: PayloadByType['github.issue_links_changed'];
     };
 
 /** Команд записи в GitHub нет: синхронизация только в сторону бота. */
@@ -176,6 +194,56 @@ function storedPullRequest(payload: unknown): PayloadByType['github.pull_request
   return parsed.data;
 }
 
+function storedIssueLink(payload: unknown): PayloadByType['github.issue_links_changed'] {
+  const parsed = payloadSchemaByType[EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED].safeParse(payload);
+  if (!parsed.success) throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'факт связи issue не прочитан');
+  return parsed.data;
+}
+
+async function recordIssueLink(
+  journal: EventJournal,
+  clock: Clock,
+  delivery: IssueLinkDelivery,
+  idempotencyKey: string,
+): Promise<GithubDeliveryResult> {
+  if (!positiveInt(delivery.issueNumber) || !positiveInt(delivery.dependsOnIssueNumber)) {
+    throw new DomainError(DOMAIN_ERROR.ISSUE_NUMBER, 'номер issue — число GitHub');
+  }
+  if (delivery.issueNumber === delivery.dependsOnIssueNumber) {
+    throw new DomainError(DOMAIN_ERROR.ISSUE_LINK_SELF, 'issue не зависит от себя');
+  }
+  const repositoryId = githubRepositoryId(delivery.repositoryId);
+  const payload: PayloadByType['github.issue_links_changed'] = {
+    repository_id: repositoryId,
+    issue_number: delivery.issueNumber,
+    depends_on_issue_number: delivery.dependsOnIssueNumber,
+    link_type: issueLinkType(delivery.linkType),
+    action: issueLinkAction(delivery.action),
+  };
+  const published = await emit(journal, {
+    type: EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED,
+    source: GITHUB_DELIVERY_SOURCE,
+    idempotencyKey,
+    payload,
+    actor: { id: actorId(optionalText(delivery.senderLogin)), role: GITHUB_ACTOR_ROLE },
+    subject: { entity: ISSUE_SUBJECT, id: subjectId(repositoryId, delivery.issueNumber) },
+    occurredAt: clock.now(),
+    causationId: null,
+    correlationId: null,
+  });
+  if (published.status === 'duplicate') {
+    if (published.row.eventType !== EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED) {
+      throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'ключ доставки уже занят');
+    }
+    return {
+      status: 'duplicate',
+      eventType: EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED,
+      payload: storedIssueLink(published.row.payload),
+    };
+  }
+  return { status: 'applied', eventType: EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED, payload };
+}
+
 /**
  * Публикует факт доставки в журнал.
  * Повтор того же ключа доставки возвращает первую запись и ничего не меняет.
@@ -221,6 +289,9 @@ export async function recordGithubDelivery(
       return { status: 'duplicate', eventType: EVENT_TYPES.GITHUB_ISSUE_CHANGED, payload: storedIssue(published.row.payload) };
     }
     return { status: 'applied', eventType: EVENT_TYPES.GITHUB_ISSUE_CHANGED, payload };
+  }
+  if (delivery.kind === 'issue_link') {
+    return recordIssueLink(journal, clock, delivery, idempotencyKey);
   }
   if (!positiveInt(delivery.number)) throw new DomainError(DOMAIN_ERROR.GITHUB_DELIVERY, 'номер pull request — число GitHub');
   const repositoryId = githubRepositoryId(delivery.repositoryId);
