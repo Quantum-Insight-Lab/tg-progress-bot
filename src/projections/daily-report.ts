@@ -8,6 +8,7 @@ import {
   type ReportProjectBacklogView,
 } from './report-backlog-block.ts';
 import { reportDivergenceLines } from './report-divergence-line.ts';
+import { reportGithubBlock, type ReportGithubCi } from './report-github-block.ts';
 import { reportTasksLine, type ReportTaskCounters } from './report-tasks-line.ts';
 import {
   reportWorkLines,
@@ -24,7 +25,9 @@ import {
  * Топики исполнителей адресом отчёта не становятся.
  * «Сейчас» и «Дальше» в личке — задачи этого человека, в командном топике — всех участников.
  * Доля «Все проекты» приходит посчитанной. Проекция её не усредняет и не заменяет нулём.
- * Коммиты и PR в эту долю не входят и по проектам не складываются: блок репозитория один.
+ * Коммиты и PR в эту долю не входят и по проектам не складываются.
+ * Блок GitHub — один на репозиторий: CI, число смерженных PR, число коммитов, имена проектов.
+ * Закрытые issues и список коммитов в него не копируются.
  */
 
 /** Куда уходит один текст отчёта. Топик исполнителя сюда не входит. */
@@ -44,11 +47,13 @@ const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
  * Репозиторий в составе отчёта.
- * Счётчики — числа самого репозитория. Закрытые issues в блок не копируются.
+ * Счётчики — числа самого репозитория, не сумма по проектам.
+ * `closedIssueTitles` в блок не копируются: они остаются в «Бэклоге».
  */
 export interface ReportRepositoryFacts {
   repositoryId: string;
   slug: string;
+  ci: ReportGithubCi;
   commits: number;
   mergedPullRequests: number;
   closedIssueTitles: readonly string[];
@@ -133,11 +138,6 @@ function threadIdOf(value: number): number {
   return value;
 }
 
-function countOf(value: number): number {
-  if (!Number.isInteger(value) || value < 0) throw new Error('счётчик репозитория — целое от нуля');
-  return value;
-}
-
 function workFor<T extends { assigneeId: string }>(
   tasks: readonly T[],
   audience: DailyReportAudience,
@@ -151,44 +151,55 @@ function workFor<T extends { assigneeId: string }>(
   return scoped;
 }
 
-function repositoryParagraph(repo: ReportRepositoryFacts): string {
-  const id = repo.repositoryId.trim();
-  const slug = repo.slug.trim();
-  if (id.length === 0 || slug.length === 0) throw new Error('у блока репозитория есть имя');
-  for (const title of repo.closedIssueTitles) {
-    if (title.trim().length === 0) throw new Error('у закрытого issue есть название');
-  }
-  const commits = countOf(repo.commits);
-  const pullRequests = countOf(repo.mergedPullRequests);
-  return `${slug} · коммитов ${String(commits)} · PR ${String(pullRequests)}`;
+function repositoryAgrees(left: ReportRepositoryFacts, right: ReportRepositoryFacts): boolean {
+  return (
+    left.slug === right.slug &&
+    left.ci === right.ci &&
+    left.commits === right.commits &&
+    left.mergedPullRequests === right.mergedPullRequests
+  );
 }
 
 /**
- * Блоки репозиториев выбранных проектов.
- * Один репозиторий — один блок. Повтор тех же чисел не складывается во вторую копию.
+ * Блоки GitHub выбранных проектов.
+ * Один репозиторий — один блок, имена проектов собираются в него.
+ * Повтор тех же чисел не складывается во вторую копию и не суммируется.
+ * Названия закрытых issues в текст не попадают.
  */
 function repositoryParagraphs(projects: readonly DailyReportProject[]): string[] {
-  const seen = new Map<string, ReportRepositoryFacts>();
-  const lines: string[] = [];
+  const groups: { repo: ReportRepositoryFacts; names: string[] }[] = [];
+  const indexById = new Map<string, number>();
   for (const project of projects) {
     const repo = project.repository;
     if (repo === null) continue;
     const id = repo.repositoryId.trim();
-    const previous = seen.get(id);
-    if (previous !== undefined) {
-      if (
-        previous.slug !== repo.slug ||
-        previous.commits !== repo.commits ||
-        previous.mergedPullRequests !== repo.mergedPullRequests
-      ) {
-        throw new Error('коммиты и PR репозитория по проектам не складываются');
-      }
+    if (id.length === 0) throw new Error('у блока репозитория есть имя');
+    for (const title of repo.closedIssueTitles) {
+      if (title.trim().length === 0) throw new Error('у закрытого issue есть название');
+    }
+    const name = project.backlog.projectName.trim();
+    if (name.length === 0) throw new Error('у блока проекта есть имя');
+    const index = indexById.get(id);
+    if (index === undefined) {
+      indexById.set(id, groups.length);
+      groups.push({ repo, names: [name] });
       continue;
     }
-    seen.set(id, repo);
-    lines.push(repositoryParagraph(repo));
+    const previous = groups[index];
+    if (previous === undefined || !repositoryAgrees(previous.repo, repo)) {
+      throw new Error('коммиты и PR репозитория по проектам не складываются');
+    }
+    previous.names.push(name);
   }
-  return lines;
+  return groups.map((group) =>
+    reportGithubBlock({
+      slug: group.repo.slug,
+      ci: group.repo.ci,
+      mergedPullRequests: group.repo.mergedPullRequests,
+      commits: group.repo.commits,
+      projectNames: group.names,
+    }),
+  );
 }
 
 function dayMonth(iso: string): string {
