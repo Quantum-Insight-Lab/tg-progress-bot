@@ -122,6 +122,7 @@ function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = [], plan: 
     plan,
     backlogShare: null,
     person: { name: 'Борис', place: { kind: 'unmatched' } },
+    issueSlice: { done: [], inProgress: [], next: [] },
   };
 }
 

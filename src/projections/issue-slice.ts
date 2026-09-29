@@ -5,7 +5,8 @@ import type { CanvasParagraph } from './canvas-message.ts';
  * P-5. Срез issues на канвасе: «Сделано», «В работе», «Далее».
  * Пункт — `#номер название`. В «В работе» после названия — «— имя».
  * Каждая часть короче полного списка: не длиннее `CANVAS_SLICE_SIZE`.
- * Какие issues в какую часть, имя по логину и связи к пункту сюда не входят.
+ * Какие issues в какую часть и чьё имя — решает домен.
+ * Связь дописывается к пункту, который уже в списке: `blocked by #N`, `sub-issue #N`.
  */
 
 /** Заголовок блока. Пустой список абзац не занимает. */
@@ -17,10 +18,14 @@ export const SLICE_IN_PROGRESS_HEADING = 'В работе';
 /** Заголовок блока. Пустой список абзац не занимает. */
 export const SLICE_NEXT_HEADING = 'Далее';
 
-/** Пункт среза: номер и название issue. */
+/** Пункт среза: номер и название issue. Связи пустые — пометки нет. */
 export interface SliceIssueLine {
   number: number;
   title: string;
+  /** Номера issues, которые блокируют этот. */
+  blockedBy?: readonly number[];
+  /** Номера sub-issues этого issue. */
+  subIssues?: readonly number[];
 }
 
 /** Пункт «В работе»: к названию дописывается имя, если оно уже есть. */
@@ -39,17 +44,37 @@ function issueTitle(value: string): string {
   return title;
 }
 
-/** `#номер название`. */
-export function sliceIssueText(issue: SliceIssueLine): string {
+function issueHead(issue: SliceIssueLine): string {
   return `#${issueNumber(issue.number)} ${issueTitle(issue.title)}`;
 }
 
-/** `#номер название — имя`. Пустое имя тире не рисует. */
+function hashNumbers(values: readonly number[] | undefined): string {
+  const printed: string[] = [];
+  for (const value of values ?? []) printed.push(`#${issueNumber(value)}`);
+  return printed.join(', ');
+}
+
+/** ` · blocked by #N · sub-issue #N`. Пустые связи ничего не дописывают. */
+function linkNote(issue: SliceIssueLine): string {
+  const notes: string[] = [];
+  const blocked = hashNumbers(issue.blockedBy);
+  const subs = hashNumbers(issue.subIssues);
+  if (blocked.length > 0) notes.push(`blocked by ${blocked}`);
+  if (subs.length > 0) notes.push(`sub-issue ${subs}`);
+  if (notes.length === 0) return '';
+  return ` · ${notes.join(' · ')}`;
+}
+
+/** `#номер название`, и связи, если они есть у этого пункта. */
+export function sliceIssueText(issue: SliceIssueLine): string {
+  return `${issueHead(issue)}${linkNote(issue)}`;
+}
+
+/** `#номер название — имя`, затем связи. Пустое имя тире не рисует. */
 export function inProgressSliceText(issue: SliceInProgressLine): string {
-  const line = sliceIssueText(issue);
   const name = issue.assigneeName.trim();
-  if (name.length === 0) return line;
-  return `${line} — ${name}`;
+  const named = name.length === 0 ? issueHead(issue) : `${issueHead(issue)} — ${name}`;
+  return `${named}${linkNote(issue)}`;
 }
 
 function shortSlice<T>(items: readonly T[]): T[] {
