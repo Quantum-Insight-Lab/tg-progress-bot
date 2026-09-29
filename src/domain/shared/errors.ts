@@ -217,6 +217,9 @@ export const DOMAIN_ERROR = {
   COMMIT_CREATED_AT: 'commit_created_at',
   COMMIT_MIRROR: 'commit_mirror',
   GITHUB_FACT_KEY: 'github_fact_key',
+  SNAPSHOT_DATE: 'snapshot_date',
+  SNAPSHOT_PROGRESS: 'snapshot_progress',
+  SNAPSHOT_ID_BLANK: 'snapshot_id_blank',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

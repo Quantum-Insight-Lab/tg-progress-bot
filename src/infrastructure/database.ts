@@ -198,6 +198,18 @@ export interface CommitsTable {
   created_at: Date;
 }
 
+/**
+ * Снимок доли (E-16): доля бэклога проекта на сутки.
+ * Ключ — id. Дата суток — в факте `progress.snapshot_taken`, не в этой строке.
+ * `progress` пуст, когда доли нет. Записанная строка не переписывается.
+ */
+export interface ProgressSnapshotsTable {
+  id: string;
+  project_id: string;
+  progress: number | null;
+  created_at: Date;
+}
+
 export interface Database {
   events: EventsTable;
   users: UsersTable;
@@ -215,4 +227,5 @@ export interface Database {
   milestones: MilestonesTable;
   pull_requests: PullRequestsTable;
   commits: CommitsTable;
+  progress_snapshots: ProgressSnapshotsTable;
 }
