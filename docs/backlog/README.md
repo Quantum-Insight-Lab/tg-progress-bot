@@ -30,13 +30,13 @@
 
 ## Публикация
 
-Файлы — источник, GitHub — копия для работы. `npm run backlog:publish` показывает план и ничего не пишет; `npm run backlog:publish -- --apply` публикует. Нужен `gh` с правами на репозиторий и `project`: `gh auth refresh -s project`.
+Файлы на ветке `main` — источник, GitHub — копия для работы. `main` — одна ветка и для backlog, и для кода. `npm run backlog:publish` показывает план и ничего не пишет; `npm run backlog:publish -- --apply` публикует. Нужен `gh` с правами на репозиторий и `project`: `gh auth refresh -s project`.
 
 | Что | Как |
 | --- | --- |
 | Milestones | «v2 · M1 Ядро» … «v2 · M8 Приёмка», описание — колонка «Что даёт» ниже; milestones v1 не трогаются |
 | Лейблы | `context:*` — зелёные, `type:*` — серые, цвета v1; `context:events` — новый; `layer:*` в v2 не ставятся: нарезка по атомам, а не по слоям |
-| Issues | в порядке `blocked_by`, заголовок и лейблы — из front matter, assignee — `plyuschevmax`; тело — файл без front matter, ссылки на документы — абсолютные на ветку `v2-from-spec` |
+| Issues | в порядке `blocked_by`, заголовок и лейблы — из front matter, assignee — `plyuschevmax`; тело — файл без front matter, ссылки на документы — абсолютные на ветку `main` |
 | Связи | нативные «blocked by» GitHub, как в v1 |
 | Доска | Projects «tg-progress-bot v2»: все issues, поля «Контекст» и «Атомов». Представления API не создаёт — вручную: таблица с группировкой по Milestone, доска по полю «Контекст» |
 | Номер | после создания `github: N` записывается в front matter файла; повторный запуск такие issues не создаёт заново и перезаписывает тело, если оно разошлось с файлом |

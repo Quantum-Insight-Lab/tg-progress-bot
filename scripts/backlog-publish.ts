@@ -12,7 +12,7 @@ import { join, posix } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { BACKLOG_DIR, BACKLOG_INDEX, parseIssue, type Issue } from './tz-check.ts';
 
-export const BRANCH = 'v2-from-spec';
+export const BRANCH = 'main';
 export const ASSIGNEE = 'plyuschevmax';
 export const MILESTONE_PREFIX = 'v2 · ';
 export const PROJECT_TITLE = 'tg-progress-bot v2';
