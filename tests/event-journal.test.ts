@@ -142,7 +142,11 @@ describe('INV-22 один факт применяется один раз', () =
     expect(second.row).toEqual(first.row);
     expect(second.row.payload).toEqual(firstPayload);
     expect(second.row.actorId).toBe('actor-1');
-    expect(await countEvents(handle.db)).toBe(1);
+    expect(await countEvents(handle.db)).toBe(2);
+    const notices = await sql<{ event_type: string }>`
+      SELECT event_type FROM events WHERE event_type = ${EVENT_TYPES.DELIVERY_DUPLICATE}
+    `.execute(handle.db);
+    expect(notices.rows).toHaveLength(1);
   });
 
   it('INV-22 повтор любого события реестра не меняет журнал', async () => {
@@ -161,7 +165,8 @@ describe('INV-22 один факт применяется один раз', () =
       expect(duplicate.status).toBe('duplicate');
       expect(duplicate.row).toEqual(applied.row);
     }
-    expect(await countEvents(handle.db)).toBe(specs.size);
+    const notices = specs.size - 1;
+    expect(await countEvents(handle.db)).toBe(specs.size + notices);
   }, 30_000);
 
   it('INV-22 вторая вставка того же ключа нарушает уникальный constraint', async () => {

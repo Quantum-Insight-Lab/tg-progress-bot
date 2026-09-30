@@ -73,6 +73,11 @@ import { planBlockParagraphs } from './projections/plan-block.ts';
 import { tasksBlockParagraphs } from './projections/tasks-block.ts';
 import { prepareCanvasMessage } from './telegram/canvas-fit.ts';
 import { attachTaskCommand } from './telegram/task-command.ts';
+import { attachRebuild } from './telegram/rebuild.ts';
+import { bindRejectionNote } from './telegram/rejection.ts';
+import { rebuildTodayCanvas } from './infrastructure/rebuild-canvas.ts';
+import { observeTelegramFailure, stabilityActions } from './infrastructure/stability.ts';
+import { recordCommandRejection } from './domain/shared/observe.ts';
 import { attachTaskMark } from './telegram/task-mark.ts';
 import { attachTaskPlan } from './telegram/task-plan.ts';
 import { attachTaskReview } from './telegram/task-review.ts';
@@ -199,25 +204,35 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
         dynamics: dynamicsLineParagraphs(home.dynamics),
       },
     });
+  async function callTelegram<T>(method: string, chatId: string, messageId: number | null, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (config.db !== undefined) {
+        await observeTelegramFailure(config.db, config.clock.now(), { method, error, chatId, messageId, scope: method });
+      }
+      throw error;
+    }
+  }
   const deliverCanvas = {
     async send(home: CanvasHome) {
       const painted = paint(home);
       if (painted.status === 'full') return { status: 'full' as const };
-      const messageId = await sendCanvasMessage(
-        bot.api,
-        { chatId: home.telegramChatId, messageThreadId: home.topicId },
-        painted.message,
+      const messageId = await callTelegram('sendRichMessage', home.telegramChatId, null, () =>
+        sendCanvasMessage(bot.api, { chatId: home.telegramChatId, messageThreadId: home.topicId }, painted.message),
       );
       return { status: 'sent' as const, messageId, shrunk: painted.shrunk };
     },
     async edit(home: CanvasHome, messageId: number) {
       const painted = paint(home);
       if (painted.status === 'full') return { status: 'full' as const };
-      await editCanvasMessage(
-        bot.api,
-        { chatId: home.telegramChatId, messageThreadId: home.topicId },
-        messageId,
-        painted.message,
+      await callTelegram('editMessageText', home.telegramChatId, messageId, () =>
+        editCanvasMessage(
+          bot.api,
+          { chatId: home.telegramChatId, messageThreadId: home.topicId },
+          messageId,
+          painted.message,
+        ),
       );
       return { status: 'edited' as const, shrunk: painted.shrunk };
     },
@@ -230,6 +245,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   let takeSnapshots: ((now: Date) => Promise<void>) | undefined;
   let noticeDivergence: ((now: Date) => Promise<void>) | undefined;
   let deliverReports: ((now: Date) => Promise<void>) | undefined;
+  let stability: ReturnType<typeof stabilityActions> | undefined;
   if (config.db !== undefined) {
     const database = config.db;
     const canvas = createCanvasPlacement(config.db, config.clock);
@@ -261,12 +277,31 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachReport(bot, createReportCommands(config.db, config.clock, renderReportDocuments));
     deliverReports = (now) =>
       deliverDueReports(database, now, renderReportDocuments, async (message) => {
-        if (message.topicId === null) {
-          await bot.api.sendMessage(message.telegramChatId, message.text);
-          return;
-        }
-        await bot.api.sendMessage(message.telegramChatId, message.text, { message_thread_id: message.topicId });
+        await callTelegram('sendMessage', message.telegramChatId, null, async () => {
+          if (message.topicId === null) {
+            await bot.api.sendMessage(message.telegramChatId, message.text);
+            return;
+          }
+          await bot.api.sendMessage(message.telegramChatId, message.text, { message_thread_id: message.topicId });
+        });
       });
+    bindRejectionNote({
+      note(error, idempotencyKey, telegramUserId) {
+        return recordCommandRejection(createEventJournal(database), config.clock, {
+          code: error.code,
+          idempotencyKey,
+          telegramUserId,
+        }).then(() => undefined);
+      },
+    });
+    attachRebuild(bot, {
+      run(input) {
+        return rebuildTodayCanvas(database, config.clock, { ...input, send: deliverCanvas.send, edit: deliverCanvas.edit });
+      },
+    });
+    stability = stabilityActions(database, (telegramUserId, text) =>
+      callTelegram('sendMessage', telegramUserId, null, () => bot.api.sendMessage(telegramUserId, text).then(() => undefined)),
+    );
     attachSettings(bot, createProjectSettings(config.db, config.clock));
     attachProjectRepository(bot, projectRepository, installation);
     attachInstallationRepositories(bot, installation);
@@ -332,6 +367,11 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   if (takeSnapshots !== undefined) scheduler.register('A-32', takeSnapshots);
   if (noticeDivergence !== undefined) scheduler.register('A-36', noticeDivergence);
   if (deliverReports !== undefined) scheduler.register('A-33', deliverReports);
+  if (stability !== undefined) {
+    scheduler.register('A-42', stability.missed);
+    scheduler.register('A-44', stability.violations);
+    scheduler.register('A-45', stability.alerts);
+  }
   const routes: WebhookRoute[] = [];
   const githubWebhookSecret = config.githubWebhookSecret;
   if (githubWebhookSecret !== null && config.db !== undefined) {

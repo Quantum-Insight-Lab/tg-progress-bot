@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { duplicateNoticeKey, recordsDuplicate } from './duplicate.ts';
 import {
+  EVENT_TYPES,
   EVENT_VERSIONS,
   EventEnvelopeSchema,
   payloadSchemaByType,
@@ -91,5 +93,18 @@ export async function emit<T extends EventType>(journal: EventJournal, input: Em
     subjectEntity: checked.data.subject.entity,
     subjectId: checked.data.subject.id,
   });
+  if (!stored.inserted && recordsDuplicate(input.type)) {
+    await emit(journal, {
+      type: EVENT_TYPES.DELIVERY_DUPLICATE,
+      source: 'system',
+      idempotencyKey: duplicateNoticeKey(input.idempotencyKey),
+      payload: { source_type: input.type, source_key: input.idempotencyKey },
+      actor: { id: 'system', role: 'system' },
+      subject: { entity: 'Event', id: stored.row.id },
+      occurredAt: input.occurredAt,
+      causationId: stored.row.id,
+      correlationId: input.correlationId,
+    });
+  }
   return { status: stored.inserted ? 'applied' : 'duplicate', row: stored.row };
 }

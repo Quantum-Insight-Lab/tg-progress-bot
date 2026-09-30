@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import type { TaskMarking, TaskMarkResult } from '../domain/tasks/check-task.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { noteCommandRejection } from './rejection.ts';
 import { TASK_MARK_ACTION } from '../projections/tasks-block.ts';
 import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
@@ -58,6 +59,7 @@ export async function replyToTaskMark(
       idempotencyKey,
     });
   } catch (error) {
+    if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
     if (!(error instanceof DomainError)) throw error;
     if (refusal(error)) return null;
     throw error;

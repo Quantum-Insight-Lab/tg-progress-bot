@@ -38,6 +38,7 @@ import type { Clock } from '../domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
+import { observeReportDeliveryFailure } from './stability.ts';
 import { reportWindows } from './zoned-day.ts';
 
 interface ProjectRow {
@@ -601,7 +602,18 @@ export async function deliverDueReports(db: Kysely<Database>, now: Date, render:
       });
       if (!applied) continue;
       sent.add(decision.idempotencyKey);
-      await send(messageOf(decision.telegramChatId, decision.topicId, render(documents)));
+      try {
+        await send(messageOf(decision.telegramChatId, decision.topicId, render(documents)));
+      } catch (error) {
+        await observeReportDeliveryFailure(db, now, {
+          target: 'group',
+          chatId: decision.chatId,
+          topicId: decision.topicId,
+          error,
+          date: decision.date,
+        });
+        throw error;
+      }
     } catch (error) {
       failures.push(error);
     }

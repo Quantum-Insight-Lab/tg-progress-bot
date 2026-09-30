@@ -97,7 +97,11 @@ describe('INV-16 бот отвечает только корню и участн
       idempotencyKey: '801',
     });
     expect(again).toBe('deny');
-    expect(stored.rows).toHaveLength(1);
+    expect(stored.rows).toHaveLength(2);
+    expect(stored.rows[1]).toMatchObject({
+      eventType: EVENT_TYPES.DELIVERY_DUPLICATE,
+      idempotencyKey: 'duplicate:801',
+    });
 
     const allowed = await admitOrDeny(stored.journal, clock, rootProfile, {
       telegramUserId: '1001',
@@ -105,7 +109,7 @@ describe('INV-16 бот отвечает только корню и участн
       idempotencyKey: '802',
     });
     expect(allowed).toBe('allow');
-    expect(stored.rows).toHaveLength(1);
+    expect(stored.rows).toHaveLength(2);
 
     await expect(
       admitOrDeny(stored.journal, clock, outside, { telegramUserId: '3002', updateKind: 'message', idempotencyKey: '   ' }),
@@ -113,7 +117,7 @@ describe('INV-16 бот отвечает только корню и участн
     await expect(
       admitOrDeny(stored.journal, clock, outside, { telegramUserId: '0', updateKind: 'message', idempotencyKey: '803' }),
     ).rejects.toMatchObject({ code: DOMAIN_ERROR.TELEGRAM_USER_ID });
-    expect(stored.rows).toHaveLength(1);
+    expect(stored.rows).toHaveLength(2);
   });
 });
 

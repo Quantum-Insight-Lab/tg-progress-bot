@@ -2,6 +2,7 @@ import type { Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { ProjectSettings, SettingsView, SettingUpdate } from '../domain/projects/settings.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { noteCommandRejection } from './rejection.ts';
 
 /** Строка админки проекта в личке корня. */
 export const SETTINGS_HEADING = 'Настройки';
@@ -169,6 +170,7 @@ export async function replyToSettings(
           });
     return renderSettings(view);
   } catch (error) {
+    await noteCommandRejection(error, idempotencyKey, String(from.id));
     return replyOf(error);
   }
 }

@@ -369,7 +369,11 @@ describe('приём webhook GitHub', () => {
     });
     expect(first).toBe(200);
     expect(second).toBe(200);
-    const rows = await handle.db.selectFrom('events').select(['payload', 'idempotency_key']).execute();
+    const rows = await handle.db
+      .selectFrom('events')
+      .select(['payload', 'idempotency_key', 'event_type'])
+      .where('event_type', '=', EVENT_TYPES.GITHUB_ISSUE_CHANGED)
+      .execute();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.idempotency_key).toBe('delivery-same');
     const stored = rows[0]?.payload;
@@ -386,7 +390,7 @@ describe('приём webhook GitHub', () => {
       clock,
     });
     expect(rejected).toBe(401);
-    expect(await eventTypes(handle.db)).toEqual([EVENT_TYPES.GITHUB_ISSUE_CHANGED]);
+    expect(await eventTypes(handle.db)).toEqual([EVENT_TYPES.GITHUB_ISSUE_CHANGED, EVENT_TYPES.DELIVERY_DUPLICATE]);
     const unsigned = await acceptGithubWebhook({
       secret,
       eventName: 'issues',
@@ -494,13 +498,16 @@ describe('webhook GitHub в процессе', () => {
     });
     expect(again).toBe(200);
     const rows = await handle.db.selectFrom('events').select(['event_type', 'idempotency_key']).execute();
-    expect(rows).toEqual([{ event_type: EVENT_TYPES.GITHUB_PULL_REQUEST_CHANGED, idempotency_key: 'delivery-live' }]);
+    expect(rows).toEqual([
+      { event_type: EVENT_TYPES.GITHUB_PULL_REQUEST_CHANGED, idempotency_key: 'delivery-live' },
+      { event_type: EVENT_TYPES.DELIVERY_DUPLICATE, idempotency_key: 'duplicate:delivery-live' },
+    ]);
     const denied = await httpStatus(running.port, 'POST', GITHUB_WEBHOOK_PATH, raw, {
       'X-GitHub-Event': 'pull_request',
       'X-GitHub-Delivery': 'delivery-denied',
       'X-Hub-Signature-256': 'sha256=00',
     });
     expect(denied).toBe(401);
-    expect(await handle.db.selectFrom('events').select(['id']).execute()).toHaveLength(1);
+    expect(await handle.db.selectFrom('events').select(['id']).execute()).toHaveLength(2);
   });
 });
