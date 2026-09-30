@@ -2,6 +2,7 @@ import type { Bot } from 'grammy';
 import type { TaskReviewing, TaskReviewResult } from '../domain/tasks/review-task.ts';
 import { TASK_TRANSITION_CONFIRM, TASK_TRANSITION_RETURN } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { noteCommandRejection } from './rejection.ts';
 import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const REVIEW_DATA = new RegExp(`^task:(${TASK_TRANSITION_CONFIRM}|${TASK_TRANSITION_RETURN}):([1-9]\\d*)$`);
@@ -62,6 +63,7 @@ export async function replyToTaskReview(
       idempotencyKey,
     });
   } catch (error) {
+    if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
     if (!(error instanceof DomainError)) throw error;
     if (refusal(error)) return null;
     throw error;

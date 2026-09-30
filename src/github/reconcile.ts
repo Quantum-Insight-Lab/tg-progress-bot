@@ -1,6 +1,6 @@
 import { workflowConclusion } from '../domain/github/ci-status.ts';
 import { commitTailStartsAt } from '../domain/github/commit.ts';
-import type { RemoteMirror, RemotePullRequestInput, ReconcileCommitInput, ReconcileIssueInput } from '../domain/github/reconcile.ts';
+import type { GithubReconcileSource, RemoteMirror, RemotePullRequestInput, ReconcileCommitInput, ReconcileIssueInput } from '../domain/github/reconcile.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { createGithubInstallationApp, type GithubAppCredentials } from './client.ts';
 
@@ -218,9 +218,17 @@ function apiFrom(reader: GithubGet): GithubReconcileApi {
  * Чтение зеркала через GitHub App.
  * Список установки на один прогон общий. Методов записи нет.
  */
-export function createGithubReconcileSource(credentials: GithubAppCredentials): {
-  read(repository: { id: string; owner: string; name: string }, now: Date): Promise<RemoteMirror>;
-} {
+function remainingPercent(data: unknown): number | null {
+  if (!isRecord(data)) return null;
+  const rate = isRecord(data.rate) ? data.rate : null;
+  if (rate === null) return null;
+  const remaining = whole(rate.remaining);
+  const limit = whole(rate.limit);
+  if (remaining === null || limit === null || limit === 0) return null;
+  return Math.round((remaining * 100) / limit);
+}
+
+export function createGithubReconcileSource(credentials: GithubAppCredentials): GithubReconcileSource {
   const app = createGithubInstallationApp(credentials);
   let cachedAt: number | null = null;
   let installed = new Map<string, InstalledRepository>();
@@ -252,6 +260,18 @@ export function createGithubReconcileSource(credentials: GithubAppCredentials): 
   }
 
   return {
+    async rateRemainingPercent() {
+      try {
+        for await (const item of app.eachRepository.iterator()) {
+          const response = await (item.octokit as GithubGet).request('GET /rate_limit', {});
+          return remainingPercent(response.data);
+        }
+      } catch (error) {
+        if (error instanceof DomainError) throw error;
+        throw new DomainError(DOMAIN_ERROR.REPOSITORY_UNAVAILABLE, 'лимит GitHub не прочитан');
+      }
+      return null;
+    },
     async read(repository, now) {
       try {
         const target = await installation(repository.id, now);

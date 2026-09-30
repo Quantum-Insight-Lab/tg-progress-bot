@@ -240,6 +240,13 @@ export const DOMAIN_ERROR = {
   REPORT_UNBOUND: 'report_unbound',
   REPORT_CHAT: 'report_chat',
   REPORT_IDEMPOTENCY_KEY: 'report_idempotency_key',
+  REBUILD_ROOT: 'rebuild_root',
+  REBUILD_CHAT: 'rebuild_chat',
+  REBUILD_PROJECT: 'rebuild_project',
+  REBUILD_MEMBER: 'rebuild_member',
+  REBUILD_AMBIGUOUS: 'rebuild_ambiguous',
+  REBUILD_ABSENT: 'rebuild_absent',
+  REBUILD_DATE: 'rebuild_date',
 } as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR)[keyof typeof DOMAIN_ERROR];

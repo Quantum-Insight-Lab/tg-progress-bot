@@ -98,6 +98,10 @@ const stream: readonly GithubFact[] = [
     payload: { repository_id: 'repo-1', restored_facts: 0 },
   },
   {
+    type: EVENT_TYPES.GITHUB_RATE_OBSERVED,
+    payload: { remaining_percent: 40 },
+  },
+  {
     type: EVENT_TYPES.REPO_PR_STALLED,
     payload: { repository_id: 'repo-1', pull_request_number: 7, author_login: 'andrey', days: 2 },
   },
@@ -127,6 +131,8 @@ function publish(journal: EventJournal, fact: GithubFact): Promise<unknown> {
     case EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED:
       return emit(journal, { ...input, type: fact.type, payload: fact.payload });
     case EVENT_TYPES.GITHUB_RECONCILED:
+      return emit(journal, { ...input, type: fact.type, payload: fact.payload });
+    case EVENT_TYPES.GITHUB_RATE_OBSERVED:
       return emit(journal, { ...input, type: fact.type, payload: fact.payload });
     case EVENT_TYPES.REPO_PR_STALLED:
       return emit(journal, { ...input, type: fact.type, payload: fact.payload });

@@ -405,8 +405,6 @@ export async function replyToSkipRepository(
   }
 }
 
-export type RepositoryNotify = (text: string, markup?: InlineKeyboard) => Promise<unknown>;
-
 /** Сообщение «Репозиторий» и кнопки списка. Роль проверяет домен. */
 export function attachProjectRepository(
   bot: Bot,

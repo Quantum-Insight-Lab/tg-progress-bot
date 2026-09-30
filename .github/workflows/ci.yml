@@ -23,6 +23,10 @@ jobs:
       - name: generated events (S-3)
         run: npm run codegen:events -- --check
       - name: invariants with tests (S-7)
-        run: npm run check:invariants
+        run: npm run check:invariants -- --strict
+      - name: mechanisms (S-4)
+        run: npm run check:mechanisms
+      - name: dead code (S-9)
+        run: npm run knip
       - run: npm test
       - run: npm run tz:check -- --gate --pda

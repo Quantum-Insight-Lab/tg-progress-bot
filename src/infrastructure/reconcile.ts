@@ -27,6 +27,7 @@ import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 import { mirrorGithubIssue } from './issue-mirror.ts';
 import { mirrorGithubPullRequest } from './pull-request-mirror.ts';
+import { observeGithubRate } from './github-rate.ts';
 import { mirrorGithubWorkflow } from './workflow-mirror.ts';
 
 const MILLISECONDS_PER_MINUTE = 60_000;
@@ -326,6 +327,13 @@ export async function reconcileGithubMirror(
       await reconcileOne(db, source, repository, now, runs.get(repository.id) ?? null, nextId);
     } catch (error) {
       failures.push(error);
+    }
+  }
+  if (source.rateRemainingPercent !== undefined) {
+    try {
+      await observeGithubRate(db, await source.rateRemainingPercent(now), now);
+    } catch {
+      // остаток лимита не отменяет уже записанную сверку
     }
   }
   if (failures.length === 0) return;

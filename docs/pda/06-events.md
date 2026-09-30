@@ -44,5 +44,14 @@
 | `github.reconciled`, `repo.pr_stalled` | github | система | сверка зеркала, застрявший PR | A-35 |
 | `progress.snapshot_taken` | progress | система | суточная доля | A-32 |
 | `report.sent` | projects | система, пользователь | отчёт в личку или в командный топик | A-12, A-33 |
+| `canvas.rebuild_requested` | tasks | корень | просьба перерисовать сегодняшний канвас; правка — следом `canvas.edited` | A-37 |
+| `command.rejected` | events | система | отказ своему участнику: нет права или запрещённый переход | A-38 |
+| `delivery.duplicate` | events | система | исходный ключ уже был в журнале | A-39 |
+| `telegram.api_failed` | events | система | ошибка Bot API | A-40 |
+| `github.rate_observed` | github | система | остаток лимита App за ход сверки | A-41 |
+| `scheduler.missed` | events | система | обязательный слот не оставил своего события | A-42 |
+| `report.delivery_failed` | projects | система | отчёт не ушёл | A-43 |
+| `invariant.violated` | events | система | состояние противоречит инварианту | A-44 |
+| `alert.sent` | projects | система | оповещение корня | A-45 |
 
 Поле `projections` в реестре — какие проекции ([07](07-architecture.md)) перерисовывает событие.

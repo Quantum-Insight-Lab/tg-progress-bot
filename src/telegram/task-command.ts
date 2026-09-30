@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import type { TaskCreation } from '../domain/tasks/create-task.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { noteCommandRejection } from './rejection.ts';
 
 /** Отказ, если команда пришла не из топика того, кто пишет. */
 export const TASK_OWN_TOPIC = 'Задачу заводят командой /task в своём топике.';
@@ -100,6 +101,7 @@ export async function replyToTaskCommand(
     }
     return taskCreatedReply(created.task.number, created.task.title);
   } catch (error) {
+    if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
     if (!(error instanceof DomainError)) throw error;
     return replyOf(error);
   }

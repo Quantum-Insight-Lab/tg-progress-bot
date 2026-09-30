@@ -22,3 +22,7 @@ export const RICH_MESSAGE_MAX_BLOCKS = 500;
 export const RECONCILE_INTERVAL = 15;
 /** C-11, дни коммитов в зеркале. */
 export const COMMITS_TAIL_DAYS = 7;
+/** C-12, проценты оставшегося лимита GitHub App: ниже — дневная сводка. */
+export const GITHUB_RATE_FLOOR = 20;
+/** C-13, во сколько интервалов сверки укладывается свежий факт зеркала. */
+export const MIRROR_LAG_INTERVALS = 2;

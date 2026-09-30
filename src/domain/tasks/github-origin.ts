@@ -9,8 +9,9 @@ import { milestoneAsTaskStatus } from './github-link.ts';
 export const SHARED_WITH_GITHUB = ['person', 'project'] as const;
 
 /**
- * Факты зеркала. Поток этих событий задачу не создаёт.
+ * Факты зеркала и прочие типы `github.*`. Поток этих событий задачу не создаёт.
  * Назначение на issue — часть `github.issue_changed`, отдельного факта нет.
+ * `github.rate_observed` — остаток лимита, не строка зеркала.
  */
 export const GITHUB_FACT_TYPES = [
   EVENT_TYPES.GITHUB_ISSUE_CHANGED,
@@ -20,6 +21,7 @@ export const GITHUB_FACT_TYPES = [
   EVENT_TYPES.GITHUB_MILESTONE_CHANGED,
   EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED,
   EVENT_TYPES.GITHUB_RECONCILED,
+  EVENT_TYPES.GITHUB_RATE_OBSERVED,
   EVENT_TYPES.REPO_PR_STALLED,
 ] as const;
 
@@ -65,6 +67,7 @@ function decline(fact: GithubFact): null {
     case EVENT_TYPES.GITHUB_WORKFLOW_COMPLETED:
     case EVENT_TYPES.GITHUB_ISSUE_LINKS_CHANGED:
     case EVENT_TYPES.GITHUB_RECONCILED:
+    case EVENT_TYPES.GITHUB_RATE_OBSERVED:
     case EVENT_TYPES.REPO_PR_STALLED:
       return null;
     default: {

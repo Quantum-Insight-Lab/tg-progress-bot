@@ -4,8 +4,9 @@ import type { Clock } from '../domain/shared/clock.ts';
  * Акты системы, для которых планировщик держит слот (поток «Время» в архитектуре).
  * Сами действия приходят в своих issues и регистрируются здесь. A-34 слота не имеет:
  * отказ постороннему — ответ на сообщение, не ход планировщика.
+ * A-37…A-41 и A-43 тоже без слота: команда или момент отказа.
  */
-export const SYSTEM_ACTION_IDS = ['A-28', 'A-29', 'A-30', 'A-31', 'A-32', 'A-33', 'A-35', 'A-36'] as const;
+export const SYSTEM_ACTION_IDS = ['A-28', 'A-29', 'A-30', 'A-31', 'A-32', 'A-33', 'A-35', 'A-36', 'A-42', 'A-44', 'A-45'] as const;
 
 export type SystemActionId = (typeof SYSTEM_ACTION_IDS)[number];
 

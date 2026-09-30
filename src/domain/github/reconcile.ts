@@ -120,6 +120,8 @@ export type MissedMirrorFact =
 /** Порт чтения GitHub. Реализация не открывает методов записи. */
 export interface GithubReconcileSource {
   read(repository: { id: string; owner: string; name: string }, now: Date): Promise<RemoteMirror>;
+  /** Остаток лимита App в процентах. Нет метода — ход без M-17. */
+  rateRemainingPercent?(now: Date): Promise<number | null>;
 }
 
 /** Репозиторий, который зеркало уже знает. */

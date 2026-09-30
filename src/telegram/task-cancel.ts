@@ -2,6 +2,7 @@ import type { Bot } from 'grammy';
 import type { TaskCancelling, TaskCancelResult } from '../domain/tasks/cancel-task.ts';
 import { TASK_TRANSITION_CANCEL } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { noteCommandRejection } from './rejection.ts';
 import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const CANCEL_DATA = new RegExp(`^task:${TASK_TRANSITION_CANCEL}:([1-9]\\d*)$`);
@@ -58,6 +59,7 @@ export async function replyToTaskCancel(
       idempotencyKey,
     });
   } catch (error) {
+    if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
     if (!(error instanceof DomainError)) throw error;
     if (refusal(error)) return null;
     throw error;
