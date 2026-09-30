@@ -422,6 +422,7 @@ describe('зеркало pull request по webhook', () => {
           body,
           journal: createEventJournal(trx, silentLogger),
           clock,
+          logger: silentLogger,
           applyPullRequest: async (payload) => {
             await mirrorGithubPullRequest(trx, payload, randomUUID());
           },
@@ -463,6 +464,7 @@ describe('зеркало pull request по webhook', () => {
       body: first,
       journal: createEventJournal(handle.db, silentLogger),
       clock,
+      logger: silentLogger,
     });
     expect(forged).toBe(401);
     expect(await pullRequestCount(handle.db)).toBe(1);

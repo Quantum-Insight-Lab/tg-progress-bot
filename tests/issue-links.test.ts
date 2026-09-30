@@ -116,6 +116,7 @@ async function deliverIssue(db: Kysely<Database>, delivery: IssueDelivery): Prom
       body,
       journal: createEventJournal(trx, silentLogger),
       clock,
+      logger: silentLogger,
       applyIssue: async (payload) => {
         await mirrorGithubIssue(trx, payload, randomUUID());
       },
@@ -141,6 +142,7 @@ async function deliverLink(
       body,
       journal: createEventJournal(trx, silentLogger),
       clock,
+      logger: silentLogger,
       applyIssueLink: async (fact) => {
         await mirrorGithubIssueLink(trx, fact);
       },

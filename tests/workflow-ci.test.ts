@@ -180,6 +180,7 @@ async function accept(
       body,
       journal: createEventJournal(trx, silentLogger),
       clock,
+      logger: silentLogger,
       applyPullRequest: async (payload) => {
         await mirrorGithubPullRequest(trx, payload, randomUUID());
       },

@@ -355,6 +355,7 @@ describe('зеркало коммитов по webhook push', () => {
           body: payload,
           journal: createEventJournal(trx, silentLogger),
           clock,
+          logger: silentLogger,
           applyCommits: async (eventPayload) => {
             await mirrorGithubCommits(trx, eventPayload, clock.now(), randomUUID);
           },
@@ -388,6 +389,7 @@ describe('зеркало коммитов по webhook push', () => {
       body: first,
       journal: createEventJournal(handle.db, silentLogger),
       clock,
+      logger: silentLogger,
     });
     expect(forged).toBe(401);
     expect(await commitCount(handle.db)).toBe(1);
@@ -418,6 +420,7 @@ describe('зеркало коммитов по webhook push', () => {
         body,
         journal: createEventJournal(trx, silentLogger),
         clock,
+        logger: silentLogger,
         applyCommits: async (payload) => {
           await mirrorGithubCommits(trx, payload, clock.now(), randomUUID);
         },
@@ -447,6 +450,7 @@ describe('зеркало коммитов по webhook push', () => {
         body: again,
         journal: createEventJournal(trx, silentLogger),
         clock,
+        logger: silentLogger,
         applyCommits: async (eventPayload) => {
           await mirrorGithubCommits(trx, eventPayload, clock.now(), randomUUID);
         },
@@ -468,6 +472,7 @@ describe('зеркало коммитов по webhook push', () => {
       body: broken,
       journal: createEventJournal(handle.db, silentLogger),
       clock,
+      logger: silentLogger,
     });
     expect(rejected).toBe(400);
     expect(await commitCount(handle.db)).toBe(1);

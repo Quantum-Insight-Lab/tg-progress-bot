@@ -326,6 +326,7 @@ describe('зеркало milestone по webhook', () => {
           body,
           journal: createEventJournal(trx, silentLogger),
           clock,
+          logger: silentLogger,
           applyMilestone: async (payload) => {
             await mirrorGithubMilestone(trx, payload, randomUUID());
           },
@@ -356,6 +357,7 @@ describe('зеркало milestone по webhook', () => {
       body: first,
       journal: createEventJournal(handle.db, silentLogger),
       clock,
+      logger: silentLogger,
     });
     expect(forged).toBe(401);
     expect(await milestoneCount(handle.db)).toBe(1);
@@ -403,6 +405,7 @@ describe('зеркало milestone по webhook', () => {
       body: broken,
       journal: createEventJournal(handle.db, silentLogger),
       clock,
+      logger: silentLogger,
     });
     expect(rejected).toBe(400);
     expect(await milestoneCount(handle.db)).toBe(2);

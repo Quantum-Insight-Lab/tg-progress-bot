@@ -36,6 +36,7 @@ import { registerRoot } from '../src/infrastructure/users.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import {
   parseRepositoriesMessage,
@@ -291,7 +292,7 @@ describe('GitHub App, не личный токен', () => {
     await expect(unconfiguredInstallationSource().list()).rejects.toMatchObject({ code: DOMAIN_ERROR.REPOSITORY_APP });
 
     const seen: GithubAppCredentials[] = [];
-    const client = createGithubAppClient({ appId: '123', privateKey: appKey }, (credentials) => {
+    const client = createGithubAppClient({ appId: '123', privateKey: appKey }, { logger: silentLogger, clock }, (credentials) => {
       seen.push(credentials);
       return {
         eachRepository: {
@@ -306,7 +307,7 @@ describe('GitHub App, не личный токен', () => {
     expect(seen).toEqual([{ appId: '123', privateKey: appKey }]);
     expect(seen[0]).not.toHaveProperty('token');
 
-    const failing = createGithubAppClient({ appId: '123', privateKey: appKey }, () => ({
+    const failing = createGithubAppClient({ appId: '123', privateKey: appKey }, { logger: silentLogger, clock }, () => ({
       eachRepository: {
         iterator() {
           return {

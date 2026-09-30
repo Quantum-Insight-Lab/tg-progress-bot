@@ -19,8 +19,10 @@ import {
   type ReconcileIssueInput,
   type ReconcilePullRequestInput,
   type ReconcileRepository,
+  type RemoteMirror,
 } from '../domain/github/reconcile.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import { DomainError } from '../domain/shared/errors.ts';
 import type { Logger } from '../domain/shared/logger.ts';
 import { EVENT_TYPES, type PayloadByType } from '../events/index.ts';
 import { mirrorGithubCommits } from './commit-mirror.ts';
@@ -295,9 +297,9 @@ async function reconcileOne(
 ): Promise<void> {
   if (!reconcileIsDue(lastRunStartedAt, now)) return;
   const remote = await source.read(repository, now);
-  await db.transaction().execute(async (trx) => {
+  const restoredFacts = await db.transaction().execute(async (trx) => {
     const key = reconcileIdempotencyKey(repository.id, now);
-    if (await alreadyRan(trx, key)) return;
+    if (await alreadyRan(trx, key)) return null;
     const mirror = await snapshotOf(trx, repository.id);
     const missed = missedMirrorFacts(repository.id, mirror, remote, now);
     await applyMissed(trx, repository.id, missed, now, nextId);
@@ -306,7 +308,16 @@ async function reconcileOne(
       restoredFacts: missed.length,
       runStartedAt: now,
     });
+    return missed.length;
   });
+  if (restoredFacts === null) return;
+  logger.info('reconcile.repository', { repositoryId: repository.id, readFacts: readFactsOf(remote), restoredFacts });
+}
+
+/** Сколько фактов GitHub отдал сверке: issues, pull request, коммиты и CI основной ветки. */
+function readFactsOf(remote: RemoteMirror): number {
+  const branchCi = remote.defaultBranchCi === null ? 0 : 1;
+  return remote.issues.length + remote.pullRequests.length + remote.commits.length + branchCi;
 }
 
 /**
@@ -329,14 +340,20 @@ export async function reconcileGithubMirror(
     try {
       await reconcileOne(db, logger, source, repository, now, runs.get(repository.id) ?? null, nextId);
     } catch (error) {
+      logger.error(
+        'reconcile.repository_failed',
+        { repositoryId: repository.id, code: error instanceof DomainError ? error.code : null },
+        error,
+      );
       failures.push(error);
     }
   }
   if (source.rateRemainingPercent !== undefined) {
     try {
       await observeGithubRate(db, logger, await source.rateRemainingPercent(now), now);
-    } catch {
+    } catch (error) {
       // остаток лимита не отменяет уже записанную сверку
+      logger.warn('github.rate_failed', {}, error);
     }
   }
   if (failures.length === 0) return;

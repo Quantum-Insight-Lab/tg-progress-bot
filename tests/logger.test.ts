@@ -11,7 +11,7 @@ import { createTelegramBot } from '../src/telegram/bot.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
-import { captureLog, type LogLine } from './log-lines.ts';
+import { captureLog, silentLogger, type LogLine } from './log-lines.ts';
 
 const moment = new Date('2026-09-30T12:00:00.000Z');
 const clock: Clock = { now: () => moment };
@@ -158,6 +158,7 @@ describe('B-17 вход HTTP: строка на каждый код ответа
             acceptGithubWebhookHttp(req, res, {
               secret: GITHUB_SECRET,
               clock,
+              logger: silentLogger,
               isolate: (run) => {
                 if (githubFails) return Promise.reject(new Error(`БД недоступна: ${secretEnv.DATABASE_URL ?? ''}`));
                 return run(journal, noop, noop, noop, noop, noop, noop);

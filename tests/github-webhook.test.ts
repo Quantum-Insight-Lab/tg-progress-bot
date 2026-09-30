@@ -287,6 +287,7 @@ describe('приём webhook GitHub', () => {
       body: pullBody,
       journal: handle.journal,
       clock,
+      logger: silentLogger,
     });
     expect(pull).toBe(200);
     const ciBody = Buffer.from(JSON.stringify({ action: 'completed', repository: { id: 42 } }));
@@ -298,6 +299,7 @@ describe('приём webhook GitHub', () => {
       body: ciBody,
       journal: handle.journal,
       clock,
+      logger: silentLogger,
     });
     expect(ci).toBe(200);
     expect(status).toBe(TASK_STATUS_IN_PROGRESS);
@@ -357,6 +359,7 @@ describe('приём webhook GitHub', () => {
       body: firstBody,
       journal: handle.journal,
       clock,
+      logger: silentLogger,
     });
     const secondBody = Buffer.from(JSON.stringify(issuePayload({ issue: { ...issueBodyIssue(), title: 'Другое' } })));
     const second = await acceptGithubWebhook({
@@ -367,6 +370,7 @@ describe('приём webhook GitHub', () => {
       body: secondBody,
       journal: handle.journal,
       clock,
+      logger: silentLogger,
     });
     expect(first).toBe(200);
     expect(second).toBe(200);
@@ -389,6 +393,7 @@ describe('приём webhook GitHub', () => {
       body: forged,
       journal: handle.journal,
       clock,
+      logger: silentLogger,
     });
     expect(rejected).toBe(401);
     expect(await eventTypes(handle.db)).toEqual([EVENT_TYPES.GITHUB_ISSUE_CHANGED, EVENT_TYPES.DELIVERY_DUPLICATE]);
@@ -400,6 +405,7 @@ describe('приём webhook GitHub', () => {
       body: forged,
       journal: handle.journal,
       clock,
+      logger: silentLogger,
     });
     expect(unsigned).toBe(401);
     expect(verifyGithubWebhookSignature(secret, forged, sign(forged))).toBe(true);
@@ -417,6 +423,7 @@ describe('приём webhook GitHub', () => {
       body: broken,
       journal: handle.journal,
       clock,
+      logger: silentLogger,
     });
     expect(dated).toBe(400);
     const ping = Buffer.from(JSON.stringify({ zen: 'design' }));
@@ -428,6 +435,7 @@ describe('приём webhook GitHub', () => {
       body: ping,
       journal: handle.journal,
       clock,
+      logger: silentLogger,
     });
     expect(acknowledged).toBe(200);
     expect(await eventTypes(handle.db)).toEqual([]);

@@ -230,6 +230,7 @@ describe('зеркало issue по webhook', () => {
           body,
           journal: createEventJournal(trx, silentLogger),
           clock,
+          logger: silentLogger,
           applyIssue: async (payload) => {
             await mirrorGithubIssue(trx, payload, randomUUID());
           },

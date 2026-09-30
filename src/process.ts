@@ -164,14 +164,14 @@ function reconcileSourceOf(config: ProcessConfig): GithubReconcileSource | null 
   if (config.reconcileSource !== undefined) return config.reconcileSource;
   const credentials = readGithubAppCredentials(process.env);
   if (credentials === null) return null;
-  return createGithubReconcileSource(credentials);
+  return createGithubReconcileSource(credentials, { logger: config.logger, clock: config.clock });
 }
 
 function installationSourceOf(config: ProcessConfig): InstallationRepositorySource {
   if (config.installationSource !== undefined) return config.installationSource;
   const credentials = readGithubAppCredentials(process.env);
   if (credentials === null) return unconfiguredInstallationSource();
-  return createGithubAppClient(credentials);
+  return createGithubAppClient(credentials, { logger: config.logger, clock: config.clock });
 }
 
 let running: RunningProcess | undefined;
@@ -388,6 +388,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
         acceptGithubWebhookHttp(req, res, {
           secret: githubWebhookSecret,
           clock: config.clock,
+          logger,
           isolate: (run) =>
             database.transaction().execute((trx) =>
               run(
