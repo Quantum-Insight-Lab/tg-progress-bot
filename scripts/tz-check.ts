@@ -98,6 +98,12 @@ export interface Issue {
   blockedBy: string[];
   atoms: { id: string; done: boolean; line: number }[];
   elements: string[];
+  /** Раздел «PDA» одной строкой: контракт, который оставляют наследникам. */
+  pda: string;
+  /** Тело раздела «Уже есть». Раздела нет — поле отсутствует. */
+  alreadyThere?: string;
+  /** «Уже есть» — первый раздел файла. */
+  alreadyThereFirst: boolean;
 }
 
 export const REGISTRY_PATH = 'contracts/tz-registry.yaml';
@@ -129,6 +135,28 @@ export const MAX_ATOMS_PER_STEP = 10;
 const ISSUE_ID = /^I-\d{2,}$/;
 const ISSUE_ATOM = /^- \[( |x|X)\] (R-\d{3,})\b/;
 const ISSUE_ELEMENT = /\b(?:U|A|E|L|INV|C|B|P|M|S)-\d+\b/g;
+const ISSUE_CONTEXT = /^(?:events|infra|projects|tasks|github|progress) — /;
+
+/** Пустой вход: у issue нет прямых предшественников. */
+export const NO_PREDECESSORS = 'Предшественников нет.';
+
+/** Строка «Уже есть»: задача предшественника и его раздел PDA. */
+export function predecessorBrief(issue: Pick<Issue, 'title' | 'pda'>): string {
+  const task = issue.title.replace(ISSUE_CONTEXT, '');
+  const pda = issue.pda.replace(/\s+/g, ' ').trim();
+  return pda.length > 0 ? `${task} · ${pda}` : task;
+}
+
+/** Тело раздела «Уже есть» из прямых blocked_by, в том же порядке. */
+export function alreadyThereBody(blockedBy: readonly string[], byId: ReadonlyMap<string, Pick<Issue, 'title' | 'pda'>>): string {
+  if (blockedBy.length === 0) return NO_PREDECESSORS;
+  return blockedBy
+    .map((id) => {
+      const predecessor = byId.get(id);
+      return predecessor ? `- ${id} — ${predecessorBrief(predecessor)}` : `- ${id} —`;
+    })
+    .join('\n');
+}
 
 export const EVENT_REGISTRY_PATH = 'contracts/event-registry.yaml';
 const EVENT_FIELDS = ['type', 'version', 'context', 'actor', 'subject', 'payload', 'idempotency_key', 'invariants', 'owner'] as const;
@@ -662,6 +690,14 @@ function section(lines: string[], title: string): { line: number; text: string }
   return (end < 0 ? rest : rest.slice(0, end)).map((text, index) => ({ line: start + index + 2, text }));
 }
 
+function sectionBody(lines: string[], title: string): string | undefined {
+  const start = lines.findIndex((line) => line.trim() === `## ${title}`);
+  if (start < 0) return undefined;
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => line.startsWith('## '));
+  return (end < 0 ? rest : rest.slice(0, end)).join('\n').trim();
+}
+
 /** Issue — markdown с front matter (`id`, `title`, `blocked_by`, `state`) и разделами «PDA» и «Атомы ТЗ». */
 export function parseIssue(doc: PdaDoc): { issue?: Issue; findings: Finding[] } {
   const lines = doc.text.split(/\r?\n/);
@@ -682,9 +718,12 @@ export function parseIssue(doc: PdaDoc): { issue?: Issue; findings: Finding[] } 
   });
   const pda = section(lines, 'PDA')
     .map(({ text }) => text)
-    .join('\n');
+    .join('\n')
+    .replace(/\s+/g, ' ')
+    .trim();
   const elements = [...new Set([...[...pda.matchAll(ISSUE_ELEMENT)].map((m) => m[0]), ...backticked(pda).map((name) => `EV-${name}`)])];
   const strings = (list: unknown): string[] => (Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string') : []);
+  const alreadyThere = sectionBody(lines, 'Уже есть');
   const issue: Issue = {
     id: meta.id,
     file: doc.file,
@@ -694,7 +733,10 @@ export function parseIssue(doc: PdaDoc): { issue?: Issue; findings: Finding[] } 
     blockedBy: strings(meta.blocked_by),
     atoms,
     elements,
+    pda,
+    alreadyThereFirst: lines.slice(end + 1).find((line) => line.startsWith('## ')) === '## Уже есть',
   };
+  if (alreadyThere !== undefined) issue.alreadyThere = alreadyThere;
   if (typeof meta.milestone === 'string') issue.milestone = meta.milestone;
   if (typeof meta.github === 'number') issue.github = meta.github;
   return { issue, findings: [] };
@@ -720,9 +762,20 @@ function cycleThrough(issues: Map<string, Issue>): string[] | null {
   return null;
 }
 
+/** «Уже есть» — прямые blocked_by: задача предшественника и его PDA, в том же порядке. */
+function checkAlreadyThere(issue: Issue, byId: Map<string, Issue>): Finding[] {
+  const where = `${issue.file}: ${issue.id}`;
+  if (issue.alreadyThere === undefined) return [{ rule: 'TR-2', message: `${where}: нет раздела «Уже есть»` }];
+  const findings: Finding[] = [];
+  if (!issue.alreadyThereFirst) findings.push({ rule: 'TR-2', message: `${where}: раздел «Уже есть» идёт не первым` });
+  const expected = alreadyThereBody(issue.blockedBy, byId);
+  if (issue.alreadyThere !== expected) findings.push({ rule: 'TR-2', message: `${where}: «Уже есть» не совпадает с blocked_by. ${expected.replaceAll('\n', ' | ')}` });
+  return findings;
+}
+
 /**
  * TR-7: покрытый атом MVP назначен issue; у закрытой issue отмечены все атомы. TR-8: атомов в issue не больше MAX_ATOMS_PER_STEP.
- * TR-2: атомы, элементы PDA, blocked_by и каталог backlog указывают на существующее.
+ * TR-2: атомы, элементы PDA, blocked_by, раздел «Уже есть» и каталог backlog указывают на существующее.
  */
 export function checkBacklog(issues: Issue[], registry: Registry, elements: PdaElement[], rows: CoverageRow[], index?: string): Finding[] {
   const findings: Finding[] = [];
@@ -761,6 +814,7 @@ export function checkBacklog(issues: Issue[], registry: Registry, elements: PdaE
   }
   const cycle = cycleThrough(byId);
   if (cycle) findings.push({ rule: 'TR-2', message: `blocked_by по кругу: ${cycle.join(' → ')}` });
+  for (const issue of issues) findings.push(...checkAlreadyThere(issue, byId));
   for (const row of rows) {
     if (row.status === 'covered' && !assigned.has(row.id)) findings.push({ rule: 'TR-7', message: `${row.id} ${row.kind} покрыт в PDA, но не назначен ни одной issue` });
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRANCH, creationOrder, issueBody, milestonesFromIndex, withGithub, type BacklogIssue } from '../scripts/backlog-publish.ts';
+import { BRANCH, creationOrder, issueBody, milestonesFromIndex, sameIssueBody, withGithub, type BacklogIssue } from '../scripts/backlog-publish.ts';
 import { parseIssue } from '../scripts/tz-check.ts';
 
 const text = [
@@ -34,6 +34,8 @@ describe('Публикация backlog', () => {
     expect(body).toContain(`[08](${repo}/blob/${BRANCH}/docs/pda/08-observability.md)`);
     expect(body).toContain('[внешнее](https://example.com)');
     expect(body).not.toContain('blocked_by');
+    expect(sameIssueBody(`${body}\n`, body)).toBe(true);
+    expect(sameIssueBody(body.replace('Сделать', 'Другое'), body)).toBe(false);
   });
 
   it('номер GitHub пишется в front matter и заменяется при повторе', () => {
@@ -44,7 +46,7 @@ describe('Публикация backlog', () => {
   });
 
   it('порядок создания: блокирующая issue раньше заблокированной', () => {
-    const make = (id: string, blockedBy: string[]) => ({ id, blockedBy, file: '', title: id, labels: [], closed: false, atoms: [], elements: [] });
+    const make = (id: string, blockedBy: string[]) => ({ id, blockedBy, file: '', title: id, labels: [], closed: false, atoms: [], elements: [], pda: '', alreadyThereFirst: true });
     expect(creationOrder([make('I-03', ['I-10']), make('I-10', ['I-02']), make('I-02', [])]).map((i) => i.id)).toEqual(['I-02', 'I-10', 'I-03']);
   });
 });
