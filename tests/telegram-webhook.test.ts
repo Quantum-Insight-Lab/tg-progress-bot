@@ -3,8 +3,11 @@ import { createTelegramBot } from '../src/telegram/bot.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { captureLog } from './log-lines.ts';
 
 const SECRET = 'webhook-secret';
+const log = captureLog();
+const clock = { now: () => new Date('2026-09-30T12:00:00.000Z') };
 
 function update(id: number): string {
   return JSON.stringify({
@@ -37,6 +40,8 @@ describe('приём обновлений через webhook', () => {
       path: TELEGRAM_WEBHOOK_PATH,
       port: 0,
       host: '127.0.0.1',
+      logger: log.logger,
+      clock,
     });
     try {
       await bot.start();
@@ -79,6 +84,8 @@ describe('приём обновлений через webhook', () => {
   });
 
   it('пустой секрет не слушает', async () => {
-    await expect(startTelegramWebhook({ bot, secretToken: '', path: TELEGRAM_WEBHOOK_PATH, port: 0, host: '127.0.0.1' })).rejects.toThrow('секрет webhook пуст');
+    await expect(
+      startTelegramWebhook({ bot, secretToken: '', path: TELEGRAM_WEBHOOK_PATH, port: 0, host: '127.0.0.1', logger: log.logger, clock }),
+    ).rejects.toThrow('секрет webhook пуст');
   });
 });

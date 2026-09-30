@@ -21,6 +21,7 @@ import {
   type ReconcileRepository,
 } from '../domain/github/reconcile.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import { EVENT_TYPES, type PayloadByType } from '../events/index.ts';
 import { mirrorGithubCommits } from './commit-mirror.ts';
 import type { Database } from './database.ts';
@@ -350,6 +351,7 @@ export function startReconcileLoop(
   run: (now: Date) => Promise<void>,
   clock: Clock,
   intervalMs: number,
+  logger: Logger,
 ): { stop(): void } {
   if (!Number.isInteger(intervalMs) || intervalMs < 1) throw new Error('интервал сверки');
   let busy = false;
@@ -357,12 +359,17 @@ export function startReconcileLoop(
   const tick = (): void => {
     if (busy || stopped) return;
     busy = true;
-    void run(clock.now()).then(
+    const startedAt = clock.now();
+    const durationMs = (): number => clock.now().getTime() - startedAt.getTime();
+    logger.info('reconcile.started');
+    void run(startedAt).then(
       () => {
         busy = false;
+        logger.info('reconcile.finished', { durationMs: durationMs() });
       },
-      () => {
+      (error: unknown) => {
         busy = false;
+        logger.error('reconcile.failed', { durationMs: durationMs() }, error);
       },
     );
   };

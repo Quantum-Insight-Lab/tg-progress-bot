@@ -4,10 +4,12 @@ import type { GithubReconcileSource } from './domain/github/reconcile.ts';
 import type { InstallationRepositorySource } from './domain/github/repository.ts';
 import { unconfiguredInstallationSource } from './domain/github/repository.ts';
 import type { Clock } from './domain/shared/clock.ts';
+import type { Logger } from './domain/shared/logger.ts';
 import { createGithubAppClient, readGithubAppCredentials } from './github/client.ts';
 import { createGithubReconcileSource } from './github/reconcile.ts';
 import { acceptGithubWebhookHttp, GITHUB_WEBHOOK_PATH } from './github/webhook.ts';
 import type { Database } from './infrastructure/database.ts';
+import { createProcessLogger } from './infrastructure/logger.ts';
 import { createScheduler, startSchedulerLoop, type Scheduler } from './infrastructure/scheduler.ts';
 import { createAccessGate } from './infrastructure/access.ts';
 import { createChatBinding } from './infrastructure/chats.ts';
@@ -99,6 +101,8 @@ export interface ProcessConfig {
   /** Секрет подписи webhook GitHub App. Пусто — приём не включается. */
   githubWebhookSecret: string | null;
   clock: Clock;
+  /** Один логгер процесса; уровень — `LOG_LEVEL`. */
+  logger: Logger;
   /** Пул для команд бота. Без него обработчики не подключаются. */
   db?: Kysely<Database>;
   /** Задаётся в тестах, чтобы не вызывать `getMe`. Боевой вход поле не ставит. */
@@ -117,7 +121,7 @@ export interface RunningProcess {
   engine: ProgressEngine;
   scheduler: Scheduler;
   port: number;
-  stop(): Promise<void>;
+  stop(signal?: NodeJS.Signals): Promise<void>;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -152,6 +156,7 @@ export function readProcessConfig(env: NodeJS.ProcessEnv, clock: Clock): Process
     webhookPath: webhookPath === undefined || webhookPath.length === 0 ? TELEGRAM_WEBHOOK_PATH : webhookPath,
     githubWebhookSecret: optional(env, 'GITHUB_WEBHOOK_SECRET'),
     clock,
+    logger: createProcessLogger(env, clock),
   };
 }
 
@@ -416,26 +421,46 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     port: config.port,
     host: config.host,
     routes,
+    logger: config.logger,
+    clock: config.clock,
   });
-  const loop = startSchedulerLoop(scheduler, config.schedulerIntervalMs);
+  const logger = config.logger;
+  const loop = startSchedulerLoop(scheduler, config.schedulerIntervalMs, logger);
   const reconcileSource = reconcileSourceOf(config);
   const database = config.db;
   const reconcileLoop =
     database !== undefined && reconcileSource !== null
-      ? startReconcileLoop((now) => reconcileGithubMirror(database, reconcileSource, now), config.clock, reconcileIntervalMs())
+      ? startReconcileLoop((now) => reconcileGithubMirror(database, reconcileSource, now), config.clock, reconcileIntervalMs(), logger)
       : undefined;
+  logger.info('process.started', {
+    port: webhook.port,
+    host: config.host,
+    telegramWebhookPath: config.webhookPath,
+    githubWebhookPath: routes.some((route) => route.path === GITHUB_WEBHOOK_PATH) ? GITHUB_WEBHOOK_PATH : null,
+    schedulerIntervalMs: config.schedulerIntervalMs,
+    reconcileIntervalMs: reconcileLoop === undefined ? null : reconcileIntervalMs(),
+    githubApp: reconcileSource !== null,
+  });
   let stopped = false;
   running = {
     bot,
     engine,
     scheduler,
     port: webhook.port,
-    async stop() {
+    async stop(signal) {
       if (stopped) return;
       stopped = true;
+      const fields = { signal: signal ?? null };
+      logger.info('process.stopping', fields);
       reconcileLoop?.stop();
       loop.stop();
-      await webhook.close();
+      try {
+        await webhook.close();
+      } catch (error) {
+        logger.error('process.stop_failed', fields, error);
+        throw error;
+      }
+      logger.info('process.stopped', fields);
     },
   };
   return running;

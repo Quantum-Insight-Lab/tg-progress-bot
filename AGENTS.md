@@ -33,7 +33,7 @@ src/config         ничего не импортирует из src
 | Планировщик актов системы | `src/infrastructure/scheduler.ts`: слоты A-28…A-33, A-35, A-36, A-42, A-44, A-45; реализация акта — в своей issue | есть |
 | GitHub | один клиент Octokit в `src/github/client.ts` | есть |
 | Ошибки домена | `DomainError` с кодом причины в `src/domain/shared/errors.ts` | есть |
-| Логирование | один логгер в `src/infrastructure/logger.ts` | появится |
+| Логирование | порт `Logger` в `src/domain/shared/logger.ts`, реализация — один логгер процесса в `src/infrastructure/logger.ts`, уровень — `LOG_LEVEL`; до адаптеров — параметром из `src/process.ts` | есть |
 | Тесты | Vitest; тест инварианта начинается с его ID, `INV-xx` | есть |
 | Проверки | `npm run ci`: типы, ESLint, dependency-cruiser, сверка генерации, S-7, тесты, `tz:check --gate --pda` с TR-7 и TR-8 по backlog | есть |
 | Трасса атома | `npm run tz:trace -- R-xxx`: атом → элементы PDA → issues → тесты | есть |
