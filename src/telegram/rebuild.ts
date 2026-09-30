@@ -1,5 +1,6 @@
 import type { Bot } from 'grammy';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** `/rebuild проект | участник`. Имена могут содержать пробелы, их делит `|`. */
 export function parseRebuildCommand(text: string): { projectName: string; memberName: string } | null {
@@ -19,6 +20,7 @@ export const REBUILD_MISSING = 'Сегодняшнего канваса нет.'
 export const REBUILD_UNKNOWN = 'Проект или участник не найдены.';
 
 function replyOf(error: DomainError): string | null {
+  traceRefusal(error);
   switch (error.code) {
     case DOMAIN_ERROR.REBUILD_ROOT:
       return REBUILD_ROOT_ONLY;
@@ -49,6 +51,7 @@ export interface RebuildActions {
 /** Команда корня в личке. Чужому — отказ без данных канваса. */
 export function attachRebuild(bot: Bot, actions: RebuildActions): void {
   bot.command('rebuild', async (ctx) => {
+    traceHandler('rebuild');
     const parsed = parseRebuildCommand(ctx.message?.text ?? '');
     if (parsed === null || ctx.from === undefined || ctx.from.is_bot) return;
     const chat = ctx.chat;

@@ -2,6 +2,7 @@ import type { Bot } from 'grammy';
 import type { TaskCreation } from '../domain/tasks/create-task.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Отказ, если команда пришла не из топика того, кто пишет. */
 export const TASK_OWN_TOPIC = 'Задачу заводят командой /task в своём топике.';
@@ -35,6 +36,7 @@ export interface TaskCommandPlace {
 }
 
 function replyOf(error: DomainError): string | null {
+  traceRefusal(error);
   switch (error.code) {
     case DOMAIN_ERROR.TASK_DUPLICATE:
       return null;
@@ -64,9 +66,9 @@ export interface CanvasRedraw {
 /** Повтор правки молчит. Отказ «канвас заполнен» доходит до человека. */
 export function canvasRedrawFailure(error: unknown): 'duplicate' | 'full' | null {
   if (!(error instanceof DomainError)) return null;
-  if (error.code === DOMAIN_ERROR.CANVAS_DUPLICATE) return 'duplicate';
-  if (error.code === DOMAIN_ERROR.CANVAS_FULL) return 'full';
-  return null;
+  if (error.code !== DOMAIN_ERROR.CANVAS_DUPLICATE && error.code !== DOMAIN_ERROR.CANVAS_FULL) return null;
+  traceRefusal(error);
+  return error.code === DOMAIN_ERROR.CANVAS_DUPLICATE ? 'duplicate' : 'full';
 }
 
 /**
@@ -110,6 +112,7 @@ export async function replyToTaskCommand(
 /** Команда `/task` на единственном экземпляре grammY. */
 export function attachTaskCommand(bot: Bot, actions: TaskCreation, canvas?: CanvasRedraw): void {
   bot.command('task', async (ctx) => {
+    traceHandler('task');
     const title = typeof ctx.match === 'string' ? ctx.match.trim() : '';
     const chat = ctx.chat;
     const reply = await replyToTaskCommand(

@@ -5,6 +5,7 @@ import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { REPORTS_TOPIC_COLLIDES } from './reports-topic.ts';
 import { FIRST_MESSAGE_TASK, renderFirstEmployeeMessage } from '../projections/first-employee-message.ts';
 import { CANVAS_FULL_REPLY } from './task-command.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Строка настроек: топик исполнителя. */
 export const EXECUTOR_TOPIC_HEADING = 'Топик исполнителя';
@@ -158,6 +159,7 @@ function screenOf(view: TopicBoard): ScreenReply {
 }
 
 function replyOf(error: unknown): ScreenReply | null {
+  traceRefusal(error);
   if (!(error instanceof DomainError)) throw error;
   switch (error.code) {
     case DOMAIN_ERROR.TOPIC_DUPLICATE:
@@ -338,6 +340,7 @@ export function attachExecutorTopic(bot: Bot, actions: ExecutorTopicActions, can
       await next();
       return;
     }
+    traceHandler('executor-topic');
     const reply = await replyToExecutorTopicMessage(
       ctx.chat?.type,
       ctx.from,
@@ -352,6 +355,7 @@ export function attachExecutorTopic(bot: Bot, actions: ExecutorTopicActions, can
   });
 
   bot.callbackQuery(/^ty:/, async (ctx) => {
+    traceHandler('executor-topic');
     await ctx.answerCallbackQuery();
     const parsed = parseTopicCallback(ctx.callbackQuery.data);
     const from = ctx.from;
@@ -361,6 +365,7 @@ export function attachExecutorTopic(bot: Bot, actions: ExecutorTopicActions, can
   });
 
   bot.callbackQuery(/^tn:/, async (ctx) => {
+    traceHandler('executor-topic');
     await ctx.answerCallbackQuery();
     const parsed = parseTopicCallback(ctx.callbackQuery.data);
     const from = ctx.from;

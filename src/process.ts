@@ -87,6 +87,7 @@ import { attachTaskCancel } from './telegram/task-cancel.ts';
 import { sendBlockerQuestion } from './telegram/blocker-question.ts';
 import { attachBlockerAnswer } from './telegram/blocker-answer.ts';
 import { sendReviewReminder } from './telegram/review-reminder.ts';
+import { attachUpdateLog } from './telegram/update-log.ts';
 import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookRoute, type WebhookServer } from './telegram/webhook.ts';
 
 const DEFAULT_HOST = '0.0.0.0';
@@ -192,6 +193,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   if (running !== undefined) throw new Error('процесс уже запущен');
   const logger = config.logger;
   const bot = config.botInfo === undefined ? createTelegramBot(config.botToken) : createTelegramBot(config.botToken, config.botInfo);
+  attachUpdateLog(bot, logger, config.clock);
   const paint = (home: CanvasHome) =>
     prepareCanvasMessage({
       projectName: home.projectName,

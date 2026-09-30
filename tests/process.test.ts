@@ -98,6 +98,13 @@ describe('один процесс', () => {
       ['info', 'POST', TELEGRAM_WEBHOOK_PATH, 200],
       ['info', 'POST', GITHUB_WEBHOOK_PATH, 404],
     ]);
+    expect(log.steps('telegram.update')).toEqual([
+      expect.objectContaining({ level: 'info', updateId: 7, kind: 'message', chatId: '1', chatType: 'private', fromId: '2', command: null }),
+    ]);
+    expect(log.steps('telegram.outcome')).toEqual([
+      expect.objectContaining({ level: 'info', updateId: 7, handler: null, outcome: 'unhandled', code: null }),
+    ]);
+    expect(log.raw.join('\n')).not.toContain('ping');
     await started.stop('SIGTERM');
     expect(log.lines().slice(-2)).toEqual([
       { time: '2026-09-28T00:00:00.000Z', level: 'info', step: 'process.stopping', signal: 'SIGTERM' },

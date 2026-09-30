@@ -1,5 +1,6 @@
 import type { Bot } from 'grammy';
 import type { UserRegistration } from '../domain/projects/user.ts';
+import { traceHandler } from './update-log.ts';
 
 /** Первый `/start`: человек — руководитель и может завести проект. */
 export const START_REPLY_ROOT = 'Вы руководитель и можете завести проект.';
@@ -44,6 +45,7 @@ export async function replyToStart(
 /** Команда `/start` на единственном экземпляре grammY. */
 export function attachStartCommand(bot: Bot, registration: UserRegistration): void {
   bot.command('start', async (ctx) => {
+    traceHandler('start');
     const reply = await replyToStart(ctx.chat?.type, ctx.from, registration);
     if (reply === null) return;
     await ctx.reply(reply);

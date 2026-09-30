@@ -2,6 +2,7 @@ import { InlineKeyboard, type Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { MembershipActions, ParticipantsView } from '../domain/projects/membership.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Строка настроек: участники проекта. */
 export const PARTICIPANTS_HEADING = 'Участники';
@@ -152,6 +153,7 @@ function screenOf(view: ParticipantsView): ScreenReply {
 }
 
 function replyOf(error: unknown): ScreenReply | null {
+  traceRefusal(error);
   if (!(error instanceof DomainError)) throw error;
   switch (error.code) {
     case DOMAIN_ERROR.MEMBER_DUPLICATE:
@@ -295,12 +297,14 @@ export function attachParticipants(
       await next();
       return;
     }
+    traceHandler('participants');
     const reply = await replyToParticipantsMessage(ctx.chat?.type, ctx.from, request, actions);
     if (reply !== null) await send(ctx, reply);
     await next();
   });
 
   bot.callbackQuery(/^ma:/, async (ctx) => {
+    traceHandler('participants');
     await ctx.answerCallbackQuery();
     const parsed = parseMemberCallback(ctx.callbackQuery.data);
     const from = ctx.from;
@@ -313,6 +317,7 @@ export function attachParticipants(
   });
 
   bot.callbackQuery(/^md:/, async (ctx) => {
+    traceHandler('participants');
     await ctx.answerCallbackQuery();
     const parsed = parseMemberCallback(ctx.callbackQuery.data);
     const from = ctx.from;
@@ -322,6 +327,7 @@ export function attachParticipants(
   });
 
   bot.callbackQuery(/^mc:/, async (ctx) => {
+    traceHandler('participants');
     await ctx.answerCallbackQuery();
     const parsed = parseMemberCallback(ctx.callbackQuery.data);
     const from = ctx.from;

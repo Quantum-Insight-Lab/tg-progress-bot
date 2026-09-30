@@ -3,6 +3,7 @@ import type { TaskCancelling, TaskCancelResult } from '../domain/tasks/cancel-ta
 import { TASK_TRANSITION_CANCEL } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const CANCEL_DATA = new RegExp(`^task:${TASK_TRANSITION_CANCEL}:([1-9]\\d*)$`);
@@ -59,6 +60,7 @@ export async function replyToTaskCancel(
       idempotencyKey,
     });
   } catch (error) {
+    traceRefusal(error);
     if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
     if (!(error instanceof DomainError)) throw error;
     if (refusal(error)) return null;
@@ -69,6 +71,7 @@ export async function replyToTaskCancel(
 /** Кнопка «отменить» на единственном экземпляре grammY. */
 export function attachTaskCancel(bot: Bot, actions: TaskCancelling, canvas?: CanvasRedraw): void {
   bot.callbackQuery(new RegExp(`^task:${TASK_TRANSITION_CANCEL}:`), async (ctx) => {
+    traceHandler('task-cancel');
     const taskNumber = parseTaskCancelData(ctx.callbackQuery.data);
     const from = ctx.from;
     const message = ctx.callbackQuery.message;

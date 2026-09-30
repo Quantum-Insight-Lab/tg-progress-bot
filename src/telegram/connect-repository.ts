@@ -11,6 +11,7 @@ import type {
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { REPOSITORIES_APP, REPOSITORIES_UNAVAILABLE } from './installation-repositories.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Заголовок отдельного шага онбординга. */
 export const PROJECT_REPOSITORY_HEADING = 'Репозиторий';
@@ -174,6 +175,7 @@ function hasChoices(keyboard: InlineKeyboard): boolean {
 }
 
 function replyOf(error: unknown): string | null {
+  traceRefusal(error);
   if (!(error instanceof DomainError)) throw error;
   switch (error.code) {
     case DOMAIN_ERROR.PROJECT_REPOSITORY_CHAT:
@@ -229,6 +231,7 @@ async function installationList(
     const repositories = await installation.show({ telegramUserId, chat, idempotencyKey });
     return { repositories: [...repositories], failure: null };
   } catch (error) {
+    traceRefusal(error);
     if (!(error instanceof DomainError)) throw error;
     if (error.code === DOMAIN_ERROR.REPOSITORY_APP) return { repositories: [], failure: REPOSITORIES_APP };
     if (error.code === DOMAIN_ERROR.REPOSITORY_UNAVAILABLE) return { repositories: [], failure: REPOSITORIES_UNAVAILABLE };
@@ -422,6 +425,7 @@ export function attachProjectRepository(
       await next();
       return;
     }
+    traceHandler('project-repository');
     const screen = await openProjectRepositoryStep(
       ctx.chat?.type,
       ctx.from,
@@ -438,6 +442,7 @@ export function attachProjectRepository(
   });
 
   bot.callbackQuery(/^rc:/, async (ctx) => {
+    traceHandler('project-repository');
     await ctx.answerCallbackQuery();
     const parsed = parseConnectRepositoryData(ctx.callbackQuery.data);
     const from = ctx.from;
@@ -454,6 +459,7 @@ export function attachProjectRepository(
   });
 
   bot.callbackQuery(/^rx:/, async (ctx) => {
+    traceHandler('project-repository');
     await ctx.answerCallbackQuery();
     const parsed = parseChangeRepositoryData(ctx.callbackQuery.data);
     const from = ctx.from;
@@ -470,6 +476,7 @@ export function attachProjectRepository(
   });
 
   bot.callbackQuery(/^rs:/, async (ctx) => {
+    traceHandler('project-repository');
     await ctx.answerCallbackQuery();
     const parsed = parseSkipRepositoryData(ctx.callbackQuery.data);
     const from = ctx.from;
