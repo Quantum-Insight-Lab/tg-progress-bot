@@ -22,12 +22,6 @@ export interface CanvasBlockers {
   defaultBranchCiRed: boolean;
 }
 
-export const EMPTY_CANVAS_BLOCKERS: CanvasBlockers = {
-  reasons: [],
-  pullRequests: [],
-  defaultBranchCiRed: false,
-};
-
 interface ReasonRow {
   number: number | string;
   reason: string | null;

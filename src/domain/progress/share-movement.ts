@@ -13,8 +13,6 @@ export const BACKLOG_LIST_NEXT = 'next';
 /** Списки канваса, которые читают тот же список issues, что и процент. */
 export const REPOSITORY_BACKLOG_LISTS = [BACKLOG_LIST_DONE, BACKLOG_LIST_IN_PROGRESS, BACKLOG_LIST_NEXT] as const;
 
-export type RepositoryBacklogList = (typeof REPOSITORY_BACKLOG_LISTS)[number];
-
 /**
  * Issue репозитория, из которого считаются процент и списки.
  * Несколько assignees не размножают issue: в процент он входит один раз.

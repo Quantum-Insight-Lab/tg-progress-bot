@@ -14,11 +14,12 @@
     "codegen:events": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/codegen-events.ts",
     "check:invariants": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-invariants.ts",
     "check:mechanisms": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-mechanisms.ts",
+    "knip": "knip",
     "tz:check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts",
     "tz:trace": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts --trace",
     "backlog:publish": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/backlog-publish.ts",
     "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/main.ts",
-    "ci": "npm run typecheck && npm run lint && npm run boundaries && npm run codegen:events -- --check && npm run check:invariants -- --strict && npm run check:mechanisms && npm test && npm run tz:check -- --gate --pda"
+    "ci": "npm run typecheck && npm run lint && npm run boundaries && npm run codegen:events -- --check && npm run check:invariants -- --strict && npm run check:mechanisms && npm run knip && npm test && npm run tz:check -- --gate --pda"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -27,6 +28,7 @@
     "@types/pg": "^8.23.1",
     "dependency-cruiser": "^18.4.0",
     "eslint": "^10.11.0",
+    "knip": "^5.88.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.70.1",
     "vitest": "^3.2.7",

@@ -13,11 +13,6 @@ export const SETTINGS_ACTOR_ROLE = 'root';
 
 const PROJECT_SUBJECT = 'Project';
 
-/** Поля A-24. Одно сообщение меняет одно поле. */
-export const SETTINGS_FIELDS = ['name', 'description', 'timezone', 'chat', 'member_role'] as const;
-
-export type SettingsField = (typeof SETTINGS_FIELDS)[number];
-
 export interface StoredProject {
   id: string;
   name: string;

@@ -19,8 +19,6 @@ export interface Project {
  */
 export const PROJECT_OWN = ['tasks', 'roles', 'canvases'] as const;
 
-export type ProjectOwn = (typeof PROJECT_OWN)[number];
-
 function blank(value: string): boolean {
   return value.trim().length === 0;
 }
