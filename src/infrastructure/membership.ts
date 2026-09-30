@@ -12,6 +12,7 @@ import {
 import { MEMBER_ROLE } from '../domain/projects/member.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { TASK_STATUS_CANCELLED, TASK_STATUS_DONE } from '../domain/tasks/status.ts';
 import type { Database } from './database.ts';
@@ -167,7 +168,7 @@ function storeOf(trx: Transaction<Database>): MembershipStore {
 }
 
 /** Состав проекта: экран, добавление и удаление коммитятся одной транзакцией со событием. */
-export function createMembership(db: Kysely<Database>, clock: Clock): MembershipActions {
+export function createMembership(db: Kysely<Database>, logger: Logger, clock: Clock): MembershipActions {
   return {
     open(input) {
       return db.transaction().execute(async (trx) => {
@@ -184,7 +185,7 @@ export function createMembership(db: Kysely<Database>, clock: Clock): Membership
         const actor = await findUser(trx, input.telegramUserId);
         const target = await findUser(trx, input.targetTelegramUserId);
         if (target === null) throw new DomainError(DOMAIN_ERROR.MEMBER_NOT_CANDIDATE, 'человек не найден');
-        const member = await addProjectMember(storeOf(trx), createEventJournal(trx), clock, {
+        const member = await addProjectMember(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           chat: input.chat,
           projectId: input.projectId,
@@ -215,7 +216,7 @@ export function createMembership(db: Kysely<Database>, clock: Clock): Membership
         const target = await findUser(trx, input.targetTelegramUserId);
         if (target === null) throw new DomainError(DOMAIN_ERROR.MEMBER_ABSENT, 'человек не найден');
         const idempotencyKey = input.idempotencyKey.trim();
-        const cancelledTaskIds = await removeProjectMember(storeOf(trx), createEventJournal(trx), clock, {
+        const cancelledTaskIds = await removeProjectMember(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           chat: input.chat,
           projectId: input.projectId,
@@ -228,7 +229,7 @@ export function createMembership(db: Kysely<Database>, clock: Clock): Membership
           .where('idempotency_key', '=', idempotencyKey)
           .executeTakeFirst();
         if (removed === undefined) throw new Error('project.member_removed не найден');
-        await cancelRemovedMemberTasks(trx, clock, {
+        await cancelRemovedMemberTasks(trx, logger, clock, {
           causationId: removed.id,
           projectId: input.projectId,
           assigneeId: target.id,

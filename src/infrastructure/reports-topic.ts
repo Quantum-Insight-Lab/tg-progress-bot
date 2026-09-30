@@ -12,6 +12,7 @@ import {
 } from '../domain/projects/reports-topic.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
@@ -138,7 +139,7 @@ function storeOf(trx: Transaction<Database>): ReportsTopicStore {
 }
 
 /** Командный топик: строка `reports_topic_id` и `chat.reports_topic_set` коммитятся одной транзакцией. */
-export function createReportsTopics(db: Kysely<Database>, clock: Clock): ReportsTopicActions {
+export function createReportsTopics(db: Kysely<Database>, logger: Logger, clock: Clock): ReportsTopicActions {
   return {
     show(input) {
       return db.transaction().execute(async (trx) => {
@@ -165,7 +166,7 @@ export function createReportsTopics(db: Kysely<Database>, clock: Clock): Reports
     assign(input): Promise<ReportsHome> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return assignReportsTopic(storeOf(trx), createEventJournal(trx), clock, {
+        return assignReportsTopic(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           chat: input.chat,
           projectId: input.projectId,
@@ -178,7 +179,7 @@ export function createReportsTopics(db: Kysely<Database>, clock: Clock): Reports
     specify(input): Promise<ReportsHome> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return assignNamedReportsTopic(storeOf(trx), createEventJournal(trx), clock, {
+        return assignNamedReportsTopic(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           chat: input.chat,
           projectName: input.projectName,

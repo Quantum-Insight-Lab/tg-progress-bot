@@ -9,6 +9,7 @@ import {
 } from '../domain/projects/create-project.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -53,12 +54,12 @@ function storeOf(trx: Transaction<Database>): ProjectStore {
 }
 
 /** «Новый проект»: строка `projects` и `project.created` коммитятся одной транзакцией. */
-export function createProjectCreation(db: Kysely<Database>, clock: Clock): ProjectCreation {
+export function createProjectCreation(db: Kysely<Database>, logger: Logger, clock: Clock): ProjectCreation {
   return {
     create(input: ProjectDraft): Promise<CreatedProject> {
       return db.transaction().execute(async (trx) => {
         const creator = await findCreator(trx, input.telegramUserId);
-        return decideCreate(storeOf(trx), createEventJournal(trx), clock, {
+        return decideCreate(storeOf(trx), createEventJournal(trx, logger), clock, {
           id: randomUUID(),
           name: input.name,
           description: input.description,

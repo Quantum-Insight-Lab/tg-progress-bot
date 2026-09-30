@@ -18,6 +18,7 @@ import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import { createEventJournal } from '../src/infrastructure/event-journal.ts';
 import { readCommitsMigration, readEventsMigration, readProjectsMigration, readRepositoriesMigration } from '../src/infrastructure/migrate.ts';
+import { silentLogger } from './log-lines.ts';
 
 const now = new Date('2026-09-28T07:33:00.000Z');
 const clock: Clock = { now: () => now };
@@ -111,7 +112,7 @@ async function openCommits(): Promise<Handle> {
 
 async function deliver(db: Kysely<Database>, delivery: GithubDelivery, at: Date = now): Promise<void> {
   await db.transaction().execute(async (trx) => {
-    const result = await recordGithubDelivery(createEventJournal(trx), { now: () => at }, delivery);
+    const result = await recordGithubDelivery(createEventJournal(trx, silentLogger), { now: () => at }, delivery);
     if (result.status === 'applied' && result.eventType === EVENT_TYPES.GITHUB_COMMITS_PUSHED) {
       await mirrorGithubCommits(trx, result.payload, at, randomUUID);
     }
@@ -352,7 +353,7 @@ describe('зеркало коммитов по webhook push', () => {
           deliveryId,
           signature: signed(payload),
           body: payload,
-          journal: createEventJournal(trx),
+          journal: createEventJournal(trx, silentLogger),
           clock,
           applyCommits: async (eventPayload) => {
             await mirrorGithubCommits(trx, eventPayload, clock.now(), randomUUID);
@@ -385,7 +386,7 @@ describe('зеркало коммитов по webhook push', () => {
       deliveryId: 'delivery-forged',
       signature: signed(Buffer.from('{}')),
       body: first,
-      journal: createEventJournal(handle.db),
+      journal: createEventJournal(handle.db, silentLogger),
       clock,
     });
     expect(forged).toBe(401);
@@ -415,7 +416,7 @@ describe('зеркало коммитов по webhook push', () => {
         deliveryId: 'delivery-batch',
         signature,
         body,
-        journal: createEventJournal(trx),
+        journal: createEventJournal(trx, silentLogger),
         clock,
         applyCommits: async (payload) => {
           await mirrorGithubCommits(trx, payload, clock.now(), randomUUID);
@@ -444,7 +445,7 @@ describe('зеркало коммитов по webhook push', () => {
         deliveryId: 'delivery-update',
         signature: `sha256=${createHmac('sha256', secret).update(again).digest('hex')}`,
         body: again,
-        journal: createEventJournal(trx),
+        journal: createEventJournal(trx, silentLogger),
         clock,
         applyCommits: async (eventPayload) => {
           await mirrorGithubCommits(trx, eventPayload, clock.now(), randomUUID);
@@ -465,7 +466,7 @@ describe('зеркало коммитов по webhook push', () => {
       deliveryId: 'delivery-broken',
       signature: `sha256=${createHmac('sha256', secret).update(broken).digest('hex')}`,
       body: broken,
-      journal: createEventJournal(handle.db),
+      journal: createEventJournal(handle.db, silentLogger),
       clock,
     });
     expect(rejected).toBe(400);

@@ -17,6 +17,7 @@ import type { CanvasIssueSlice } from '../domain/progress/canvas-issue-slice.ts'
 import type { RecordedSnapshot } from '../domain/progress/snapshot.ts';
 import type { Canvas } from '../domain/tasks/canvas.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { projectCalendarDate } from '../domain/shared/project-time.ts';
 import { tasksBlock } from '../domain/tasks/github-link.ts';
@@ -286,6 +287,7 @@ function editedOf(value: CanvasEditResult): { status: 'full' } | { status: 'edit
 
 function noteFull(
   db: Kysely<Database>,
+  logger: Logger,
   input: {
     projectId: string;
     assigneeId: string;
@@ -297,7 +299,7 @@ function noteFull(
 ): Promise<'applied' | 'duplicate'> {
   const cause = input.cause?.trim() || CANVAS_FULL_SCHEDULE;
   return db.transaction().execute((trx) =>
-    recordFullCanvas(createEventJournal(trx), {
+    recordFullCanvas(createEventJournal(trx, logger), {
       canvasId: input.canvasId,
       projectId: input.projectId,
       assigneeId: input.assigneeId,
@@ -338,12 +340,13 @@ function rejectedFull(recorded: 'applied' | 'duplicate'): never {
 /** После выставления: незакрытые задачи прошлого канваса ложатся на сегодня, если сутки уже новые. */
 async function finish(
   db: Kysely<Database>,
+  logger: Logger,
   projectId: string,
   assigneeId: string,
   now: Date,
   shown: ShownCanvas,
 ): Promise<ShownCanvas> {
-  await carryAssigneeDay(db, projectId, assigneeId, now);
+  await carryAssigneeDay(db, logger, projectId, assigneeId, now);
   return shown;
 }
 
@@ -351,7 +354,7 @@ async function finish(
  * Выставить канвас на дату `now` в таймзоне проекта.
  * Нет строки — новое сообщение и `canvas.posted`. Есть — правка того же `message_id` и `canvas.edited`.
  */
-export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): Promise<ShownCanvas> {
+export async function showCanvas(db: Kysely<Database>, logger: Logger, input: ShowCanvasInput): Promise<ShownCanvas> {
   const preview = await sql<{ timezone: string; name: string }>`
     SELECT timezone, name FROM projects WHERE id = ${input.projectId}::uuid
   `.execute(db);
@@ -378,7 +381,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
     );
     if (edited.status === 'full') {
       rejectedFull(
-        await noteFull(db, {
+        await noteFull(db, logger, {
           projectId: input.projectId,
           assigneeId: input.assigneeId,
           canvasId: move.canvas.id,
@@ -389,14 +392,14 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
       );
     }
     const canvas = await db.transaction().execute((trx) =>
-      recordEditedCanvas(createEventJournal(trx), {
+      recordEditedCanvas(createEventJournal(trx, logger), {
         canvas: move.canvas,
         causationId,
         occurredAt: input.now,
         shrunk: edited.shrunk,
       }),
     );
-    return finish(db, input.projectId, input.assigneeId, input.now, { action: 'edit', canvas });
+    return finish(db, logger, input.projectId, input.assigneeId, input.now, { action: 'edit', canvas });
   }
   const sent = sentOf(
     await input.send({
@@ -409,7 +412,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
   );
   if (sent.status === 'full') {
     rejectedFull(
-      await noteFull(db, {
+      await noteFull(db, logger, {
         projectId: input.projectId,
         assigneeId: input.assigneeId,
         canvasId: null,
@@ -437,7 +440,7 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
           `.execute(trx);
         },
       },
-      createEventJournal(trx),
+      createEventJournal(trx, logger),
       {
         id: randomUUID(),
         projectId: input.projectId,
@@ -449,12 +452,13 @@ export async function showCanvas(db: Kysely<Database>, input: ShowCanvasInput): 
       },
     ),
   );
-  return finish(db, input.projectId, input.assigneeId, input.now, { action: 'post', canvas });
+  return finish(db, logger, input.projectId, input.assigneeId, input.now, { action: 'post', canvas });
 }
 
 /** Топик только что указан: канвас этого исполнителя на сегодня. */
 export async function showCanvasForTopic(
   db: Kysely<Database>,
+  logger: Logger,
   input: {
     telegramUserId: string;
     topicId: number;
@@ -481,7 +485,7 @@ export async function showCanvasForTopic(
   }
   const row = found.rows[0];
   if (row === undefined) throw new DomainError(DOMAIN_ERROR.CANVAS_NO_TOPIC, 'канвас живёт в топике исполнителя');
-  return showCanvas(db, {
+  return showCanvas(db, logger, {
     projectId: row.project_id,
     assigneeId: row.user_id,
     destination: CANVAS_DESTINATION_TOPIC,
@@ -499,6 +503,7 @@ export async function showCanvasForTopic(
  */
 export async function ensureTodayCanvases(
   db: Kysely<Database>,
+  logger: Logger,
   now: Date,
   send: (home: CanvasHome) => Promise<CanvasSendResult>,
 ): Promise<void> {
@@ -533,7 +538,7 @@ export async function ensureTodayCanvases(
         }),
       );
       if (sent.status === 'full') {
-        await noteFull(db, {
+        await noteFull(db, logger, {
           projectId: member.project_id,
           assigneeId: member.user_id,
           canvasId: null,
@@ -561,7 +566,7 @@ export async function ensureTodayCanvases(
               `.execute(trx);
             },
           },
-          createEventJournal(trx),
+          createEventJournal(trx, logger),
           {
             id: randomUUID(),
             projectId: member.project_id,
@@ -573,7 +578,7 @@ export async function ensureTodayCanvases(
           },
         ),
       );
-      await carryAssigneeDay(db, member.project_id, member.user_id, now);
+      await carryAssigneeDay(db, logger, member.project_id, member.user_id, now);
     } catch (error) {
       failures.push(error);
     }
@@ -587,21 +592,21 @@ export async function ensureTodayCanvases(
 
 export interface CanvasPlacement {
   show(input: Omit<ShowCanvasInput, 'now'> & { now?: Date }): Promise<ShownCanvas>;
-  showForTopic(input: Omit<Parameters<typeof showCanvasForTopic>[1], 'now'>): Promise<ShownCanvas>;
+  showForTopic(input: Omit<Parameters<typeof showCanvasForTopic>[2], 'now'>): Promise<ShownCanvas>;
   ensureToday(now: Date, send: (home: CanvasHome) => Promise<CanvasSendResult>): Promise<void>;
 }
 
 /** Часы — только момент «сегодня». Дата канваса считается по таймзоне проекта. */
-export function createCanvasPlacement(db: Kysely<Database>, clock: Clock): CanvasPlacement {
+export function createCanvasPlacement(db: Kysely<Database>, logger: Logger, clock: Clock): CanvasPlacement {
   return {
     show(input) {
-      return showCanvas(db, { ...input, now: input.now ?? clock.now() });
+      return showCanvas(db, logger, { ...input, now: input.now ?? clock.now() });
     },
     showForTopic(input) {
-      return showCanvasForTopic(db, { ...input, now: clock.now() });
+      return showCanvasForTopic(db, logger, { ...input, now: clock.now() });
     },
     ensureToday(now, send) {
-      return ensureTodayCanvases(db, now, send);
+      return ensureTodayCanvases(db, logger, now, send);
     },
   };
 }

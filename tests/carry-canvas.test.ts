@@ -40,6 +40,7 @@ import {
 import { createScheduler } from '../src/infrastructure/scheduler.ts';
 import { planFirstLine } from '../src/projections/plan-block.ts';
 import { TASK_REVIEW_MARK, TASK_REVIEW_PLACE, taskFirstLine } from '../src/projections/tasks-block.ts';
+import { silentLogger } from './log-lines.ts';
 
 const rootId = '00000000-0000-4000-8000-000000000001';
 const anyaId = '00000000-0000-4000-8000-000000000002';
@@ -306,7 +307,7 @@ describe('перенос дня на новый канвас', () => {
     await seed(handle.db);
     const beforeCanvases = await canvases(handle.db);
     const beforeStatuses = await statuses(handle.db);
-    await carryAssigneeDay(handle.db, moscowId, anyaId, later);
+    await carryAssigneeDay(handle.db, silentLogger, moscowId, anyaId, later);
     const moved = (await items(handle.db)).filter((item) => item.canvas_id === moscowTodayId);
     expect(moved.map((item) => item.task_id)).toEqual([blockedId, progressId, reviewId, plannedHighId, plannedLowId]);
     expect(moved.map((item) => item.position)).toEqual([1, 2, 3, 4, 5]);
@@ -360,13 +361,13 @@ describe('перенос дня на новый канвас', () => {
     await seed(handle.db);
     const clock: Clock = { now: () => later };
     const scheduler = createScheduler(clock);
-    scheduler.register('A-30', (now) => carryOpenCanvases(handle.db, now));
+    scheduler.register('A-30', (now) => carryOpenCanvases(handle.db, silentLogger, now));
     await scheduler.run();
     const onceItems = await items(handle.db);
     const onceEvents = await carryEvents(handle.db);
     expect(onceEvents).toHaveLength(2);
     await scheduler.run();
-    await carryOpenCanvases(handle.db, later);
+    await carryOpenCanvases(handle.db, silentLogger, later);
     expect(await items(handle.db)).toEqual(onceItems);
     expect(await carryEvents(handle.db)).toEqual(onceEvents);
     expect(onceEvents.map((row) => row.key).sort()).toEqual(
@@ -392,7 +393,7 @@ describe('перенос дня на новый канвас', () => {
     opened.push(handle);
     await seed(handle.db);
     const sent = await canvases(handle.db);
-    await carryOpenCanvases(handle.db, early);
+    await carryOpenCanvases(handle.db, silentLogger, early);
     expect(await carryEvents(handle.db)).toEqual([
       {
         key: carriedCanvasKey(honoluluId, borisId, '2026-09-28'),
@@ -406,14 +407,14 @@ describe('перенос дня на новый канвас', () => {
     expect((await items(handle.db)).some((item) => item.canvas_id === moscowTodayId)).toBe(false);
     expect((await items(handle.db)).some((item) => item.canvas_id === honoluluFutureId)).toBe(false);
 
-    await carryOpenCanvases(handle.db, later);
+    await carryOpenCanvases(handle.db, silentLogger, later);
     const moscow = (await carryEvents(handle.db)).find((row) => row.payload.to_canvas_id === moscowTodayId);
     expect(moscow?.payload.task_ids).toEqual([blockedId, progressId, reviewId, plannedHighId, plannedLowId]);
     expect(await canvases(handle.db)).toEqual(sent);
     expect((await items(handle.db)).filter((item) => item.canvas_id === honoluluFutureId)).toEqual([]);
 
     await sql`UPDATE projects SET timezone = 'Etc/UTC' WHERE id = ${moscowId}::uuid`.execute(handle.db);
-    await carryOpenCanvases(handle.db, later);
+    await carryOpenCanvases(handle.db, silentLogger, later);
     expect(await canvases(handle.db)).toEqual(sent);
     expect((await items(handle.db)).filter((item) => item.canvas_id === moscowYesterdayId)).toEqual([
       {

@@ -35,6 +35,7 @@ import {
 } from '../domain/tasks/status.ts';
 import { EVENT_TYPES } from '../events/index.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
@@ -470,12 +471,13 @@ async function projectFacts(db: Kysely<Database>, section: ReportSection, now: D
 
 async function commitReport(
   db: Kysely<Database>,
+  logger: Logger,
   occurredAt: Date,
   fact: Parameters<typeof publishReportSent>[2],
 ): Promise<boolean> {
   return db.transaction().execute(async (trx) => {
     await sql`SELECT pg_advisory_xact_lock(hashtext(${`report:${fact.chatId}`})::bigint)`.execute(trx);
-    const published = await publishReportSent(createEventJournal(trx), occurredAt, fact);
+    const published = await publishReportSent(createEventJournal(trx, logger), occurredAt, fact);
     return published.applied;
   });
 }
@@ -485,7 +487,7 @@ function messageOf(telegramChatId: string, topicId: number | null, text: string)
 }
 
 /** `/report` в личке или в группе. Текст — проекция фактов, повтор ключа молчит. */
-export function createReportCommands(db: Kysely<Database>, clock: Clock, render: ReportRenderer): ReportCommands {
+export function createReportCommands(db: Kysely<Database>, logger: Logger, clock: Clock, render: ReportRenderer): ReportCommands {
   return {
     async request(input) {
       const now = clock.now();
@@ -507,7 +509,7 @@ export function createReportCommands(db: Kysely<Database>, clock: Clock, render:
           windows: reportWindows(now),
         });
         const documents = await documentsOf(db, command.sections, now);
-        const applied = await commitReport(db, now, command);
+        const applied = await commitReport(db, logger, now, command);
         if (!applied) return null;
         return messageOf(command.telegramChatId, command.topicId, render(documents));
       }
@@ -527,7 +529,7 @@ export function createReportCommands(db: Kysely<Database>, clock: Clock, render:
         windows: reportWindows(now),
       });
       const documents = await documentsOf(db, command.sections, now);
-      const applied = await commitReport(db, now, command);
+      const applied = await commitReport(db, logger, now, command);
       if (!applied) return null;
       return messageOf(command.telegramChatId, command.topicId, render(documents));
     },
@@ -546,7 +548,7 @@ interface SlotRow {
  * A-33. В час отчёта группы пишет `report.sent` и отдаёт текст в командный топик.
  * Повтор в те же сутки второй раз не шлёт. Сбой одной группы не отменяет остальные.
  */
-export async function deliverDueReports(db: Kysely<Database>, now: Date, render: ReportRenderer, send: ReportSender): Promise<void> {
+export async function deliverDueReports(db: Kysely<Database>, logger: Logger, now: Date, render: ReportRenderer, send: ReportSender): Promise<void> {
   const slots = await sql<SlotRow>`
     SELECT id::text AS id, telegram_chat_id, timezone, daily_cron, reports_topic_id FROM chats ORDER BY id
   `.execute(db);
@@ -587,7 +589,7 @@ export async function deliverDueReports(db: Kysely<Database>, now: Date, render:
         ],
         now,
       );
-      const applied = await commitReport(db, now, {
+      const applied = await commitReport(db, logger, now, {
         target: REPORT_TARGET_GROUP,
         chatId: decision.chatId,
         subjectId: decision.chatId,
@@ -605,7 +607,7 @@ export async function deliverDueReports(db: Kysely<Database>, now: Date, render:
       try {
         await send(messageOf(decision.telegramChatId, decision.topicId, render(documents)));
       } catch (error) {
-        await observeReportDeliveryFailure(db, now, {
+        await observeReportDeliveryFailure(db, logger, now, {
           target: 'group',
           chatId: decision.chatId,
           topicId: decision.topicId,

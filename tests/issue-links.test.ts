@@ -25,6 +25,7 @@ import {
   readProjectsMigration,
   readRepositoriesMigration,
 } from '../src/infrastructure/migrate.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const repositoryId = '42';
@@ -113,7 +114,7 @@ async function deliverIssue(db: Kysely<Database>, delivery: IssueDelivery): Prom
       deliveryId: delivery.deliveryId,
       signature,
       body,
-      journal: createEventJournal(trx),
+      journal: createEventJournal(trx, silentLogger),
       clock,
       applyIssue: async (payload) => {
         await mirrorGithubIssue(trx, payload, randomUUID());
@@ -138,7 +139,7 @@ async function deliverLink(
       deliveryId,
       signature,
       body,
-      journal: createEventJournal(trx),
+      journal: createEventJournal(trx, silentLogger),
       clock,
       applyIssueLink: async (fact) => {
         await mirrorGithubIssueLink(trx, fact);

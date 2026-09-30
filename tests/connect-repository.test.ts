@@ -43,6 +43,7 @@ import {
   replyToSkipRepository,
   skipRepositoryData,
 } from '../src/telegram/connect-repository.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -115,7 +116,7 @@ async function seed(db: Kysely<Database>): Promise<void> {
 
 function actionsOf(db: Kysely<Database>) {
   return {
-    connection: createProjectRepository(db, clock),
+    connection: createProjectRepository(db, silentLogger, clock),
     installation: createInstallationRepositories(db, source),
   };
 }
@@ -353,7 +354,7 @@ describe('INV-22 повтор подключения репозитория не
     const handle = await openDb();
     opened.push(handle);
     await seed(handle.db);
-    const connection = createProjectRepository(handle.db, clock);
+    const connection = createProjectRepository(handle.db, silentLogger, clock);
     await sql`
       INSERT INTO repositories (id, owner, name) VALUES (${repoId}, 'lab', 'bot')
     `.execute(handle.db);

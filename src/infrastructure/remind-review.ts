@@ -4,6 +4,7 @@ import { type TaskJournalMark } from '../domain/tasks/detect-blocker.ts';
 import { decideReviewReminder, publishReviewReminded } from '../domain/tasks/remind-review.ts';
 import { taskStatus } from '../domain/tasks/status.ts';
 import { defineTask, type Task } from '../domain/tasks/task.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -159,7 +160,7 @@ async function lockTask(trx: Transaction<Database>, taskId: string): Promise<Can
   return found.rows[0] ?? null;
 }
 
-async function remindOne(db: Kysely<Database>, taskId: string, now: Date): Promise<RemindedReview | null> {
+async function remindOne(db: Kysely<Database>, logger: Logger, taskId: string, now: Date): Promise<RemindedReview | null> {
   return db.transaction().execute(async (trx) => {
     const row = await lockTask(trx, taskId);
     if (row === null) return null;
@@ -188,7 +189,7 @@ async function remindOne(db: Kysely<Database>, taskId: string, now: Date): Promi
             .then((found) => (found === undefined ? null : { eventId: found.id }));
         },
       },
-      createEventJournal(trx),
+      createEventJournal(trx, logger),
       {
         taskId: task.id,
         leadIds: decision.leadIds,
@@ -214,6 +215,7 @@ async function remindOne(db: Kysely<Database>, taskId: string, now: Date): Promi
  */
 export async function remindStaleReviews(
   db: Kysely<Database>,
+  logger: Logger,
   now: Date,
   notify: (hit: RemindedReview) => Promise<void>,
 ): Promise<void> {
@@ -221,7 +223,7 @@ export async function remindStaleReviews(
   const failures: unknown[] = [];
   for (const row of rows) {
     try {
-      const hit = await remindOne(db, row.id, now);
+      const hit = await remindOne(db, logger, row.id, now);
       if (hit === null) continue;
       await notify(hit);
     } catch (error) {

@@ -54,6 +54,7 @@ import {
   createTaskReviewActions,
 } from '../src/infrastructure/tasks.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const at = '2026-09-28T07:33:00.000Z';
@@ -180,11 +181,11 @@ async function openProject(): Promise<Fixture> {
   await pglite.exec(readTasksMigration());
   await pglite.exec(readBlockersMigration());
   const db = new Kysely<Database>({ dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }) });
-  const registration = createUserRegistration(db, clock);
+  const registration = createUserRegistration(db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const alpha = await createProjectCreation(db, clock).create({
+  const alpha = await createProjectCreation(db, silentLogger, clock).create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
     description: '',
@@ -192,7 +193,7 @@ async function openProject(): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  await createMembership(db, clock).add({
+  await createMembership(db, silentLogger, clock).add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     targetTelegramUserId: String(borisAccount.id),
@@ -204,7 +205,7 @@ async function openProject(): Promise<Fixture> {
     VALUES (${'00000000-0000-4000-8000-0000000000c1'}::uuid, ${alpha.project.id}::uuid, ${vera.user.id}::uuid, ${LEAD_ROLE}, ${veraTopic})
   `.execute(db);
   await sql`UPDATE project_members SET topic_id = ${borisTopic} WHERE user_id = ${boris.user.id}::uuid`.execute(db);
-  await createChatBinding(db, clock).confirm({
+  await createChatBinding(db, silentLogger, clock).confirm({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     offer: forumAdmin,
@@ -333,7 +334,7 @@ describe('блокер задачи', () => {
 
     const fixture = await openProject();
     opened.push(fixture);
-    const tasks = createTaskActions(fixture.db, clock);
+    const tasks = createTaskActions(fixture.db, silentLogger, clock);
     const checked = await tasks.create({ ...place, title: 'Галочка', idempotencyKey: 'task-check' });
     const planned = await tasks.create({ ...place, title: 'План', idempotencyKey: 'task-plan' });
     const cancelled = await tasks.create({ ...place, title: 'Снять', idempotencyKey: 'task-cancel' });
@@ -371,7 +372,7 @@ describe('блокер задачи', () => {
       resolvedAt: ids.earlier,
     });
 
-    const marked = await createTaskMarkActions(fixture.db, clock).press({
+    const marked = await createTaskMarkActions(fixture.db, silentLogger, clock).press({
       ...place,
       taskNumber: checked.task.number,
       idempotencyKey: 'cb-check',
@@ -384,7 +385,7 @@ describe('блокер задачи', () => {
       taskId: checked.task.id,
     });
 
-    const moved = await createTaskPlanActions(fixture.db, clock).press({
+    const moved = await createTaskPlanActions(fixture.db, silentLogger, clock).press({
       ...place,
       taskNumber: planned.task.number,
       act: TASK_TRANSITION_PLAN,
@@ -394,7 +395,7 @@ describe('блокер задачи', () => {
     expect(moved.task.status).toBe(TASK_STATUS_PLANNED);
     expect((await storedBlocker(fixture.db, ids.plan)).resolvedAt).toBe(at);
 
-    const dropped = await createTaskCancelActions(fixture.db, clock).press({
+    const dropped = await createTaskCancelActions(fixture.db, silentLogger, clock).press({
       ...place,
       taskNumber: cancelled.task.number,
       idempotencyKey: 'cb-cancel',
@@ -404,7 +405,7 @@ describe('блокер задачи', () => {
     expect((await storedBlocker(fixture.db, ids.cancel)).resolvedAt).toBe(at);
 
     await fixture.db.transaction().execute((trx) =>
-      cancelRemovedMemberTasks(trx, clock, {
+      cancelRemovedMemberTasks(trx, silentLogger, clock, {
         causationId: '00000000-0000-4000-8000-0000000000aa',
         projectId: fixture.alphaId,
         assigneeId: fixture.borisId,
@@ -413,7 +414,7 @@ describe('блокер задачи', () => {
     );
     expect((await storedBlocker(fixture.db, ids.remove)).resolvedAt).toBe(at);
 
-    const review = createTaskReviewActions(fixture.db, clock);
+    const review = createTaskReviewActions(fixture.db, silentLogger, clock);
     const leadPlace = { ...place, telegramUserId: String(veraAccount.id) };
     await expect(
       review.press({
@@ -425,7 +426,7 @@ describe('блокер задачи', () => {
     ).rejects.toMatchObject({ code: DOMAIN_ERROR.TASK_OPEN_BLOCKER });
     expect((await storedBlocker(fixture.db, ids.held)).resolvedAt).toBeNull();
 
-    const quietMark = await createTaskMarkActions(fixture.db, clock).press({
+    const quietMark = await createTaskMarkActions(fixture.db, silentLogger, clock).press({
       ...place,
       taskNumber: quiet.task.number,
       idempotencyKey: 'cb-quiet',

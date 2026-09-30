@@ -190,6 +190,7 @@ let running: RunningProcess | undefined;
  */
 export async function startProcess(config: ProcessConfig): Promise<RunningProcess> {
   if (running !== undefined) throw new Error('процесс уже запущен');
+  const logger = config.logger;
   const bot = config.botInfo === undefined ? createTelegramBot(config.botToken) : createTelegramBot(config.botToken, config.botInfo);
   const paint = (home: CanvasHome) =>
     prepareCanvasMessage({
@@ -214,7 +215,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
       return await run();
     } catch (error) {
       if (config.db !== undefined) {
-        await observeTelegramFailure(config.db, config.clock.now(), { method, error, chatId, messageId, scope: method });
+        await observeTelegramFailure(config.db, logger, config.clock.now(), { method, error, chatId, messageId, scope: method });
       }
       throw error;
     }
@@ -253,35 +254,35 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
   let stability: ReturnType<typeof stabilityActions> | undefined;
   if (config.db !== undefined) {
     const database = config.db;
-    const canvas = createCanvasPlacement(config.db, config.clock);
+    const canvas = createCanvasPlacement(config.db, logger, config.clock);
     ensureToday = (now) => canvas.ensureToday(now, deliverCanvas.send);
-    carryToday = (now) => carryOpenCanvases(database, now);
-    const binding = createChatBinding(config.db, config.clock);
-    attachAccessGuard(bot, createAccessGate(config.db, config.clock));
-    attachStartCommand(bot, createUserRegistration(config.db, config.clock));
-    attachNewProject(bot, createProjectCreation(config.db, config.clock), (reply) => sendSupergroupRequest(reply, binding));
+    carryToday = (now) => carryOpenCanvases(database, logger, now);
+    const binding = createChatBinding(config.db, logger, config.clock);
+    attachAccessGuard(bot, createAccessGate(config.db, logger, config.clock));
+    attachStartCommand(bot, createUserRegistration(config.db, logger, config.clock));
+    attachNewProject(bot, createProjectCreation(config.db, logger, config.clock), (reply) => sendSupergroupRequest(reply, binding));
     const installation = createInstallationRepositories(config.db, installationSourceOf(config));
-    const projectRepository = createProjectRepository(config.db, config.clock);
+    const projectRepository = createProjectRepository(config.db, logger, config.clock);
     attachChatBinding(bot, binding, (projectId, from, idempotencyKey, notify) =>
       deliverProjectRepositoryStep(from, projectId, idempotencyKey, projectRepository, installation, notify),
     );
-    const githubLogin = createGithubLogin(config.db, config.clock);
+    const githubLogin = createGithubLogin(config.db, logger, config.clock);
     attachGithubLogin(bot, githubLogin);
-    attachParticipants(bot, createMembership(config.db, config.clock), async (telegramUserId, send) => {
+    attachParticipants(bot, createMembership(config.db, logger, config.clock), async (telegramUserId, send) => {
       await deliverGithubLoginPrompt(await githubLogin.find(telegramUserId), send);
     });
-    attachExecutorTopic(bot, createExecutorTopics(config.db, config.clock), {
+    attachExecutorTopic(bot, createExecutorTopics(config.db, logger, config.clock), {
       posted(input) {
         return canvas
           .showForTopic({ ...input, causationId: null, cause: input.cause ?? null, send: deliverCanvas.send, edit: deliverCanvas.edit })
           .then(() => undefined);
       },
     });
-    attachReportsTopic(bot, createReportsTopics(config.db, config.clock));
-    attachSchedule(bot, createChatSchedule(config.db, config.clock));
-    attachReport(bot, createReportCommands(config.db, config.clock, renderReportDocuments));
+    attachReportsTopic(bot, createReportsTopics(config.db, logger, config.clock));
+    attachSchedule(bot, createChatSchedule(config.db, logger, config.clock));
+    attachReport(bot, createReportCommands(config.db, logger, config.clock, renderReportDocuments));
     deliverReports = (now) =>
-      deliverDueReports(database, now, renderReportDocuments, async (message) => {
+      deliverDueReports(database, logger, now, renderReportDocuments, async (message) => {
         await callTelegram('sendMessage', message.telegramChatId, null, async () => {
           if (message.topicId === null) {
             await bot.api.sendMessage(message.telegramChatId, message.text);
@@ -292,7 +293,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
       });
     bindRejectionNote({
       note(error, idempotencyKey, telegramUserId) {
-        return recordCommandRejection(createEventJournal(database), config.clock, {
+        return recordCommandRejection(createEventJournal(database, logger), config.clock, {
           code: error.code,
           idempotencyKey,
           telegramUserId,
@@ -301,13 +302,13 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     });
     attachRebuild(bot, {
       run(input) {
-        return rebuildTodayCanvas(database, config.clock, { ...input, send: deliverCanvas.send, edit: deliverCanvas.edit });
+        return rebuildTodayCanvas(database, logger, config.clock, { ...input, send: deliverCanvas.send, edit: deliverCanvas.edit });
       },
     });
-    stability = stabilityActions(database, (telegramUserId, text) =>
+    stability = stabilityActions(database, logger, (telegramUserId, text) =>
       callTelegram('sendMessage', telegramUserId, null, () => bot.api.sendMessage(telegramUserId, text).then(() => undefined)),
     );
-    attachSettings(bot, createProjectSettings(config.db, config.clock));
+    attachSettings(bot, createProjectSettings(config.db, logger, config.clock));
     attachProjectRepository(bot, projectRepository, installation);
     attachInstallationRepositories(bot, installation);
     const redrawTaskCanvas = {
@@ -325,14 +326,14 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
           .then(() => undefined);
       },
     };
-    attachTaskCommand(bot, createTaskActions(config.db, config.clock), redrawTaskCanvas);
-    attachTaskMark(bot, createTaskMarkActions(config.db, config.clock), redrawTaskCanvas);
-    attachTaskPlan(bot, createTaskPlanActions(config.db, config.clock), redrawTaskCanvas);
-    attachTaskReview(bot, createTaskReviewActions(config.db, config.clock), redrawTaskCanvas);
-    attachTaskCancel(bot, createTaskCancelActions(config.db, config.clock), redrawTaskCanvas);
-    attachBlockerAnswer(bot, createBlockerAnswerActions(config.db, config.clock), redrawTaskCanvas);
+    attachTaskCommand(bot, createTaskActions(config.db, logger, config.clock), redrawTaskCanvas);
+    attachTaskMark(bot, createTaskMarkActions(config.db, logger, config.clock), redrawTaskCanvas);
+    attachTaskPlan(bot, createTaskPlanActions(config.db, logger, config.clock), redrawTaskCanvas);
+    attachTaskReview(bot, createTaskReviewActions(config.db, logger, config.clock), redrawTaskCanvas);
+    attachTaskCancel(bot, createTaskCancelActions(config.db, logger, config.clock), redrawTaskCanvas);
+    attachBlockerAnswer(bot, createBlockerAnswerActions(config.db, logger, config.clock), redrawTaskCanvas);
     detectStale = (now) =>
-      detectStaleTasks(database, now, async (hit) => {
+      detectStaleTasks(database, logger, now, async (hit) => {
         await sendBlockerQuestion(bot.api, {
           chatId: hit.telegramChatId,
           messageThreadId: hit.topicId,
@@ -349,11 +350,11 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
           edit: deliverCanvas.edit,
         });
       });
-    noticePullRequests = (now) => noticeStalePullRequests(database, now);
-    takeSnapshots = (now) => takeProgressSnapshots(database, now);
-    noticeDivergence = (now) => noticeProjectDivergence(database, now);
+    noticePullRequests = (now) => noticeStalePullRequests(database, logger, now);
+    takeSnapshots = (now) => takeProgressSnapshots(database, logger, now); // pragma: allowlist secret
+    noticeDivergence = (now) => noticeProjectDivergence(database, logger, now);
     remindReviews = (now) =>
-      remindStaleReviews(database, now, async (hit) => {
+      remindStaleReviews(database, logger, now, async (hit) => {
         await sendReviewReminder(bot.api, {
           chatId: hit.telegramChatId,
           messageThreadId: hit.topicId,
@@ -390,7 +391,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
           isolate: (run) =>
             database.transaction().execute((trx) =>
               run(
-                createEventJournal(trx),
+                createEventJournal(trx, logger),
                 async (payload) => {
                   await mirrorGithubIssue(trx, payload, randomUUID());
                 },
@@ -424,13 +425,12 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     logger: config.logger,
     clock: config.clock,
   });
-  const logger = config.logger;
   const loop = startSchedulerLoop(scheduler, config.schedulerIntervalMs, logger);
   const reconcileSource = reconcileSourceOf(config);
   const database = config.db;
   const reconcileLoop =
     database !== undefined && reconcileSource !== null
-      ? startReconcileLoop((now) => reconcileGithubMirror(database, reconcileSource, now), config.clock, reconcileIntervalMs(), logger)
+      ? startReconcileLoop((now) => reconcileGithubMirror(database, logger, reconcileSource, now), config.clock, reconcileIntervalMs(), logger)
       : undefined;
   logger.info('process.started', {
     port: webhook.port,

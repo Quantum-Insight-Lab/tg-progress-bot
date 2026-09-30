@@ -9,6 +9,7 @@ import {
   type SnapshotProject,
 } from '../domain/progress/snapshot.ts';
 import { EVENT_TYPES } from '../events/index.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 import { loadProjectRepositoryReadings } from './repository-share.ts';
@@ -67,6 +68,7 @@ async function takenKeys(db: Kysely<Database>): Promise<Set<string>> {
 
 async function publishOne(
   db: Kysely<Database>,
+  logger: Logger,
   decision: SnapshotDecision,
   now: Date,
 ): Promise<void> {
@@ -94,7 +96,7 @@ async function publishOne(
             .execute();
         },
       },
-      createEventJournal(trx),
+      createEventJournal(trx, logger),
       { ...decision, snapshotId, occurredAt: now },
     );
   });
@@ -105,7 +107,7 @@ async function publishOne(
  * Повтор в те же сутки второе событие не пишет и строку не меняет.
  * Сбой одного проекта не отменяет остальные, затем всплывает.
  */
-export async function takeProgressSnapshots(db: Kysely<Database>, now: Date): Promise<void> {
+export async function takeProgressSnapshots(db: Kysely<Database>, logger: Logger, now: Date): Promise<void> { // pragma: allowlist secret
   const projects = await projectsOf(db);
   const taken = await takenKeys(db);
   const failures: unknown[] = [];
@@ -119,7 +121,7 @@ export async function takeProgressSnapshots(db: Kysely<Database>, now: Date): Pr
     }
     for (const decision of decisions) {
       try {
-        await publishOne(db, decision, now);
+        await publishOne(db, logger, decision, now);
         taken.add(decision.idempotencyKey);
       } catch (error) {
         failures.push(error);

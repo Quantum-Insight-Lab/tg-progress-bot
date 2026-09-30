@@ -286,6 +286,7 @@ async function applyMissed(
 
 async function reconcileOne(
   db: Kysely<Database>,
+  logger: Logger,
   source: GithubReconcileSource,
   repository: ReconcileRepository,
   now: Date,
@@ -300,7 +301,7 @@ async function reconcileOne(
     const mirror = await snapshotOf(trx, repository.id);
     const missed = missedMirrorFacts(repository.id, mirror, remote, now);
     await applyMissed(trx, repository.id, missed, now, nextId);
-    await publishGithubReconciled(createEventJournal(trx), {
+    await publishGithubReconciled(createEventJournal(trx, logger), {
       repositoryId: repository.id,
       restoredFacts: missed.length,
       runStartedAt: now,
@@ -316,6 +317,7 @@ async function reconcileOne(
  */
 export async function reconcileGithubMirror(
   db: Kysely<Database>,
+  logger: Logger,
   source: GithubReconcileSource,
   now: Date,
   nextId: () => string = randomUUID,
@@ -325,14 +327,14 @@ export async function reconcileGithubMirror(
   const failures: unknown[] = [];
   for (const repository of repositories) {
     try {
-      await reconcileOne(db, source, repository, now, runs.get(repository.id) ?? null, nextId);
+      await reconcileOne(db, logger, source, repository, now, runs.get(repository.id) ?? null, nextId);
     } catch (error) {
       failures.push(error);
     }
   }
   if (source.rateRemainingPercent !== undefined) {
     try {
-      await observeGithubRate(db, await source.rateRemainingPercent(now), now);
+      await observeGithubRate(db, logger, await source.rateRemainingPercent(now), now);
     } catch {
       // остаток лимита не отменяет уже записанную сверку
     }

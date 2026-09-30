@@ -52,6 +52,7 @@ function memoryJournal(): { journal: EventJournal; rows: EventRow[] } {
         rows.push(row);
         return { inserted: true, row };
       },
+      refuse: () => undefined,
     },
   };
 }

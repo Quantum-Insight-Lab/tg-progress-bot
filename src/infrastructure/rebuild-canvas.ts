@@ -1,6 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { projectCalendarDate } from '../domain/shared/project-time.ts';
 import { recordRebuildRequest } from '../domain/tasks/rebuild-canvas.ts';
@@ -20,7 +21,7 @@ export interface RebuildCommand {
 }
 
 /** A-37. Просьба в журнал, затем правка того же сообщения. */
-export async function rebuildTodayCanvas(db: Kysely<Database>, clock: Clock, input: RebuildCommand): Promise<void> {
+export async function rebuildTodayCanvas(db: Kysely<Database>, logger: Logger, clock: Clock, input: RebuildCommand): Promise<void> {
   const now = clock.now();
   const actor = await sql<{ id: string; is_root: boolean }>`
     SELECT id::text AS id, is_root FROM users WHERE telegram_user_id = ${input.telegramUserId}::bigint
@@ -54,7 +55,7 @@ export async function rebuildTodayCanvas(db: Kysely<Database>, clock: Clock, inp
   `.execute(db);
   const canvas = canvases.rows[0];
   if (canvas === undefined) throw new DomainError(DOMAIN_ERROR.REBUILD_ABSENT, 'сегодняшнего канваса нет');
-  const causationId = await recordRebuildRequest(createEventJournal(db), clock, {
+  const causationId = await recordRebuildRequest(createEventJournal(db, logger), clock, {
     canvasId: canvas.id,
     projectId: project.id,
     assigneeId: member.id,
@@ -65,7 +66,7 @@ export async function rebuildTodayCanvas(db: Kysely<Database>, clock: Clock, inp
     privateChat: input.chat === PRIVATE_CHAT,
     today,
   });
-  await showCanvas(db, {
+  await showCanvas(db, logger, {
     projectId: project.id,
     assigneeId: member.id,
     destination: CANVAS_DESTINATION_TOPIC,

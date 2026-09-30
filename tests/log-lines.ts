@@ -14,6 +14,14 @@ export interface CapturedLog {
 
 const fixedClock: Clock = { now: () => new Date('2026-09-30T12:00:00.000Z') };
 
+/** Логгер для тестов, которые строки лога не проверяют. */
+export const silentLogger: Logger = {
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+};
+
 export function captureLog(options: { level?: LogLevel; clock?: Clock; secrets?: readonly string[] } = {}): CapturedLog {
   const raw: string[] = [];
   const logger = createLogger({

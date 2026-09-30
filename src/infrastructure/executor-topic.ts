@@ -15,6 +15,7 @@ import {
 import type { ProjectRole } from '../domain/projects/member.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
@@ -182,7 +183,7 @@ function storeOf(trx: Transaction<Database>): ExecutorTopicStore {
 }
 
 /** Топик исполнителя: строка `topic_id` и `member.topic_set` коммитятся одной транзакцией. */
-export function createExecutorTopics(db: Kysely<Database>, clock: Clock): ExecutorTopicActions {
+export function createExecutorTopics(db: Kysely<Database>, logger: Logger, clock: Clock): ExecutorTopicActions {
   return {
     show(input): Promise<TopicBoard> {
       return db.transaction().execute(async (trx) => {
@@ -212,7 +213,7 @@ export function createExecutorTopics(db: Kysely<Database>, clock: Clock): Execut
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
         const target = await findUser(trx, input.targetTelegramUserId);
-        return assignExecutorTopic(storeOf(trx), createEventJournal(trx), clock, {
+        return assignExecutorTopic(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           chat: input.chat,
           projectId: input.projectId,
@@ -226,7 +227,7 @@ export function createExecutorTopics(db: Kysely<Database>, clock: Clock): Execut
     specify(input): Promise<AssignedTopic> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return assignNamedExecutorTopic(storeOf(trx), createEventJournal(trx), clock, {
+        return assignNamedExecutorTopic(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           chat: input.chat,
           projectName: input.projectName,

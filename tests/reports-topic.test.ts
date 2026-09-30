@@ -46,6 +46,7 @@ import {
   type ReportsChannel,
 } from '../src/telegram/reports-topic.ts';
 import { afterReportsTopic } from '../src/telegram/schedule.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -110,11 +111,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(bound: boolean): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -123,7 +124,7 @@ async function seed(bound: boolean): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  await createMembership(handle.db, clock).add({
+  await createMembership(handle.db, silentLogger, clock).add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     targetTelegramUserId: String(borisAccount.id),
@@ -135,7 +136,7 @@ async function seed(bound: boolean): Promise<Fixture> {
     VALUES (${leadId}::uuid, ${alpha.project.id}::uuid, ${vera.user.id}::uuid, ${LEAD_ROLE})
   `.execute(handle.db);
   if (bound) {
-    await createChatBinding(handle.db, clock).confirm({
+    await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId: alpha.project.id,
       offer: forumAdmin,
@@ -199,7 +200,7 @@ describe('INV-27 командный топик общий у группы и о�
   it('INV-27 пока супергруппа не привязана, командный топик пуст', async () => {
     const loose = await seed(false);
     opened.push(loose);
-    const actions = createReportsTopics(loose.db, clock);
+    const actions = createReportsTopics(loose.db, silentLogger, clock);
     const unbound = await replyToReportsTopicMessage(
       'private',
       rootAccount,
@@ -216,7 +217,7 @@ describe('INV-27 командный топик общий у группы и о�
   it('INV-27 бот спрашивает, есть ли командный топик', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const boundActions = createReportsTopics(fixture.db, clock);
+    const boundActions = createReportsTopics(fixture.db, silentLogger, clock);
     const view = await replyToReportsTopicMessage(
       'private',
       veraAccount,
@@ -259,7 +260,7 @@ describe('INV-27 командный топик общий у группы и о�
   it('INV-27 если топик есть, руководитель указывает его; в топики исполнителей номер не пишется', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createReportsTopics(fixture.db, clock);
+    const actions = createReportsTopics(fixture.db, silentLogger, clock);
     const prompt = await replyToHasReportsTopic('private', veraAccount, fixture.alphaId, actions);
     expect(prompt?.text).toBe(specifyReportsTemplate('Альфа'));
     expect(parseReportsTopicMessage(prompt?.text ?? '')).toEqual({ kind: 'invalid-topic' });
@@ -316,7 +317,7 @@ describe('INV-27 командный топик общий у группы и о�
   it('INV-27 если топика нет, бот создаёт «Отчёты»; второй проект группы получает тот же топик', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createReportsTopics(fixture.db, clock);
+    const actions = createReportsTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 15);
     const created = await replyToCreateReportsTopic('private', rootAccount, fixture.alphaId, 'create-reports', actions, gate.api);
     expect(created?.text).toBe(afterReportsTopic(REPORTS_TOPIC_CREATED));
@@ -334,7 +335,7 @@ describe('INV-27 командный топик общий у группы и о�
       { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
     ]);
 
-    const beta = await createProjectCreation(fixture.db, clock).create({
+    const beta = await createProjectCreation(fixture.db, silentLogger, clock).create({
       telegramUserId: String(rootAccount.id),
       name: 'Бета',
       description: '',
@@ -342,7 +343,7 @@ describe('INV-27 командный топик общий у группы и о�
       chat: 'private',
       idempotencyKey: 'project-beta',
     });
-    const shared = await createChatBinding(fixture.db, clock).confirm({
+    const shared = await createChatBinding(fixture.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId: beta.project.id,
       offer: forumAdmin,
@@ -373,8 +374,8 @@ describe('INV-27 командный топик общий у группы и о�
   it('INV-27 командный топик не совпадает с топиком исполнителя', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const topics = createExecutorTopics(fixture.db, clock);
-    const reports = createReportsTopics(fixture.db, clock);
+    const topics = createExecutorTopics(fixture.db, silentLogger, clock);
+    const reports = createReportsTopics(fixture.db, silentLogger, clock);
     await topics.specify({
       telegramUserId: String(rootAccount.id),
       projectName: 'Альфа',
@@ -449,7 +450,7 @@ describe('INV-22 повтор командного топика не приме�
   it('INV-22 тот же ключ не меняет командный топик и не пишет второе событие', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createReportsTopics(fixture.db, clock);
+    const actions = createReportsTopics(fixture.db, silentLogger, clock);
     const first = await replyToReportsTopicMessage(
       'private',
       rootAccount,
@@ -495,7 +496,7 @@ describe('INV-22 повтор командного топика не приме�
   it('INV-22 повтор того же создания не открывает второй топик «Отчёты»', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createReportsTopics(fixture.db, clock);
+    const actions = createReportsTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 21);
     const first = await replyToCreateReportsTopic('private', rootAccount, fixture.alphaId, 'create-once', actions, gate.api);
     expect(first?.text).toBe(afterReportsTopic(REPORTS_TOPIC_CREATED));

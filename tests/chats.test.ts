@@ -35,6 +35,7 @@ import { NEW_PROJECT_HEADING } from '../src/telegram/new-project.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -80,13 +81,13 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 }
 
 async function registerRoot(db: Kysely<Database>): Promise<string> {
-  const registration = createUserRegistration(db, clock);
+  const registration = createUserRegistration(db, silentLogger, clock);
   const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   return root.user.id;
 }
 
 async function registerSecond(db: Kysely<Database>): Promise<void> {
-  const registration = createUserRegistration(db, clock);
+  const registration = createUserRegistration(db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(secondAccount.id), name: secondAccount.first_name });
 }
 
@@ -96,7 +97,7 @@ async function createNamed(
   timezone: string,
   idempotencyKey: string,
 ): Promise<string> {
-  const created = await createProjectCreation(db, clock).create({
+  const created = await createProjectCreation(db, silentLogger, clock).create({
     telegramUserId: String(rootAccount.id),
     name,
     description: '',
@@ -308,7 +309,7 @@ describe('INV-27 время и включение рассылки задают�
 
     await registerRoot(handle.db);
     const projectId = await createNamed(handle.db, 'Альфа', 'Europe/Moscow', 'alpha');
-    const bound = await createChatBinding(handle.db, clock).confirm({
+    const bound = await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId,
       offer: forumAdmin,
@@ -344,7 +345,7 @@ describe('INV-20 пока группа не привязана, канвас и 
     expect(before.rows[0]?.chat_id ?? null).toBeNull();
     expect(canvasAndReportTarget(before.rows[0]?.chat_id ?? null)).toBeNull();
 
-    const bound = await createChatBinding(handle.db, clock).confirm({
+    const bound = await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId,
       offer: forumAdmin,
@@ -373,7 +374,7 @@ describe('INV-22 повтор подтверждения супергруппы 
     await registerRoot(handle.db);
     await registerSecond(handle.db);
     const projectId = await createNamed(handle.db, 'Альфа', 'Europe/Moscow', 'alpha');
-    const binding = createChatBinding(handle.db, clock);
+    const binding = createChatBinding(handle.db, silentLogger, clock);
     const first = await binding.confirm({
       telegramUserId: String(rootAccount.id),
       projectId,
@@ -431,7 +432,7 @@ describe('INV-27 рассылка живёт на группе и общая д�
     await registerRoot(handle.db);
     const alphaId = await createNamed(handle.db, 'Альфа', 'Europe/Moscow', 'alpha');
     const betaId = await createNamed(handle.db, 'Бета', 'Asia/Yekaterinburg', 'beta');
-    const binding = createChatBinding(handle.db, clock);
+    const binding = createChatBinding(handle.db, silentLogger, clock);
     const first = await binding.confirm({
       telegramUserId: String(rootAccount.id),
       projectId: alphaId,

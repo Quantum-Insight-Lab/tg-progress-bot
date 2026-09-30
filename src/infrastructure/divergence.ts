@@ -12,6 +12,7 @@ import {
   type DivergenceTask,
 } from '../domain/progress/divergence.ts';
 import { EVENT_TYPES } from '../events/index.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -148,7 +149,7 @@ async function takenKeys(db: Kysely<Database>): Promise<Set<string>> {
   return new Set(found.rows.map((row) => row.idempotency_key));
 }
 
-async function publishOne(db: Kysely<Database>, notice: DivergenceNotice, now: Date): Promise<void> {
+async function publishOne(db: Kysely<Database>, logger: Logger, notice: DivergenceNotice, now: Date): Promise<void> {
   await db.transaction().execute(async (trx) => {
     await publishDivergenceDetected(
       {
@@ -161,7 +162,7 @@ async function publishOne(db: Kysely<Database>, notice: DivergenceNotice, now: D
             .then((found) => (found === undefined ? null : { eventId: found.id }));
         },
       },
-      createEventJournal(trx),
+      createEventJournal(trx, logger),
       { ...notice, occurredAt: now },
     );
   });
@@ -172,7 +173,7 @@ async function publishOne(db: Kysely<Database>, notice: DivergenceNotice, now: D
  * Повтор тех же суток второе событие не пишет. Задачи и блокеры не меняет.
  * Сбой одного проекта не отменяет остальные, затем всплывает.
  */
-export async function noticeProjectDivergence(db: Kysely<Database>, now: Date): Promise<void> {
+export async function noticeProjectDivergence(db: Kysely<Database>, logger: Logger, now: Date): Promise<void> {
   const facts: Omit<DivergenceFacts, 'now' | 'projects' | 'takenKeys'> = {
     members: await membersOf(db),
     commits: await commitsOf(db),
@@ -193,7 +194,7 @@ export async function noticeProjectDivergence(db: Kysely<Database>, now: Date): 
     }
     for (const notice of notices) {
       try {
-        await publishOne(db, notice, now);
+        await publishOne(db, logger, notice, now);
         taken.add(notice.idempotencyKey);
       } catch (error) {
         failures.push(error);

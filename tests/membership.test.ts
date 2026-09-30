@@ -38,6 +38,7 @@ import {
   replyToParticipantsMessage,
   replyToRemovalRequest,
 } from '../src/telegram/members.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -82,11 +83,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -178,6 +179,7 @@ function memoryJournal(): { journal: EventJournal; rows: EventRow[] } {
         rows.push(row);
         return { inserted: true, row };
       },
+      refuse: () => undefined,
     },
   };
 }
@@ -239,7 +241,7 @@ describe('INV-16 состав видит только корень', () => {
   it('INV-16 человек вне проекта не видит состав и чужие имена', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     const reply = await replyToParticipantsMessage('private', borisAccount, { projectName: 'Альфа' }, membership);
     expect(reply?.text).toBe(PARTICIPANTS_ACCESS);
     expect(reply?.text).not.toContain('Альфа');
@@ -256,7 +258,7 @@ describe('INV-16 состав видит только корень', () => {
   it('INV-16 участник, который не корень, состав не получает', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-boris-access', membership);
     const reply = await replyToParticipantsMessage('private', borisAccount, { projectName: 'Альфа' }, membership);
     expect(reply?.text).toBe(PARTICIPANTS_ROOT_ONLY);
@@ -275,7 +277,7 @@ describe('INV-18 добавление member и снятие незакрыты�
   it('INV-18 корень добавляет человека как member, и тот ведёт задачи', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     const reply = await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-boris', membership);
     expect(reply?.text).toBe(addedReply('Борис'));
     expect(leadsTasks(MEMBER_ROLE)).toBe(true);
@@ -294,7 +296,7 @@ describe('INV-18 добавление member и снятие незакрыты�
   it('INV-18 один человек в двух проектах, роль в каждом своя', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     await sql`
       INSERT INTO project_members (id, project_id, user_id, role)
       VALUES (${memberId}::uuid, ${fixture.betaId}::uuid, ${fixture.borisId}::uuid, ${LEAD_ROLE})
@@ -395,7 +397,7 @@ describe('INV-18 добавление member и снятие незакрыты�
   it('INV-18 снятие и событие коммитятся вместе: повтор ключа оставляет участника', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-before-rollback', membership);
     await sql`
       INSERT INTO events (
@@ -443,7 +445,7 @@ describe('INV-19 участников меняет корень в личке', 
   it('INV-19 корень в личке видит тех, кто ещё не в проекте, и добавляет их', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     const screen = await replyToParticipantsMessage('private', rootAccount, { projectName: 'Альфа' }, membership);
     expect(screen?.text.startsWith(`${PARTICIPANTS_HEADING}\nАльфа\n`)).toBe(true);
     expect(screen?.text).toContain('Борис');
@@ -463,7 +465,7 @@ describe('INV-19 участников меняет корень в личке', 
   it('INV-19 удаление требует подтверждения и снимает только после него', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-for-remove', membership);
     const ask = await replyToRemovalRequest('private', rootAccount, fixture.alphaId, String(borisAccount.id), membership);
     expect(ask?.text).toBe(removeConfirmText('Борис'));
@@ -497,7 +499,7 @@ describe('INV-22 повтор добавления и удаления не пр
   it('INV-22 тот же ключ не добавляет второго человека и не пишет второе событие', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     const first = await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'same-add', membership);
     const second = await replyToAddMember('private', rootAccount, fixture.alphaId, String(veraAccount.id), 'same-add', membership);
     expect(first?.text).toBe(addedReply('Борис'));
@@ -513,7 +515,7 @@ describe('INV-22 повтор добавления и удаления не пр
   it('INV-22 пустой ключ участника не записывает', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const membership = createMembership(fixture.db, clock);
+    const membership = createMembership(fixture.db, silentLogger, clock);
     await expect(
       membership.add({
         telegramUserId: String(rootAccount.id),

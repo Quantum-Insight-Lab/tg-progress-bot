@@ -45,6 +45,7 @@ import { blockerQuestionReply, blockerQuestionText, parseNoBlockerData } from '.
 import { reviewReminderText } from '../src/projections/review-reminder.ts';
 import { replyToBlockerReason, replyToNoBlocker } from '../src/telegram/blocker-answer.ts';
 import { sendReviewReminder } from '../src/telegram/review-reminder.ts';
+import { silentLogger } from './log-lines.ts';
 
 const leadId = '00000000-0000-4000-8000-000000000001';
 const assigneeId = '00000000-0000-4000-8000-000000000002';
@@ -131,7 +132,7 @@ async function seed(db: Kysely<Database>): Promise<void> {
     INSERT INTO blockers (id, task_id, reason, asked_at, resolved_at)
     VALUES (${blockerId}::uuid, ${blockedId}::uuid, NULL, ${at}::timestamptz, NULL)
   `.execute(db);
-  const journal = createEventJournal(db);
+  const journal = createEventJournal(db, silentLogger);
   await emit(journal, {
     type: EVENT_TYPES.TASK_CHECKED,
     source: 'telegram',
@@ -266,7 +267,7 @@ describe('причина блокера и «нет блокера»', () => {
     const handle = await openDb();
     opened.push(handle);
     await seed(handle.db);
-    const actions = createBlockerAnswerActions(handle.db, clockAt(now));
+    const actions = createBlockerAnswerActions(handle.db, silentLogger, clockAt(now));
     const declared = await replyToBlockerReason(place, assignee, 'update-1', '  ждёт заказчика  ', questionReply(), actions);
     expect(declared?.applied).toBe(true);
     expect(declared?.blocker.reason).toBe('ждёт заказчика');
@@ -282,7 +283,7 @@ describe('причина блокера и «нет блокера»', () => {
     const handle = await openDb();
     opened.push(handle);
     await seed(handle.db);
-    const actions = createBlockerAnswerActions(handle.db, clockAt(now));
+    const actions = createBlockerAnswerActions(handle.db, silentLogger, clockAt(now));
     const missed = await replyToBlockerReason(place, assignee, 'update-2', 'ждёт', { messageId: 9, text: 'другое', fromBot: true }, actions);
     expect(missed).toBeNull();
     expect(await reasonOf(handle.db)).toBeNull();
@@ -307,7 +308,7 @@ describe('причина блокера и «нет блокера»', () => {
     const handle = await openDb();
     opened.push(handle);
     await seed(handle.db);
-    const actions = createBlockerAnswerActions(handle.db, clockAt(now));
+    const actions = createBlockerAnswerActions(handle.db, silentLogger, clockAt(now));
     await replyToBlockerReason(place, assignee, 'update-1', 'ждёт заказчика', questionReply(), actions);
     const dismissed = await replyToNoBlocker(place, assignee, 'callback-1', 7, actions);
     expect(dismissed?.applied).toBe(true);
@@ -328,7 +329,7 @@ describe('причина блокера и «нет блокера»', () => {
     const handle = await openDb();
     opened.push(handle);
     await seed(handle.db);
-    const actions = createBlockerAnswerActions(handle.db, clockAt(now));
+    const actions = createBlockerAnswerActions(handle.db, silentLogger, clockAt(now));
     await replyToBlockerReason(place, assignee, 'update-1', 'ждёт заказчика', questionReply(), actions);
     const again = await replyToBlockerReason(place, assignee, 'update-1', 'другая причина', questionReply(), actions);
     expect(again?.applied).toBe(false);
@@ -440,7 +441,7 @@ describe('напоминание руководителям', () => {
       },
     };
     const hits: RemindedReview[] = [];
-    await remindStaleReviews(handle.db, now, async (hit) => {
+    await remindStaleReviews(handle.db, silentLogger, now, async (hit) => {
       hits.push(hit);
       await sendReviewReminder(api, {
         chatId: hit.telegramChatId,
@@ -470,11 +471,11 @@ describe('напоминание руководителям', () => {
         payload: { task_id: reviewId, lead_ids: [leadId, secondLeadId] },
       },
     ]);
-    await remindStaleReviews(handle.db, nextDay, async () => {
+    await remindStaleReviews(handle.db, silentLogger, nextDay, async () => {
       throw new Error('рано');
     });
     expect(await eventsOf(handle.db, EVENT_TYPES.REVIEW_REMINDED)).toHaveLength(1);
-    await remindStaleReviews(handle.db, twoDaysLater, async () => undefined);
+    await remindStaleReviews(handle.db, silentLogger, twoDaysLater, async () => undefined);
     expect(await eventsOf(handle.db, EVENT_TYPES.REVIEW_REMINDED)).toHaveLength(2);
     expect(projectDaysBetween(now, nextDay, 'Europe/Moscow')).toBe(STALE_DAYS - 1);
   });
@@ -484,10 +485,10 @@ describe('напоминание руководителям', () => {
     opened.push(handle);
     await seed(handle.db);
     const seen: string[] = [];
-    await remindStaleReviews(handle.db, now, async (hit) => {
+    await remindStaleReviews(handle.db, silentLogger, now, async (hit) => {
       seen.push(hit.taskId);
     });
-    await remindStaleReviews(handle.db, now, async () => {
+    await remindStaleReviews(handle.db, silentLogger, now, async () => {
       throw new Error('повтор');
     });
     expect(seen).toEqual([reviewId]);

@@ -42,6 +42,7 @@ import {
 import { createScheduler } from '../src/infrastructure/scheduler.ts';
 import { blockerQuestionText, noBlockerButton } from '../src/projections/blocker-question.ts';
 import { sendBlockerQuestion } from '../src/telegram/blocker-question.ts';
+import { silentLogger } from './log-lines.ts';
 
 const userId = '00000000-0000-4000-8000-000000000001';
 const otherId = '00000000-0000-4000-8000-000000000002';
@@ -130,7 +131,7 @@ async function seed(db: Kysely<Database>): Promise<void> {
       (${quietTaskId}::uuid, ${moscowId}::uuid, 11, 'Без топика', ${TASK_STATUS_IN_PROGRESS}, 'normal', ${otherId}::uuid, ${at}::timestamptz, ${at}::timestamptz),
       (${uncheckedId}::uuid, ${moscowId}::uuid, 12, 'Сняли галочку', ${TASK_STATUS_IN_PROGRESS}, 'normal', ${userId}::uuid, ${at}::timestamptz, ${at}::timestamptz)
   `.execute(db);
-  await emit(createEventJournal(db), {
+  await emit(createEventJournal(db, silentLogger), {
     type: EVENT_TYPES.TASK_UNCHECKED,
     source: 'telegram',
     idempotencyKey: 'uncheck-recent',
@@ -192,7 +193,7 @@ async function run(db: Kysely<Database>, at: Date): Promise<Hit[]> {
       return { message_id: 1, date: 0, chat: { id: 0, type: 'supergroup' } } as Awaited<ReturnType<Api['sendMessage']>>;
     },
   };
-  await detectStaleTasks(db, at, async (hit) => {
+  await detectStaleTasks(db, silentLogger, at, async (hit) => {
     await sendBlockerQuestion(api, {
       chatId: hit.telegramChatId,
       messageThreadId: hit.topicId,

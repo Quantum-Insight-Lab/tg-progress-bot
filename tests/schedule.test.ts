@@ -42,6 +42,7 @@ import {
   scheduleTemplate,
 } from '../src/telegram/schedule.ts';
 import { REPORTS_TOPIC_SET } from '../src/telegram/reports-topic.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -87,11 +88,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(bound: boolean, shared = false): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -100,7 +101,7 @@ async function seed(bound: boolean, shared = false): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  await createMembership(handle.db, clock).add({
+  await createMembership(handle.db, silentLogger, clock).add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     targetTelegramUserId: String(borisAccount.id),
@@ -113,7 +114,7 @@ async function seed(bound: boolean, shared = false): Promise<Fixture> {
   `.execute(handle.db);
   let betaId: string | null = null;
   if (bound) {
-    await createChatBinding(handle.db, clock).confirm({
+    await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId: alpha.project.id,
       offer: forumAdmin,
@@ -130,7 +131,7 @@ async function seed(bound: boolean, shared = false): Promise<Fixture> {
       idempotencyKey: 'project-beta',
     });
     betaId = beta.project.id;
-    await createChatBinding(handle.db, clock).confirm({
+    await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId: beta.project.id,
       offer: forumAdmin,
@@ -212,7 +213,7 @@ describe('INV-24 час отчёта считается по таймзоне г
   it('INV-24 время отчёта берёт таймзону группы и не переписывает таймзоны проектов', async () => {
     const fixture = await seed(true, true);
     opened.push(fixture);
-    const actions = createChatSchedule(fixture.db, clock);
+    const actions = createChatSchedule(fixture.db, silentLogger, clock);
     const before = await stored(fixture.db);
     expect(before.chats).toBe(1);
     expect(before.dailyCron).toBeNull();
@@ -271,14 +272,14 @@ describe('INV-27 рассылка живёт на группе и включен
       rootAccount,
       { kind: 'show', projectName: 'Альфа' },
       'show-loose',
-      createChatSchedule(loose.db, clock),
+      createChatSchedule(loose.db, silentLogger, clock),
     );
     expect(unbound).toContain(SCHEDULE_UNBOUND);
     expect((await stored(loose.db)).chats).toBe(0);
 
     const fixture = await seed(true, true);
     opened.push(fixture);
-    const actions = createChatSchedule(fixture.db, clock);
+    const actions = createChatSchedule(fixture.db, silentLogger, clock);
     const asked = await replyToScheduleMessage('private', rootAccount, { kind: 'show', projectName: 'Бета' }, 'show-off', actions);
     expect(asked).toContain(SCHEDULE_OFF);
     expect(asked).toContain(SCHEDULE_ASK);
@@ -374,7 +375,7 @@ describe('INV-22 повтор расписания не применяется �
   it('INV-22 тот же ключ не меняет время и таймзону и не пишет второе событие', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createChatSchedule(fixture.db, clock);
+    const actions = createChatSchedule(fixture.db, silentLogger, clock);
     const first = await replyToScheduleMessage(
       'private',
       rootAccount,
@@ -411,7 +412,7 @@ describe('INV-22 повтор расписания не применяется �
   it('INV-22 повтор стирания тем же ключом не пишет второе событие и не затирает новое время', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createChatSchedule(fixture.db, clock);
+    const actions = createChatSchedule(fixture.db, silentLogger, clock);
     await actions.set({
       telegramUserId: String(rootAccount.id),
       projectName: 'Альфа',
