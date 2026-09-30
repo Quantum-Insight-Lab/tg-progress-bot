@@ -20,6 +20,7 @@ import {
 import { recordGithubDelivery } from '../domain/github/delivery.ts';
 import { DomainError } from '../domain/shared/errors.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { LogFields, Logger } from '../domain/shared/logger.ts';
 import { EVENT_TYPES, EventRejected, type PayloadByType } from '../events/index.ts';
 import type { EventJournal } from '../events/journal.ts';
 
@@ -38,6 +39,12 @@ const ACTION_COMPLETED = 'completed';
 const STATUS_OK = 200;
 const STATUS_BAD = 400;
 const STATUS_UNAUTHORIZED = 401;
+const STEP_DELIVERY = 'github.delivery';
+const STEP_DELIVERY_REFUSED = 'github.delivery_refused';
+const STEP_SIGNATURE_INVALID = 'github.signature_invalid';
+const REFUSED_HEADERS = 'headers';
+const REFUSED_JSON = 'json';
+const REFUSED_PAYLOAD = 'payload';
 
 export interface GithubWebhookRequest {
   secret: string;
@@ -47,6 +54,8 @@ export interface GithubWebhookRequest {
   body: Buffer;
   journal: EventJournal;
   clock: Clock;
+  /** Строка на доставку: ключ, событие, action, репозиторий, исход. Тело запроса не пишется. */
+  logger: Logger;
   /** Пишет зеркало issue после новой доставки. Повтор ключа сюда не приходит. */
   applyIssue?: (payload: PayloadByType['github.issue_changed']) => Promise<void>;
   /** Пишет связь issues после новой доставки. Повтор ключа сюда не приходит. */
@@ -64,6 +73,7 @@ export interface GithubWebhookRequest {
 export interface GithubWebhookHttpDeps {
   secret: string;
   clock: Clock;
+  logger: Logger;
   isolate: (
     run: (
       journal: EventJournal,
@@ -401,29 +411,49 @@ function parseDelivery(eventName: string, deliveryId: string, json: unknown): Gi
   return { kind: 'other', deliveryId, eventName };
 }
 
+function orNull(value: string): string | null {
+  return value.length === 0 ? null : value;
+}
+
+/** Action и репозиторий доставки для строки лога. Остальное тело в лог не идёт. */
+function deliveryContext(json: unknown): LogFields {
+  if (!isRecord(json)) return { action: null, repositoryId: null };
+  return { action: text(json.action), repositoryId: repositoryId(json) };
+}
+
 /**
  * Проверяет подпись и публикует факт в журнал.
  * Неверная подпись не читает доставку. Повтор ключа не пишет второе событие.
  * Записи в GitHub здесь нет.
  */
 export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<number> {
-  if (!verifyGithubWebhookSignature(input.secret, input.body, input.signature)) return STATUS_UNAUTHORIZED;
   const eventName = input.eventName?.trim().toLowerCase() ?? '';
   const deliveryId = input.deliveryId?.trim() ?? '';
-  if (eventName.length === 0 || deliveryId.length === 0) return STATUS_BAD;
+  const headers: LogFields = { deliveryId: orNull(deliveryId), githubEvent: orNull(eventName) };
+  if (!verifyGithubWebhookSignature(input.secret, input.body, input.signature)) {
+    input.logger.warn(STEP_SIGNATURE_INVALID, headers);
+    return STATUS_UNAUTHORIZED;
+  }
+  const refuse = (code: string, fields: LogFields = {}): number => {
+    input.logger.warn(STEP_DELIVERY_REFUSED, { ...headers, ...fields, code });
+    return STATUS_BAD;
+  };
+  if (eventName.length === 0 || deliveryId.length === 0) return refuse(REFUSED_HEADERS);
   let json: unknown;
   try {
     json = JSON.parse(input.body.toString('utf8')) as unknown;
   } catch {
-    return STATUS_BAD;
+    return refuse(REFUSED_JSON);
   }
+  const context: LogFields = { ...headers, ...deliveryContext(json) };
   const delivery = parseDelivery(eventName, deliveryId, json);
-  if (delivery === null) return STATUS_BAD;
+  if (delivery === null) return refuse(REFUSED_PAYLOAD, context);
   let result: Awaited<ReturnType<typeof recordGithubDelivery>>;
   try {
     result = await recordGithubDelivery(input.journal, input.clock, delivery);
   } catch (error) {
-    if (error instanceof DomainError || error instanceof EventRejected) return STATUS_BAD;
+    if (error instanceof DomainError) return refuse(error.code, context);
+    if (error instanceof EventRejected) return refuse(error.reason, context);
     throw error;
   }
   if (input.applyIssue !== undefined && result.status === 'applied' && result.eventType === EVENT_TYPES.GITHUB_ISSUE_CHANGED) {
@@ -464,6 +494,11 @@ export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<
   ) {
     await input.applyCommits(result.payload);
   }
+  input.logger.info(STEP_DELIVERY, {
+    ...context,
+    outcome: result.status,
+    eventType: result.status === 'ignored' ? null : result.eventType,
+  });
   return STATUS_OK;
 }
 
@@ -497,6 +532,7 @@ export async function acceptGithubWebhookHttp(
       body,
       journal,
       clock: deps.clock,
+      logger: deps.logger,
       applyIssue,
       applyIssueLink,
       applyMilestone,

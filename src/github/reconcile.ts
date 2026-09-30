@@ -2,7 +2,7 @@ import { workflowConclusion } from '../domain/github/ci-status.ts';
 import { commitTailStartsAt } from '../domain/github/commit.ts';
 import type { GithubReconcileSource, RemoteMirror, RemotePullRequestInput, ReconcileCommitInput, ReconcileIssueInput } from '../domain/github/reconcile.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
-import { createGithubInstallationApp, type GithubAppCredentials } from './client.ts';
+import { createGithubInstallationApp, type GithubAppCredentials, type GithubCallLog } from './client.ts';
 
 const ROUTE_ISSUES = 'GET /repos/{owner}/{repo}/issues';
 const ROUTE_PULLS = 'GET /repos/{owner}/{repo}/pulls';
@@ -228,8 +228,8 @@ function remainingPercent(data: unknown): number | null {
   return Math.round((remaining * 100) / limit);
 }
 
-export function createGithubReconcileSource(credentials: GithubAppCredentials): GithubReconcileSource {
-  const app = createGithubInstallationApp(credentials);
+export function createGithubReconcileSource(credentials: GithubAppCredentials, calls: GithubCallLog): GithubReconcileSource {
+  const app = createGithubInstallationApp(credentials, calls);
   let cachedAt: number | null = null;
   let installed = new Map<string, InstalledRepository>();
 
