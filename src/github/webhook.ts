@@ -467,50 +467,46 @@ export async function acceptGithubWebhook(input: GithubWebhookRequest): Promise<
   return STATUS_OK;
 }
 
-/** HTTP-вход той же проверки. Ответ без тела: GitHub смотрит на код. */
+/**
+ * HTTP-вход той же проверки. Ответ без тела: GitHub смотрит на код.
+ * Отказ записи всплывает: `500` и причину пишет общий вход HTTP.
+ */
 export async function acceptGithubWebhookHttp(
   req: IncomingMessage,
   res: ServerResponse,
   deps: GithubWebhookHttpDeps,
 ): Promise<void> {
-  try {
-    const body = await readBody(req);
-    const eventName = header(req, 'x-github-event');
-    const deliveryId = header(req, 'x-github-delivery');
-    const signature = header(req, 'x-hub-signature-256');
-    const status = await deps.isolate((
+  const body = await readBody(req);
+  const eventName = header(req, 'x-github-event');
+  const deliveryId = header(req, 'x-github-delivery');
+  const signature = header(req, 'x-hub-signature-256');
+  const status = await deps.isolate((
+    journal,
+    applyIssue,
+    applyIssueLink,
+    applyMilestone,
+    applyPullRequest,
+    applyWorkflow,
+    applyCommits,
+  ) =>
+    acceptGithubWebhook({
+      secret: deps.secret,
+      eventName,
+      deliveryId,
+      signature,
+      body,
       journal,
+      clock: deps.clock,
       applyIssue,
       applyIssueLink,
       applyMilestone,
       applyPullRequest,
       applyWorkflow,
       applyCommits,
-    ) =>
-      acceptGithubWebhook({
-        secret: deps.secret,
-        eventName,
-        deliveryId,
-        signature,
-        body,
-        journal,
-        clock: deps.clock,
-        applyIssue,
-        applyIssueLink,
-        applyMilestone,
-        applyPullRequest,
-        applyWorkflow,
-        applyCommits,
-      }),
-    );
-    if (!res.writableEnded) {
-      res.statusCode = status;
-      res.end();
-    }
-  } catch {
-    if (!res.writableEnded) {
-      res.statusCode = 500;
-      res.end();
-    }
+    }),
+  );
+  if (!res.writableEnded) {
+    res.statusCode = status;
+    res.end();
   }
 }

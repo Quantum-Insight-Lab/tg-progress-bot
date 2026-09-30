@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Clock } from '../src/domain/shared/clock.ts';
 import { createScheduler, startSchedulerLoop, SYSTEM_ACTION_IDS, type SystemActionId } from '../src/infrastructure/scheduler.ts';
+import { captureLog } from './log-lines.ts';
 
 const moment = new Date('2026-09-28T00:00:00.000Z');
 const clock: Clock = { now: () => moment };
@@ -65,7 +66,7 @@ describe('планировщик актов системы', () => {
         release = resolve;
       });
     });
-    const loop = startSchedulerLoop(scheduler, 1000);
+    const loop = startSchedulerLoop(scheduler, 1000, captureLog().logger);
     await vi.advanceTimersByTimeAsync(1000);
     expect(started).toBe(1);
     await vi.advanceTimersByTimeAsync(1000);
@@ -80,6 +81,6 @@ describe('планировщик актов системы', () => {
   });
 
   it('интервал меньше единицы не запускает цикл', () => {
-    expect(() => startSchedulerLoop(createScheduler(clock), 0)).toThrow('интервал планировщика');
+    expect(() => startSchedulerLoop(createScheduler(clock), 0, captureLog().logger)).toThrow('интервал планировщика');
   });
 });

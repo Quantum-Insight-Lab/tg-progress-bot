@@ -1,8 +1,14 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { webhookCallback, type Bot } from 'grammy';
+import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 
 /** Путь приёма обновлений, если окружение его не задаёт. `setWebhook` — в развёртывании. */
 export const TELEGRAM_WEBHOOK_PATH = '/telegram/webhook';
+
+const STATUS_NOT_FOUND = 404;
+const STATUS_FAILED = 500;
+const STEP_HTTP = 'http.request';
 
 /** Дополнительный POST-путь на том же порту. Адаптеры друг друга не импортируют. */
 export interface WebhookRoute {
@@ -18,6 +24,9 @@ export interface WebhookListenOptions {
   port: number;
   host: string;
   routes?: readonly WebhookRoute[];
+  /** Строка на каждый запрос: метод, путь, код, длительность. Заголовки и тело не пишутся. */
+  logger: Logger;
+  clock: Clock;
 }
 
 export interface WebhookServer {
@@ -63,9 +72,14 @@ function closeServer(server: Server): Promise<void> {
  */
 function fail(res: ServerResponse): void {
   if (!res.writableEnded) {
-    res.statusCode = 500;
+    res.statusCode = STATUS_FAILED;
     res.end();
   }
+}
+
+function notFound(res: ServerResponse): void {
+  res.statusCode = STATUS_NOT_FOUND;
+  res.end();
 }
 
 export async function startTelegramWebhook(options: WebhookListenOptions): Promise<WebhookServer> {
@@ -78,33 +92,45 @@ export async function startTelegramWebhook(options: WebhookListenOptions): Promi
   }
   const handle = webhookCallback(options.bot, 'http', { secretToken: options.secretToken });
   const server = createServer((req, res) => {
-    if (req.method !== 'POST') {
-      res.statusCode = 404;
-      res.end();
-      return;
-    }
+    const startedAt = options.clock.now().getTime();
     const path = pathnameOf(req.url);
-    if (path === options.path) {
-      void handle(req, res).then(
-        () => undefined,
+    const logEntry = (cause?: unknown): void => {
+      const fields = {
+        method: req.method ?? '',
+        path,
+        status: res.statusCode,
+        durationMs: options.clock.now().getTime() - startedAt,
+      };
+      if (cause !== undefined || res.statusCode >= STATUS_FAILED) options.logger.error(STEP_HTTP, fields, cause);
+      else options.logger.info(STEP_HTTP, fields);
+    };
+    const serve = (run: Promise<unknown>): void => {
+      void run.then(
         () => {
+          logEntry();
+        },
+        (error: unknown) => {
           fail(res);
+          logEntry(error);
         },
       );
+    };
+    if (req.method !== 'POST') {
+      notFound(res);
+      logEntry();
+      return;
+    }
+    if (path === options.path) {
+      serve(handle(req, res));
       return;
     }
     const route = routes.find((item) => item.path === path);
     if (route === undefined) {
-      res.statusCode = 404;
-      res.end();
+      notFound(res);
+      logEntry();
       return;
     }
-    void route.handle(req, res).then(
-      () => undefined,
-      () => {
-        fail(res);
-      },
-    );
+    serve(route.handle(req, res));
   });
   await listen(server, options.port, options.host);
   return { port: boundPort(server), close: () => closeServer(server) };

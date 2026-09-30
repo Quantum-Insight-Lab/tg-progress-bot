@@ -1,4 +1,5 @@
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 
 /**
  * Акты системы, для которых планировщик держит слот (поток «Время» в архитектуре).
@@ -59,23 +60,34 @@ export function createScheduler(clock: Clock): Scheduler {
   };
 }
 
+function logRun(logger: Logger, run: SchedulerRun): void {
+  logger.info('scheduler.run', { ran: run.ran, failed: run.failed.map((failure) => failure.id) });
+  for (const failure of run.failed) logger.error('scheduler.slot_failed', { slot: failure.id }, failure.error);
+}
+
 /**
  * Периодический ход. Интервал — параметр процесса, не порог домена.
  * Пока предыдущий ход не закончился, следующий не стартует.
  */
-export function startSchedulerLoop(scheduler: Scheduler, intervalMs: number): { stop(): void } {
+export function startSchedulerLoop(scheduler: Scheduler, intervalMs: number, logger: Logger): { stop(): void } {
   if (!Number.isInteger(intervalMs) || intervalMs < 1) throw new Error('интервал планировщика');
   let busy = false;
   let stopped = false;
   const timer = setInterval(() => {
-    if (busy || stopped) return;
+    if (stopped) return;
+    if (busy) {
+      logger.debug('scheduler.tick_skipped');
+      return;
+    }
     busy = true;
     void scheduler.run().then(
-      () => {
+      (run) => {
         busy = false;
+        logRun(logger, run);
       },
-      () => {
+      (error: unknown) => {
         busy = false;
+        logger.error('scheduler.run_failed', {}, error);
       },
     );
   }, intervalMs);

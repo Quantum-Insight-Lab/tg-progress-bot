@@ -7,8 +7,10 @@ import { readProcessConfig, startProcess, type RunningProcess } from '../src/pro
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { captureLog } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T00:00:00.000Z') };
+const log = captureLog({ clock });
 
 function env(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
@@ -40,6 +42,8 @@ describe('один процесс', () => {
       ...readProcessConfig(env(), clock),
       host: '127.0.0.1',
       botInfo: testBotInfo,
+      logger: log.logger,
+      reconcileSource: null,
     });
     expect(running.port).toBeGreaterThan(0);
     expect(running.engine.tasks.id).toBe('tasks');
@@ -71,6 +75,35 @@ describe('один процесс', () => {
     });
     expect(github).toBe(404);
     await expect(startProcess(readProcessConfig(env(), clock))).rejects.toThrow('процесс уже запущен');
+  });
+
+  it('B-17 после старта — строка старта и строка на каждый запрос; стоп — сигнал и итог закрытия', async () => {
+    const started = running;
+    if (started === undefined) throw new Error('процесс не запущен');
+    expect(log.steps('process.started')).toEqual([
+      {
+        time: '2026-09-28T00:00:00.000Z',
+        level: 'info',
+        step: 'process.started',
+        port: started.port,
+        host: '127.0.0.1',
+        telegramWebhookPath: TELEGRAM_WEBHOOK_PATH,
+        githubWebhookPath: null,
+        schedulerIntervalMs: 60000,
+        reconcileIntervalMs: null,
+        githubApp: false,
+      },
+    ]);
+    expect(log.steps('http.request').map((line) => [line.level, line.method, line.path, line.status])).toEqual([
+      ['info', 'POST', TELEGRAM_WEBHOOK_PATH, 200],
+      ['info', 'POST', GITHUB_WEBHOOK_PATH, 404],
+    ]);
+    await started.stop('SIGTERM');
+    expect(log.lines().slice(-2)).toEqual([
+      { time: '2026-09-28T00:00:00.000Z', level: 'info', step: 'process.stopping', signal: 'SIGTERM' },
+      { time: '2026-09-28T00:00:00.000Z', level: 'info', step: 'process.stopped', signal: 'SIGTERM' },
+    ]);
+    expect(log.raw.join('\n')).not.toMatch(/test-token|secret/);
   });
 
   it('без токена, секрета и интервала процесс не конфигурируется', () => {

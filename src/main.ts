@@ -8,8 +8,10 @@ function listen(signal: NodeJS.Signals, listener: NodeJS.SignalsListener): void 
   process.on(signal, listener);
 }
 
-const stop = (): void => {
-  void running.stop();
+const stop = (signal: NodeJS.Signals): void => {
+  running.stop(signal).catch(() => {
+    process.exitCode = 1;
+  });
 };
 
 listen('SIGTERM', stop);
