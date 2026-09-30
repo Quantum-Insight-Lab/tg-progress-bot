@@ -1,0 +1,57 @@
+# app — образ процесса. migrate — отдельный шаг до старта. caddy — TLS для обоих webhook.
+# setWebhook: npm run register-webhooks, когда PUBLIC_HOST уже отвечает по HTTPS.
+# URL GitHub App — тот же хост и путь /github/webhook; бот его в GitHub не записывает.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-progress}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-user} -d $${POSTGRES_DB:-progress}"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+  migrate:
+    build: .
+    command:
+      - node
+      - --experimental-strip-types
+      - --disable-warning=ExperimentalWarning
+      - src/migrate-main.ts
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://user:password@postgres:5432/progress}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+  app:
+    build: .
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://user:password@postgres:5432/progress}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      PORT: ${PORT:-8080}
+      HOST: 0.0.0.0
+      SCHEDULER_INTERVAL_MS: ${SCHEDULER_INTERVAL_MS:-60000}
+      TELEGRAM_WEBHOOK_PATH: ${TELEGRAM_WEBHOOK_PATH:-/telegram/webhook}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "8080"
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-bot.example.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - app

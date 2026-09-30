@@ -19,6 +19,8 @@
     "tz:trace": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/tz-check.ts --trace",
     "backlog:publish": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/backlog-publish.ts",
     "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/main.ts",
+    "migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/migrate-main.ts",
+    "register-webhooks": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/register-webhooks-main.ts",
     "ci": "npm run typecheck && npm run lint && npm run boundaries && npm run codegen:events -- --check && npm run check:invariants -- --strict && npm run check:mechanisms && npm run knip && npm test && npm run tz:check -- --gate --pda"
   },
   "devDependencies": {
