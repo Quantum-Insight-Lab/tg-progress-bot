@@ -1,6 +1,7 @@
 import { InlineKeyboard, type Bot } from 'grammy';
 import { assessSupergroup, type ChatBinding, type ChatKind, type SupergroupOffer } from '../domain/projects/chat.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Бот просит супергруппу с темами и права администратора. */
 export const SUPERGROUP_REQUEST =
@@ -103,6 +104,7 @@ function boundReply(shared: boolean): string {
 }
 
 async function refuse(error: DomainError, notify: (text: string) => Promise<unknown>): Promise<void> {
+  traceRefusal(error);
   if (error.code === DOMAIN_ERROR.CHAT_DUPLICATE || error.code === DOMAIN_ERROR.CHAT_PROJECT_MISSING) return;
   if (error.code === DOMAIN_ERROR.CHAT_BIND_ACTOR) {
     await notify(SUPERGROUP_CONFIRM_REFUSAL);
@@ -138,6 +140,7 @@ export function attachChatBinding(bot: Bot, binding: ChatBinding, afterBound?: B
       await next();
       return;
     }
+    traceHandler('chat-binding');
     const status = update.new_chat_member.status;
     if (status === 'left' || status === 'kicked') return;
     const chatType = update.chat.type;
@@ -163,6 +166,7 @@ export function attachChatBinding(bot: Bot, binding: ChatBinding, afterBound?: B
   });
 
   bot.callbackQuery(/^b:/, async (ctx) => {
+    traceHandler('chat-binding');
     await ctx.answerCallbackQuery();
     const parsed = parseBindCallback(ctx.callbackQuery.data);
     const from = ctx.from;

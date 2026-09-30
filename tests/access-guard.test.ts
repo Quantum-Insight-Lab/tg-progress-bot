@@ -25,7 +25,8 @@ import {
 import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
-import { ACCESS_DENIED_REPLY, GUARDED_HANDLERS, type GuardedHandler } from '../src/telegram/access-guard.ts';
+import { ACCESS_DENIED_REPLY } from '../src/telegram/access-guard.ts';
+import { GUARDED_HANDLERS, type GuardedHandler } from '../src/telegram/handlers.ts';
 import { GITHUB_LOGIN_HEADING } from '../src/telegram/github-login.ts';
 import { NEW_PROJECT_HEADING } from '../src/telegram/new-project.ts';
 import { EXECUTOR_TOPIC_HEADING } from '../src/telegram/executor-topic.ts';
@@ -162,14 +163,14 @@ function messageBody(updateId: number, account: { id: number; first_name: string
   return JSON.stringify({ update_id: updateId, message });
 }
 
-function callbackBody(updateId: number, account: { id: number; first_name: string }): string {
+function callbackBody(updateId: number, account: { id: number; first_name: string }, data: string): string {
   return JSON.stringify({
     update_id: updateId,
     callback_query: {
       id: `cb-${updateId}`,
       from: { id: account.id, is_bot: false, first_name: account.first_name },
       chat_instance: '1',
-      data: 'b:00000000-0000-4000-8000-000000000010:-100123',
+      data,
       message: {
         message_id: 1,
         date: 1700000000,
@@ -187,7 +188,7 @@ function bodyFor(handler: GuardedHandler, updateId: number, account: { id: numbe
     case 'new-project':
       return messageBody(updateId, account, `${NEW_PROJECT_HEADING}\nСекрет\n\nEurope/Moscow`);
     case 'chat-binding':
-      return callbackBody(updateId, account);
+      return callbackBody(updateId, account, 'b:00000000-0000-4000-8000-000000000010:-100123');
     case 'participants':
       return messageBody(updateId, account, `${PARTICIPANTS_HEADING}\nАльфа`);
     case 'executor-topic':
@@ -206,8 +207,20 @@ function bodyFor(handler: GuardedHandler, updateId: number, account: { id: numbe
       return messageBody(updateId, account, `${PROJECT_REPOSITORY_HEADING}\nАльфа`);
     case 'task':
       return messageBody(updateId, account, '/task Секрет', true);
+    case 'task-mark':
+      return callbackBody(updateId, account, 'task:mark:1');
+    case 'task-plan':
+      return callbackBody(updateId, account, 'task:plan:1');
+    case 'task-review':
+      return callbackBody(updateId, account, 'task:confirm:1');
+    case 'task-cancel':
+      return callbackBody(updateId, account, 'task:cancel:1');
+    case 'blocker-answer':
+      return callbackBody(updateId, account, 'task:noblock:1');
     case 'report':
       return messageBody(updateId, account, '/report', true);
+    case 'rebuild':
+      return messageBody(updateId, account, '/rebuild Альфа | Секрет', true);
     default: {
       const unreachable: never = handler;
       throw new Error(unreachable);

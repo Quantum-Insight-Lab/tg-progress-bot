@@ -2,6 +2,7 @@ import { InlineKeyboard, type Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { GithubLoginActions } from '../domain/projects/github-login.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Пункт настроек и заголовок сообщения с логином. */
 export const GITHUB_LOGIN_HEADING = 'Логин GitHub';
@@ -63,6 +64,7 @@ interface TelegramAccount {
 }
 
 function replyOf(error: unknown): string | null {
+  traceRefusal(error);
   if (!(error instanceof DomainError)) throw error;
   switch (error.code) {
     case DOMAIN_ERROR.GITHUB_LOGIN_DUPLICATE:
@@ -124,12 +126,14 @@ export function attachGithubLogin(bot: Bot, actions: GithubLoginActions): void {
       await next();
       return;
     }
+    traceHandler('github-login');
     const reply = await replyToGithubLogin(ctx.chat?.type, ctx.from, String(ctx.update.update_id), parsed.login, actions);
     if (reply !== null) await ctx.reply(reply);
     await next();
   });
 
   bot.callbackQuery(GITHUB_LOGIN_SKIP_DATA, async (ctx) => {
+    traceHandler('github-login');
     await ctx.answerCallbackQuery();
     const from = ctx.from;
     if (from.is_bot) return;

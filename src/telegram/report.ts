@@ -3,6 +3,7 @@ import type { ReportCommands, ReportDocument, ReportMessage } from '../domain/pr
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { dailyReport, type DailyReportView } from '../projections/daily-report.ts';
 import type { ReportBacklogShare } from '../projections/report-backlog-block.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Группа ещё не привязана — командного отчёта нет. */
 export const REPORT_UNBOUND = 'Пока супергруппа не привязана, отчёта группы нет.';
@@ -63,6 +64,7 @@ export function renderReportDocuments(documents: readonly ReportDocument[]): str
 }
 
 function noteOf(error: DomainError): string | null {
+  traceRefusal(error);
   switch (error.code) {
     case DOMAIN_ERROR.REPORT_UNBOUND:
       return REPORT_UNBOUND;
@@ -109,6 +111,7 @@ export async function replyToReportCommand(
 /** Команда `/report` на единственном экземпляре grammY. */
 export function attachReport(bot: Bot, actions: ReportCommands): void {
   bot.command('report', async (ctx) => {
+    traceHandler('report');
     const chat = ctx.chat;
     const message = await replyToReportCommand(
       { type: chat?.type, id: chat === undefined ? undefined : String(chat.id) },

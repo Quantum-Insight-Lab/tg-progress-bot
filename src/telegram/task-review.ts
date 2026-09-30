@@ -3,6 +3,7 @@ import type { TaskReviewing, TaskReviewResult } from '../domain/tasks/review-tas
 import { TASK_TRANSITION_CONFIRM, TASK_TRANSITION_RETURN } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const REVIEW_DATA = new RegExp(`^task:(${TASK_TRANSITION_CONFIRM}|${TASK_TRANSITION_RETURN}):([1-9]\\d*)$`);
@@ -63,6 +64,7 @@ export async function replyToTaskReview(
       idempotencyKey,
     });
   } catch (error) {
+    traceRefusal(error);
     if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
     if (!(error instanceof DomainError)) throw error;
     if (refusal(error)) return null;
@@ -73,6 +75,7 @@ export async function replyToTaskReview(
 /** Кнопки «подтвердить» и «вернуть» на единственном экземпляре grammY. */
 export function attachTaskReview(bot: Bot, actions: TaskReviewing, canvas?: CanvasRedraw): void {
   bot.callbackQuery(new RegExp(`^task:(?:${TASK_TRANSITION_CONFIRM}|${TASK_TRANSITION_RETURN}):`), async (ctx) => {
+    traceHandler('task-review');
     const parsed = parseTaskReviewData(ctx.callbackQuery.data);
     const from = ctx.from;
     const message = ctx.callbackQuery.message;

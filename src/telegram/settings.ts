@@ -3,6 +3,7 @@ import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { ProjectSettings, SettingsView, SettingUpdate } from '../domain/projects/settings.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Строка админки проекта в личке корня. */
 export const SETTINGS_HEADING = 'Настройки';
@@ -111,6 +112,7 @@ export function renderSettings(view: SettingsView): string {
 }
 
 function replyOf(error: unknown): string | null {
+  traceRefusal(error);
   if (!(error instanceof DomainError)) throw error;
   switch (error.code) {
     case DOMAIN_ERROR.SETTINGS_DUPLICATE:
@@ -188,6 +190,7 @@ export function attachSettings(bot: Bot, actions: ProjectSettings): void {
       await next();
       return;
     }
+    traceHandler('settings');
     const reply = await replyToSettings(ctx.chat?.type, ctx.from, request, String(ctx.update.update_id), actions);
     if (reply !== null) await ctx.reply(reply);
     await next();

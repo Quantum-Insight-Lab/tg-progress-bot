@@ -3,6 +3,7 @@ import type { TaskPlanResult, TaskPlanning } from '../domain/tasks/plan-task.ts'
 import { TASK_TRANSITION_PLAN, TASK_TRANSITION_RESUME } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 import { TASK_PRIORITY_ACTION } from '../projections/tasks-block.ts';
 import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
@@ -65,6 +66,7 @@ export async function replyToTaskPlan(
       idempotencyKey,
     });
   } catch (error) {
+    traceRefusal(error);
     if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
     if (!(error instanceof DomainError)) throw error;
     if (refusal(error)) return null;
@@ -77,6 +79,7 @@ export function attachTaskPlan(bot: Bot, actions: TaskPlanning, canvas?: CanvasR
   bot.callbackQuery(
     new RegExp(`^task:(?:${TASK_TRANSITION_PLAN}|${TASK_TRANSITION_RESUME}|${TASK_PRIORITY_ACTION}):`),
     async (ctx) => {
+      traceHandler('task-plan');
       const parsed = parseTaskPlanData(ctx.callbackQuery.data);
       const from = ctx.from;
       const message = ctx.callbackQuery.message;

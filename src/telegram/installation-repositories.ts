@@ -2,6 +2,7 @@ import type { Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { InstallationRepositories, Repository } from '../domain/github/repository.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Заголовок списка репозиториев установки. */
 export const REPOSITORIES_HEADING = 'Репозитории';
@@ -34,6 +35,7 @@ export function renderRepositories(repositories: readonly Repository[]): string 
 }
 
 function replyOf(error: unknown): string | null {
+  traceRefusal(error);
   if (!(error instanceof DomainError)) throw error;
   switch (error.code) {
     case DOMAIN_ERROR.REPOSITORY_CHAT:
@@ -82,6 +84,7 @@ export function attachInstallationRepositories(bot: Bot, actions: InstallationRe
       await next();
       return;
     }
+    traceHandler('installation-repositories');
     const reply = await replyToRepositories(ctx.chat?.type, ctx.from, String(ctx.update.update_id), actions);
     if (reply !== null) await ctx.reply(reply);
     await next();

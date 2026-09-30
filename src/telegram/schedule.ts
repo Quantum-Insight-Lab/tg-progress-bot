@@ -2,6 +2,7 @@ import type { Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { ScheduleActions, ScheduleBoard } from '../domain/projects/schedule.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Строка настроек: время отчёта группы. */
 export const SCHEDULE_HEADING = 'Время отчёта';
@@ -98,6 +99,7 @@ export function parseScheduleMessage(text: string): ScheduleRequest | null {
 }
 
 function replyOf(error: unknown): string | null {
+  traceRefusal(error);
   if (!(error instanceof DomainError)) throw error;
   switch (error.code) {
     case DOMAIN_ERROR.SCHEDULE_DUPLICATE:
@@ -192,6 +194,7 @@ export function attachSchedule(bot: Bot, actions: ScheduleActions): void {
       await next();
       return;
     }
+    traceHandler('schedule');
     const reply = await replyToScheduleMessage(ctx.chat?.type, ctx.from, request, String(ctx.update.update_id), actions);
     if (reply !== null) await ctx.reply(reply);
     await next();

@@ -1,27 +1,11 @@
 import type { Bot, Context } from 'grammy';
 import type { AccessGate } from '../domain/projects/access.ts';
+import { commandOf, traceGuard } from './update-log.ts';
 
 /** Отказ постороннему. Имен, проектов и других данных в тексте нет. */
 export const ACCESS_DENIED_REPLY = 'Нет доступа.';
 
-/**
- * Обработчики, которые стоят за единственным guard.
- * Новый обработчик добавляется сюда и подключается в процессе после guard.
- */
-export const GUARDED_HANDLERS = ['start', 'new-project', 'chat-binding', 'participants', 'executor-topic', 'github-login', 'reports-topic', 'schedule', 'settings', 'installation-repositories', 'project-repository', 'task', 'report'] as const;
-
-export type GuardedHandler = (typeof GUARDED_HANDLERS)[number];
-
-function isStartCommand(ctx: Context): boolean {
-  const message = ctx.message;
-  if (message === undefined || !('text' in message) || message.text === undefined) return false;
-  if (!('entities' in message) || message.entities === undefined) return false;
-  const entity = message.entities[0];
-  if (entity === undefined || entity.type !== 'bot_command' || entity.offset !== 0) return false;
-  const token = message.text.slice(entity.offset, entity.offset + entity.length);
-  const name = token.split('@')[0];
-  return name === '/start';
-}
+const START_COMMAND = '/start';
 
 function updateKind(ctx: Context): string {
   if (ctx.message !== undefined) return 'message';
@@ -31,18 +15,20 @@ function updateKind(ctx: Context): string {
 }
 
 /**
- * Единственный вход во все обработчики.
+ * Единственный вход во все обработчики из `GUARDED_HANDLERS`.
  * `/start` проходит дальше: так человек становится известен боту.
  * Остальные обновления постороннего сюда не пускают и отвечают отказом.
  */
 export function attachAccessGuard(bot: Bot, gate: AccessGate): void {
   bot.use(async (ctx, next) => {
-    if (isStartCommand(ctx)) {
+    if (commandOf(ctx) === START_COMMAND) {
+      traceGuard('allow', 'start');
       await next();
       return;
     }
     const from = ctx.from;
     if (from === undefined || from.is_bot) {
+      traceGuard('allow', 'no_person');
       await next();
       return;
     }
@@ -51,6 +37,7 @@ export function attachAccessGuard(bot: Bot, gate: AccessGate): void {
       updateKind: updateKind(ctx),
       idempotencyKey: String(ctx.update.update_id),
     });
+    traceGuard(decision, 'gate');
     if (decision === 'allow') {
       await next();
       return;

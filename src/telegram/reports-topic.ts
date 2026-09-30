@@ -7,6 +7,7 @@ import {
 } from '../domain/projects/reports-topic.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { afterReportsTopic } from './schedule.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Строка настроек: командный топик. */
 export const REPORTS_TOPIC_HEADING = 'Командный топик';
@@ -129,6 +130,7 @@ function screenOf(view: ReportsBoard): ScreenReply {
 }
 
 function replyOf(error: unknown): ScreenReply | null {
+  traceRefusal(error);
   if (!(error instanceof DomainError)) throw error;
   switch (error.code) {
     case DOMAIN_ERROR.REPORTS_TOPIC_DUPLICATE:
@@ -265,12 +267,14 @@ export function attachReportsTopic(bot: Bot, actions: ReportsTopicActions): void
       await next();
       return;
     }
+    traceHandler('reports-topic');
     const reply = await replyToReportsTopicMessage(ctx.chat?.type, ctx.from, request, String(ctx.update.update_id), actions);
     if (reply !== null) await send(ctx, reply);
     await next();
   });
 
   bot.callbackQuery(/^ry:/, async (ctx) => {
+    traceHandler('reports-topic');
     await ctx.answerCallbackQuery();
     const parsed = parseReportsCallback(ctx.callbackQuery.data);
     const from = ctx.from;
@@ -280,6 +284,7 @@ export function attachReportsTopic(bot: Bot, actions: ReportsTopicActions): void
   });
 
   bot.callbackQuery(/^rn:/, async (ctx) => {
+    traceHandler('reports-topic');
     await ctx.answerCallbackQuery();
     const parsed = parseReportsCallback(ctx.callbackQuery.data);
     const from = ctx.from;

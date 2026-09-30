@@ -2,6 +2,7 @@ import type { Bot } from 'grammy';
 import { PRIVATE_CHAT, type ProjectCreation, type ProjectDraft } from '../domain/projects/create-project.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { SupergroupReply } from './chat-binding.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Шаг онбординга: заголовок сообщения, затем имя, описание и таймзона. */
 export const NEW_PROJECT_HEADING = 'Новый проект';
@@ -64,6 +65,7 @@ export async function replyToNewProject(
     const created = await creation.create(draft);
     return projectCreatedReply(created.project.name);
   } catch (error) {
+    traceRefusal(error);
     if (!(error instanceof DomainError)) throw error;
     if (error.code === DOMAIN_ERROR.PROJECT_DUPLICATE) return null;
     if (error.code === DOMAIN_ERROR.PROJECT_CREATOR) return NEW_PROJECT_REFUSAL;
@@ -91,6 +93,7 @@ export function attachNewProject(
       await next();
       return;
     }
+    traceHandler('new-project');
     const chatType = ctx.chat?.type;
     const reply = await replyToNewProject(chatType, ctx.from, String(ctx.update.update_id), fields, creation);
     if (reply !== null) {

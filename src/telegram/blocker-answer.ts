@@ -3,6 +3,7 @@ import type { BlockerAnswering, BlockerReasonResult, NoBlockerResult } from '../
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { blockerQuestionReply, parseNoBlockerData } from '../projections/blocker-question.ts';
 import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
+import { traceHandler, traceRefusal } from './update-log.ts';
 
 interface TelegramAccount {
   id: number;
@@ -50,6 +51,7 @@ export async function replyToBlockerReason(
     fromBot: reply.fromBot,
   });
   if (question === null) return null;
+  traceHandler('blocker-answer');
   try {
     return await actions.declare({
       telegramUserId: String(from.id),
@@ -63,6 +65,7 @@ export async function replyToBlockerReason(
       idempotencyKey,
     });
   } catch (error) {
+    traceRefusal(error);
     if (!(error instanceof DomainError)) throw error;
     if (refusal(error)) return null;
     throw error;
@@ -91,6 +94,7 @@ export async function replyToNoBlocker(
       idempotencyKey,
     });
   } catch (error) {
+    traceRefusal(error);
     if (!(error instanceof DomainError)) throw error;
     if (refusal(error)) return null;
     throw error;
@@ -128,6 +132,7 @@ export function attachBlockerAnswer(bot: Bot, actions: BlockerAnswering, canvas?
   });
 
   bot.callbackQuery(/^task:noblock:/, async (ctx) => {
+    traceHandler('blocker-answer');
     const taskNumber = parseNoBlockerData(ctx.callbackQuery.data);
     const from = ctx.from;
     const message = ctx.callbackQuery.message;
