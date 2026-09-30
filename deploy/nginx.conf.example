@@ -1,0 +1,42 @@
+# Внешний прокси: nginx хоста держит 80 и 443, app из compose слушает 127.0.0.1:APP_HOST_PORT (8088).
+# bot.example.com — заменить на PUBLIC_HOST. Сертификат — certbot: certbot certonly --nginx -d bot.example.com
+# Оба webhook на одном TLS-хосте, остальные пути — 404, как в deploy/Caddyfile.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name bot.example.com;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name bot.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/bot.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bot.example.com/privkey.pem;
+
+    location = /telegram/webhook {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # GitHub шлёт доставку до 25 МБ; у nginx по умолчанию 1 МБ.
+    location = /github/webhook {
+        client_max_body_size 25m;
+        proxy_pass http://127.0.0.1:8088;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        return 404;
+    }
+}
