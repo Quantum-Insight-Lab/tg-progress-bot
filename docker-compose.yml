@@ -1,18 +1,30 @@
-# app — образ процесса. migrate — отдельный шаг до старта. caddy — TLS для обоих webhook.
-# setWebhook: npm run register-webhooks, когда PUBLIC_HOST уже отвечает по HTTPS.
+# app — образ процесса. migrate — отдельный шаг до старта. Порядок и копия журнала — deploy/README.md.
+# TLS: профиль caddy (COMPOSE_PROFILES=caddy) — Caddy на 80 и 443; без профиля — прокси хоста
+# на 127.0.0.1:APP_HOST_PORT, пример — deploy/nginx.conf.example.
+# setWebhook: docker compose run --rm register-webhooks, когда PUBLIC_HOST уже отвечает по HTTPS.
 # URL GitHub App — тот же хост и путь /github/webhook; бот его в GitHub не записывает.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: ${POSTGRES_DB:-progress}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-user} -d $${POSTGRES_DB:-progress}"]
       interval: 2s
       timeout: 5s
       retries: 20
+    logging: *logging
   migrate:
     build: .
     command:
@@ -26,8 +38,10 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
+    logging: *logging
   app:
     build: .
+    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://user:password@postgres:5432/progress}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -45,8 +59,13 @@ services:
         condition: service_completed_successfully
     expose:
       - "8080"
+    ports:
+      - "127.0.0.1:${APP_HOST_PORT:-8088}:8080"
+    logging: *logging
   caddy:
     image: caddy:2
+    profiles: [caddy]
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
@@ -56,3 +75,22 @@ services:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - app
+    logging: *logging
+  register-webhooks:
+    build: .
+    profiles: [tools]
+    command:
+      - node
+      - --experimental-strip-types
+      - --disable-warning=ExperimentalWarning
+      - src/register-webhooks-main.ts
+    environment:
+      PUBLIC_WEBHOOK_ORIGIN: ${PUBLIC_WEBHOOK_ORIGIN:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_WEBHOOK_PATH: ${TELEGRAM_WEBHOOK_PATH:-/telegram/webhook}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+    logging: *logging
+
+volumes:
+  pgdata:
