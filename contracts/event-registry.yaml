@@ -685,3 +685,142 @@ events:
     realizes: [R-754, R-759, R-758]
     projections: [P-12, P-13, P-14]
     owner: max
+
+  # наблюдаемость — факты, которых нет в журнале домена; счётчик из них считается, а не хранится
+  - type: canvas.rebuild_requested
+    version: 1
+    context: tasks
+    actor: root
+    subject: Canvas
+    payload:
+      canvas_id: string
+      project_id: string
+      assignee_id: string
+      canvas_date: date
+      requested_by: string
+    idempotency_key: telegram update_id
+    invariants: [INV-22, INV-23, INV-24]
+    projections: []
+    next: [canvas.edited]
+    derived: просьба перерисовать сегодняшний канвас при разборе инцидента (A-37)
+    owner: max
+
+  - type: command.rejected
+    version: 1
+    context: events
+    actor: system
+    subject: User
+    payload:
+      reason: enum[no_right, forbidden_transition]
+      code: string
+    idempotency_key: callback_query_id or telegram update_id
+    invariants: [INV-22]
+    projections: []
+    derived: отказ своему участнику не был фактом (M-12, A-38)
+    owner: max
+
+  - type: delivery.duplicate
+    version: 1
+    context: events
+    actor: system
+    subject: Event
+    payload:
+      source_type: string
+      source_key: string
+    idempotency_key: duplicate + source_key
+    invariants: [INV-22]
+    projections: []
+    derived: повтор доставки не пишет вторую строку исходного факта (M-7, A-39)
+    owner: max
+
+  - type: telegram.api_failed
+    version: 1
+    context: events
+    actor: system
+    subject: Chat
+    payload:
+      method: string
+      kind: enum[edit_rejected, rate_limited, other]
+      error_code: int
+      chat_id: string | null
+      message_id: int | null
+    idempotency_key: method + chat_id + message_id + error_code + telegram update_id or slot + date
+    invariants: [INV-22]
+    projections: []
+    derived: ошибка Bot API не была фактом (M-15, A-40)
+    owner: max
+
+  - type: github.rate_observed
+    version: 1
+    context: github
+    actor: system
+    subject: App
+    payload:
+      remaining_percent: int
+    idempotency_key: run_started_at
+    invariants: [INV-21, INV-22]
+    projections: []
+    derived: остаток лимита GitHub App за ход сверки (M-17, A-41)
+    owner: max
+
+  - type: scheduler.missed
+    version: 1
+    context: events
+    actor: system
+    subject: Event
+    payload:
+      action: enum[A-32, A-33]
+      subject_id: string
+      date: date
+    idempotency_key: action + subject_id + date
+    invariants: [INV-22, INV-24]
+    projections: []
+    derived: пропуск обязательного слота виден только на следующем ходу (M-18, A-42)
+    owner: max
+
+  - type: report.delivery_failed
+    version: 1
+    context: projects
+    actor: system
+    subject: Chat
+    payload:
+      target: enum[private, group]
+      chat_id: string
+      topic_id: int | null
+      error_code: int | null
+    idempotency_key: chat_id + date + target
+    invariants: [INV-22, INV-27]
+    projections: []
+    derived: неотправленный отчёт не был фактом (M-19, A-43)
+    owner: max
+
+  - type: invariant.violated
+    version: 1
+    context: events
+    actor: system
+    subject: Event
+    payload:
+      invariant_id: string
+      subject_entity: string
+      subject_id: string
+      date: date
+    idempotency_key: invariant_id + subject_id + date
+    invariants: [INV-22]
+    projections: []
+    derived: нарушение INV дошло до состояния (M-11, A-44)
+    owner: max
+
+  - type: alert.sent
+    version: 1
+    context: projects
+    actor: system
+    subject: User
+    payload:
+      metric: string
+      subject_id: string
+      period: enum[day, week]
+    idempotency_key: metric + subject_id + period_start
+    invariants: [INV-16, INV-22]
+    projections: [P-19]
+    derived: оповещение корня, чтобы ход планировщика не слал его дважды (A-45)
+    owner: max

@@ -45,6 +45,15 @@ export const EVENT_TYPES = {
   REPO_PR_STALLED: 'repo.pr_stalled',
   PROGRESS_SNAPSHOT_TAKEN: 'progress.snapshot_taken',
   REPORT_SENT: 'report.sent',
+  CANVAS_REBUILD_REQUESTED: 'canvas.rebuild_requested',
+  COMMAND_REJECTED: 'command.rejected',
+  DELIVERY_DUPLICATE: 'delivery.duplicate',
+  TELEGRAM_API_FAILED: 'telegram.api_failed',
+  GITHUB_RATE_OBSERVED: 'github.rate_observed',
+  SCHEDULER_MISSED: 'scheduler.missed',
+  REPORT_DELIVERY_FAILED: 'report.delivery_failed',
+  INVARIANT_VIOLATED: 'invariant.violated',
+  ALERT_SENT: 'alert.sent',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -92,6 +101,15 @@ export const EVENT_VERSIONS = {
   'repo.pr_stalled': 1,
   'progress.snapshot_taken': 1,
   'report.sent': 1,
+  'canvas.rebuild_requested': 1,
+  'command.rejected': 1,
+  'delivery.duplicate': 1,
+  'telegram.api_failed': 1,
+  'github.rate_observed': 1,
+  'scheduler.missed': 1,
+  'report.delivery_failed': 1,
+  'invariant.violated': 1,
+  'alert.sent': 1,
 } as const satisfies Record<EventType, number>;
 
 export interface EventEnvelope {
@@ -377,6 +395,62 @@ export interface ReportSentPayload {
   trigger: 'schedule' | 'command';
 }
 
+export interface CanvasRebuildRequestedPayload {
+  canvas_id: string;
+  project_id: string;
+  assignee_id: string;
+  canvas_date: string;
+  requested_by: string;
+}
+
+export interface CommandRejectedPayload {
+  reason: 'no_right' | 'forbidden_transition';
+  code: string;
+}
+
+export interface DeliveryDuplicatePayload {
+  source_type: string;
+  source_key: string;
+}
+
+export interface TelegramApiFailedPayload {
+  method: string;
+  kind: 'edit_rejected' | 'rate_limited' | 'other';
+  error_code: number;
+  chat_id: string | null;
+  message_id: number | null;
+}
+
+export interface GithubRateObservedPayload {
+  remaining_percent: number;
+}
+
+export interface SchedulerMissedPayload {
+  action: 'A-32' | 'A-33';
+  subject_id: string;
+  date: string;
+}
+
+export interface ReportDeliveryFailedPayload {
+  target: 'private' | 'group';
+  chat_id: string;
+  topic_id: number | null;
+  error_code: number | null;
+}
+
+export interface InvariantViolatedPayload {
+  invariant_id: string;
+  subject_entity: string;
+  subject_id: string;
+  date: string;
+}
+
+export interface AlertSentPayload {
+  metric: string;
+  subject_id: string;
+  period: 'day' | 'week';
+}
+
 export interface PayloadByType {
   'task.created': TaskCreatedPayload;
   'task.checked': TaskCheckedPayload;
@@ -420,6 +494,15 @@ export interface PayloadByType {
   'repo.pr_stalled': RepoPrStalledPayload;
   'progress.snapshot_taken': ProgressSnapshotTakenPayload;
   'report.sent': ReportSentPayload;
+  'canvas.rebuild_requested': CanvasRebuildRequestedPayload;
+  'command.rejected': CommandRejectedPayload;
+  'delivery.duplicate': DeliveryDuplicatePayload;
+  'telegram.api_failed': TelegramApiFailedPayload;
+  'github.rate_observed': GithubRateObservedPayload;
+  'scheduler.missed': SchedulerMissedPayload;
+  'report.delivery_failed': ReportDeliveryFailedPayload;
+  'invariant.violated': InvariantViolatedPayload;
+  'alert.sent': AlertSentPayload;
 }
 
 export const EventEnvelopeSchema = z.strictObject({
@@ -705,6 +788,62 @@ export const ReportSentPayloadSchema = z.strictObject({
   trigger: z.enum(['schedule', 'command']),
 });
 
+export const CanvasRebuildRequestedPayloadSchema = z.strictObject({
+  canvas_id: z.string(),
+  project_id: z.string(),
+  assignee_id: z.string(),
+  canvas_date: z.string(),
+  requested_by: z.string(),
+});
+
+export const CommandRejectedPayloadSchema = z.strictObject({
+  reason: z.enum(['no_right', 'forbidden_transition']),
+  code: z.string(),
+});
+
+export const DeliveryDuplicatePayloadSchema = z.strictObject({
+  source_type: z.string(),
+  source_key: z.string(),
+});
+
+export const TelegramApiFailedPayloadSchema = z.strictObject({
+  method: z.string(),
+  kind: z.enum(['edit_rejected', 'rate_limited', 'other']),
+  error_code: z.number().int(),
+  chat_id: z.union([z.string(), z.null()]),
+  message_id: z.union([z.number().int(), z.null()]),
+});
+
+export const GithubRateObservedPayloadSchema = z.strictObject({
+  remaining_percent: z.number().int(),
+});
+
+export const SchedulerMissedPayloadSchema = z.strictObject({
+  action: z.enum(['A-32', 'A-33']),
+  subject_id: z.string(),
+  date: z.string(),
+});
+
+export const ReportDeliveryFailedPayloadSchema = z.strictObject({
+  target: z.enum(['private', 'group']),
+  chat_id: z.string(),
+  topic_id: z.union([z.number().int(), z.null()]),
+  error_code: z.union([z.number().int(), z.null()]),
+});
+
+export const InvariantViolatedPayloadSchema = z.strictObject({
+  invariant_id: z.string(),
+  subject_entity: z.string(),
+  subject_id: z.string(),
+  date: z.string(),
+});
+
+export const AlertSentPayloadSchema = z.strictObject({
+  metric: z.string(),
+  subject_id: z.string(),
+  period: z.enum(['day', 'week']),
+});
+
 export const payloadSchemaByType = {
   'task.created': TaskCreatedPayloadSchema,
   'task.checked': TaskCheckedPayloadSchema,
@@ -748,4 +887,13 @@ export const payloadSchemaByType = {
   'repo.pr_stalled': RepoPrStalledPayloadSchema,
   'progress.snapshot_taken': ProgressSnapshotTakenPayloadSchema,
   'report.sent': ReportSentPayloadSchema,
+  'canvas.rebuild_requested': CanvasRebuildRequestedPayloadSchema,
+  'command.rejected': CommandRejectedPayloadSchema,
+  'delivery.duplicate': DeliveryDuplicatePayloadSchema,
+  'telegram.api_failed': TelegramApiFailedPayloadSchema,
+  'github.rate_observed': GithubRateObservedPayloadSchema,
+  'scheduler.missed': SchedulerMissedPayloadSchema,
+  'report.delivery_failed': ReportDeliveryFailedPayloadSchema,
+  'invariant.violated': InvariantViolatedPayloadSchema,
+  'alert.sent': AlertSentPayloadSchema,
 } as const satisfies { [K in EventType]: z.ZodType<PayloadByType[K]> };
