@@ -42,15 +42,36 @@ function issues(error: { issues: readonly { message: string }[] }): string {
   return error.issues.map((issue) => issue.message).join('; ');
 }
 
-interface PayloadParser<T> {
-  safeParse(data: unknown): { success: true; data: T } | { success: false; error: { issues: readonly { message: string }[] } };
+interface PayloadIssue {
+  code: string;
+  path: readonly PropertyKey[];
+  message: string;
+  keys?: readonly string[];
 }
 
-function parsePayload<T extends EventType>(type: T, payload: PayloadByType[T]): PayloadByType[T] {
+interface PayloadParser<T> {
+  safeParse(data: unknown): { success: true; data: T } | { success: false; error: { issues: readonly PayloadIssue[] } };
+}
+
+/** Путь поля от корня payload. Лишний ключ strict-схемы — путь к самому ключу. */
+function issuePaths(issue: PayloadIssue): string[] {
+  const base = ['payload', ...issue.path.map(String)];
+  if (issue.keys === undefined || issue.keys.length === 0) return [base.join('.')];
+  return issue.keys.map((key) => [...base, key].join('.'));
+}
+
+function parsePayload<T extends EventType>(journal: EventJournal, type: T, payload: PayloadByType[T]): PayloadByType[T] {
   // Индекс по EventType — объединение схем; разбор идёт схемой конкретного типа.
   const schema = payloadSchemaByType[type] as PayloadParser<PayloadByType[T]>;
   const parsed = schema.safeParse(payload);
-  if (!parsed.success) throw new EventRejected('invalid_payload', issues(parsed.error));
+  if (!parsed.success) {
+    journal.refuse({
+      eventType: type,
+      paths: [...new Set(parsed.error.issues.flatMap(issuePaths))],
+      codes: [...new Set(parsed.error.issues.map((issue) => issue.code))],
+    });
+    throw new EventRejected('invalid_payload', issues(parsed.error));
+  }
   return parsed.data;
 }
 
@@ -63,7 +84,7 @@ export async function emit<T extends EventType>(journal: EventJournal, input: Em
     throw new EventRejected('invalid_envelope', 'source и ключ идемпотентности не пустые');
   }
   if (Number.isNaN(input.occurredAt.getTime())) throw new EventRejected('invalid_envelope', 'occurred_at');
-  const payload = parsePayload(input.type, input.payload);
+  const payload = parsePayload(journal, input.type, input.payload);
   const envelope = {
     event_id: randomUUID(),
     event_type: input.type,

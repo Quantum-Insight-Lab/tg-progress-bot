@@ -45,6 +45,7 @@ import {
   SETTINGS_UNBOUND,
   SETTINGS_UNKNOWN_FIELD,
 } from '../src/telegram/settings.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -94,12 +95,12 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
   await registration.registerOnStart({ telegramUserId: String(glebAccount.id), name: glebAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -116,7 +117,7 @@ async function seed(): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-beta',
   });
-  const membership = createMembership(handle.db, clock);
+  const membership = createMembership(handle.db, silentLogger, clock);
   await membership.add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
@@ -135,7 +136,7 @@ async function seed(): Promise<Fixture> {
     INSERT INTO project_members (id, project_id, user_id, role)
     VALUES (${leadId}::uuid, ${alpha.project.id}::uuid, ${vera.user.id}::uuid, ${LEAD_ROLE})
   `.execute(handle.db);
-  const binding = createChatBinding(handle.db, clock);
+  const binding = createChatBinding(handle.db, silentLogger, clock);
   await binding.confirm({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
@@ -266,7 +267,7 @@ describe('INV-19 настройки меняет только корень в л
   it('INV-19 корень в личке меняет имя, описание, таймзону, супергруппу и роль; остальные нет', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createProjectSettings(fixture.db, clock);
+    const actions = createProjectSettings(fixture.db, silentLogger, clock);
     const before = await projects(fixture.db);
     const alpha = before.find((project) => project.name === 'Альфа');
     const beta = before.find((project) => project.name === 'Бета');
@@ -407,7 +408,7 @@ describe('INV-19 настройки меняет только корень в л
     expect(await replyToSettings('private', rootAccount, { kind: 'show', projectName: 'Нет такого' }, 'missing', actions)).toBe(
       SETTINGS_NO_PROJECT,
     );
-    await createProjectCreation(fixture.db, clock).create({
+    await createProjectCreation(fixture.db, silentLogger, clock).create({
       telegramUserId: String(rootAccount.id),
       name: 'Бета',
       description: '',
@@ -489,7 +490,7 @@ describe('INV-22 повтор настройки не применяется в�
   it('INV-22 тот же ключ не меняет поле и не пишет второе событие', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createProjectSettings(fixture.db, clock);
+    const actions = createProjectSettings(fixture.db, silentLogger, clock);
     const first = await replyToSettings(
       'private',
       rootAccount,
@@ -555,7 +556,7 @@ describe('INV-24 сутки и застой по таймзоне проекта
         ${sentCanvasDate}::date
       )
     `.execute(fixture.db);
-    const actions = createProjectSettings(fixture.db, clock);
+    const actions = createProjectSettings(fixture.db, silentLogger, clock);
     const beforeProjects = await projects(fixture.db);
     const beforeChats = await chatZones(fixture.db);
     const beforeRoles = await roles(fixture.db, fixture.alphaId);

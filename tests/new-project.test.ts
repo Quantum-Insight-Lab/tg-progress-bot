@@ -24,6 +24,7 @@ import { SUPERGROUP_REQUEST } from '../src/telegram/chat-binding.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -60,13 +61,13 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 }
 
 async function registerRoot(db: Kysely<Database>): Promise<string> {
-  const registration = createUserRegistration(db, clock);
+  const registration = createUserRegistration(db, silentLogger, clock);
   const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   return root.user.id;
 }
 
 async function registerSecond(db: Kysely<Database>): Promise<void> {
-  const registration = createUserRegistration(db, clock);
+  const registration = createUserRegistration(db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(secondAccount.id), name: secondAccount.first_name });
 }
 
@@ -193,7 +194,7 @@ describe('INV-17 корень в заведённом проекте — lead', 
     const handle = await openDb();
     opened.push(handle);
     const rootId = await registerRoot(handle.db);
-    const creation = createProjectCreation(handle.db, clock);
+    const creation = createProjectCreation(handle.db, silentLogger, clock);
     const fields = parseNewProjectMessage(projectText);
     if (fields === null) throw new Error('сообщение проекта');
     const first = await replyToNewProject('private', rootAccount, '42', fields, creation);
@@ -242,7 +243,7 @@ describe('INV-17 корень в заведённом проекте — lead', 
     opened.push(handle);
     await registerRoot(handle.db);
     await registerSecond(handle.db);
-    const creation = createProjectCreation(handle.db, clock);
+    const creation = createProjectCreation(handle.db, silentLogger, clock);
     const fields = parseNewProjectMessage(projectText);
     if (fields === null) throw new Error('сообщение проекта');
     const reply = await replyToNewProject('private', secondAccount, '44', fields, creation);
@@ -266,7 +267,7 @@ describe('INV-19 проект заводится в личке', () => {
     const handle = await openDb();
     opened.push(handle);
     await registerRoot(handle.db);
-    const creation = createProjectCreation(handle.db, clock);
+    const creation = createProjectCreation(handle.db, silentLogger, clock);
     const fields = parseNewProjectMessage(projectText);
     if (fields === null) throw new Error('сообщение проекта');
     const reply = await replyToNewProject('supergroup', rootAccount, '45', fields, creation);
@@ -291,7 +292,7 @@ describe('INV-19 проект заводится в личке', () => {
     const handle = await openDb();
     opened.push(handle);
     await registerRoot(handle.db);
-    const creation = createProjectCreation(handle.db, clock);
+    const creation = createProjectCreation(handle.db, silentLogger, clock);
     expect(parseNewProjectMessage('Альфа\nописание\nEurope/Moscow')).toBeNull();
     expect(parseNewProjectMessage(`${NEW_PROJECT_HEADING}\nАльфа`)).toBeNull();
 
@@ -320,7 +321,7 @@ describe('INV-22 повтор «Новый проект» не применяе�
     const handle = await openDb();
     opened.push(handle);
     const rootId = await registerRoot(handle.db);
-    const creation = createProjectCreation(handle.db, clock);
+    const creation = createProjectCreation(handle.db, silentLogger, clock);
     const fields = parseNewProjectMessage(projectText);
     if (fields === null) throw new Error('сообщение проекта');
     const first = await replyToNewProject('private', rootAccount, '48', fields, creation);
@@ -346,7 +347,7 @@ describe('INV-22 повтор «Новый проект» не применяе�
     const handle = await openDb();
     opened.push(handle);
     await registerRoot(handle.db);
-    const creation = createProjectCreation(handle.db, clock);
+    const creation = createProjectCreation(handle.db, silentLogger, clock);
     await expect(
       creation.create({
         telegramUserId: String(rootAccount.id),

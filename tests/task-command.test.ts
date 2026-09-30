@@ -51,6 +51,7 @@ import {
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const at = '2026-09-28T07:33:00.000Z';
@@ -102,6 +103,7 @@ function memoryJournal(): { journal: EventJournal; rows: EventRow[] } {
         rows.push(row);
         return { inserted: true, row };
       },
+      refuse: () => undefined,
     },
   };
 }
@@ -158,11 +160,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -179,7 +181,7 @@ async function seed(): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-beta',
   });
-  const membership = createMembership(handle.db, clock);
+  const membership = createMembership(handle.db, silentLogger, clock);
   await membership.add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
@@ -194,7 +196,7 @@ async function seed(): Promise<Fixture> {
   await sql`
     UPDATE project_members SET topic_id = ${borisTopic} WHERE user_id = ${boris.user.id}::uuid
   `.execute(handle.db);
-  await createChatBinding(handle.db, clock).confirm({
+  await createChatBinding(handle.db, silentLogger, clock).confirm({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     offer: forumAdmin,
@@ -320,7 +322,7 @@ describe('команда /task в топике исполнителя', () => {
 
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createTaskActions(fixture.db, clock);
+    const actions = createTaskActions(fixture.db, silentLogger, clock);
     const created = await replyToTaskCommand(place(borisTopic), borisAccount, '401', formulation, actions);
     expect(created).toBe(taskCreatedReply(1, formulation));
     const foreign = await replyToTaskCommand(place(veraTopic), borisAccount, '402', formulation, actions);
@@ -332,7 +334,7 @@ describe('команда /task в топике исполнителя', () => {
     const empty = await replyToTaskCommand(place(borisTopic), borisAccount, '405', '   ', actions);
     expect(empty).toBe(TASK_NEEDS_TITLE);
 
-    await emit(createEventJournal(fixture.db), {
+    await emit(createEventJournal(fixture.db, silentLogger), {
       type: EVENT_TYPES.GITHUB_ISSUE_CHANGED,
       source: 'github',
       idempotencyKey: 'gh-issue',
@@ -352,7 +354,7 @@ describe('команда /task в топике исполнителя', () => {
       causationId: null,
       correlationId: null,
     });
-    await emit(createEventJournal(fixture.db), {
+    await emit(createEventJournal(fixture.db, silentLogger), {
       type: EVENT_TYPES.GITHUB_PULL_REQUEST_CHANGED,
       source: 'github',
       idempotencyKey: 'gh-pr',
@@ -372,7 +374,7 @@ describe('команда /task в топике исполнителя', () => {
       causationId: null,
       correlationId: null,
     });
-    await emit(createEventJournal(fixture.db), {
+    await emit(createEventJournal(fixture.db, silentLogger), {
       type: EVENT_TYPES.GITHUB_COMMITS_PUSHED,
       source: 'github',
       idempotencyKey: 'gh-commits',
@@ -411,7 +413,7 @@ describe('команда /task в топике исполнителя', () => {
   it('INV-05 новая задача одна и в статусе IN_PROGRESS; события GitHub статус не меняют', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createTaskActions(fixture.db, clock);
+    const actions = createTaskActions(fixture.db, silentLogger, clock);
     await replyToTaskCommand(place(veraTopic), veraAccount, '501', 'Ждёт руководителя', actions);
     const before = await tasksOf(fixture.db);
     expect(before).toEqual([
@@ -422,7 +424,7 @@ describe('команда /task в топике исполнителя', () => {
       }),
     ]);
     expect(new Set(before.map((task) => task.status))).toEqual(new Set([TASK_STATUS_IN_PROGRESS]));
-    await emit(createEventJournal(fixture.db), {
+    await emit(createEventJournal(fixture.db, silentLogger), {
       type: EVENT_TYPES.GITHUB_ISSUE_CHANGED,
       source: 'github',
       idempotencyKey: 'gh-status',
@@ -450,7 +452,7 @@ describe('команда /task в топике исполнителя', () => {
   it('INV-08 приоритет новой задачи — значение по умолчанию normal', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const created = await createTaskActions(fixture.db, clock).create({
+    const created = await createTaskActions(fixture.db, silentLogger, clock).create({
       telegramUserId: String(borisAccount.id),
       chat: TASK_TOPIC_CHAT,
       telegramChatId,
@@ -470,7 +472,7 @@ describe('команда /task в топике исполнителя', () => {
   it('INV-22 тот же update не создаёт вторую задачу и не пишет второе событие', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createTaskActions(fixture.db, clock);
+    const actions = createTaskActions(fixture.db, silentLogger, clock);
     const first = await replyToTaskCommand(place(borisTopic), borisAccount, '901', 'Первая', actions);
     const second = await replyToTaskCommand(place(borisTopic), borisAccount, '901', 'Вторая', actions);
     expect(first).toBe(taskCreatedReply(1, 'Первая'));
@@ -501,7 +503,7 @@ describe('команда /task в топике исполнителя', () => {
   it('номер уникален в проекте и следующий берётся после наибольшего; lead тоже заводит задачу', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createTaskActions(fixture.db, clock);
+    const actions = createTaskActions(fixture.db, silentLogger, clock);
     await actions.create({
       telegramUserId: String(borisAccount.id),
       chat: TASK_TOPIC_CHAT,

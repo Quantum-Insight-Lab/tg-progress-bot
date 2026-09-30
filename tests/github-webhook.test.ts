@@ -36,6 +36,7 @@ import { readCiMirrorMigration, readEventsMigration, readPullRequestsMigration, 
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const secret = 'hook-secret';
@@ -113,7 +114,7 @@ async function openPullRequestJournal(): Promise<JournalHandle & { journal: Retu
   });
   return {
     db,
-    journal: createEventJournal(db),
+    journal: createEventJournal(db, silentLogger),
     async close() {
       await db.destroy();
     },
@@ -128,7 +129,7 @@ async function openJournal(): Promise<JournalHandle & { journal: ReturnType<type
   });
   return {
     db,
-    journal: createEventJournal(db),
+    journal: createEventJournal(db, silentLogger),
     async close() {
       await db.destroy();
     },

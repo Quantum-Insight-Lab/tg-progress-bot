@@ -23,6 +23,7 @@ import {
   readProjectsMigration,
   readRepositoriesMigration,
 } from '../src/infrastructure/migrate.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const repositoryId = '42';
@@ -124,7 +125,7 @@ async function openMirror(): Promise<Handle> {
 
 async function deliver(db: Kysely<Database>, delivery: GithubDelivery): Promise<void> {
   await db.transaction().execute(async (trx) => {
-    const result = await recordGithubDelivery(createEventJournal(trx), clock, delivery);
+    const result = await recordGithubDelivery(createEventJournal(trx, silentLogger), clock, delivery);
     if (result.status === 'applied' && result.eventType === EVENT_TYPES.GITHUB_ISSUE_CHANGED) {
       await mirrorGithubIssue(trx, result.payload, randomUUID());
     }
@@ -227,7 +228,7 @@ describe('зеркало issue по webhook', () => {
           deliveryId,
           signature: signed(body),
           body,
-          journal: createEventJournal(trx),
+          journal: createEventJournal(trx, silentLogger),
           clock,
           applyIssue: async (payload) => {
             await mirrorGithubIssue(trx, payload, randomUUID());

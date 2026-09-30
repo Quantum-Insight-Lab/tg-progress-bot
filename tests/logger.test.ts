@@ -131,6 +131,7 @@ describe('B-17 вход HTTP: строка на каждый код ответа
   const log = captureLog({ secrets: secretValues(secretEnv) });
   const journal: EventJournal = {
     append: () => Promise.reject(new Error('журнал в этом тесте не пишется')),
+    refuse: () => undefined,
   };
   const noop = async (): Promise<void> => undefined;
   let githubFails = false;

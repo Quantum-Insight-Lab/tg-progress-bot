@@ -50,6 +50,7 @@ import { createProjectCreation } from '../src/infrastructure/projects.ts';
 import { cancelRemovedMemberTasks, createTaskActions, createTaskCancelActions } from '../src/infrastructure/tasks.ts';
 import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { replyToTaskCancel, parseTaskCancelData } from '../src/telegram/task-cancel.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const at = '2026-09-28T07:33:00.000Z';
@@ -177,8 +178,8 @@ describe('кнопка «отменить» и задачи удалённого
   it('R-247 R-248 R-644 руководитель или исполнитель переводят задачу в CANCELLED, чужой и корень — нет', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createTaskCancelActions(fixture.db, clock);
-    const tasks = createTaskActions(fixture.db, clock);
+    const actions = createTaskCancelActions(fixture.db, silentLogger, clock);
+    const tasks = createTaskActions(fixture.db, silentLogger, clock);
     const own = await tasks.create(draft(borisTopic, 'Своя', 'task-own'));
     const foreign = await tasks.create(draft(veraTopic, 'Чужая', 'task-foreign', veraAccount));
     const planned = await tasks.create(draft(borisTopic, 'В плане', 'task-plan'));
@@ -236,8 +237,8 @@ describe('кнопка «отменить» и задачи удалённого
   it('INV-22 повтор «Отменить» не пишет второе событие и не меняет статус', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createTaskCancelActions(fixture.db, clock);
-    const created = await createTaskActions(fixture.db, clock).create(draft(borisTopic, 'Повтор', 'task-repeat'));
+    const actions = createTaskCancelActions(fixture.db, silentLogger, clock);
+    const created = await createTaskActions(fixture.db, silentLogger, clock).create(draft(borisTopic, 'Повтор', 'task-repeat'));
     const first = await replyToTaskCancel(place(borisTopic), borisAccount, 'cb-repeat', created.task.number, actions);
     const second = await replyToTaskCancel(place(borisTopic), borisAccount, 'cb-repeat', created.task.number, actions);
     expect(first?.applied).toBe(true);
@@ -253,7 +254,7 @@ describe('кнопка «отменить» и задачи удалённого
   it('INV-18 INV-22 удаление участника снимает незакрытые задачи в той же транзакции, повтор ключа откатывает снятие', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const tasks = createTaskActions(fixture.db, clock);
+    const tasks = createTaskActions(fixture.db, silentLogger, clock);
     const open = await tasks.create(draft(borisTopic, 'Открытая', 'task-open'));
     const planned = await tasks.create(draft(borisTopic, 'План', 'task-planned'));
     const blocked = await tasks.create(draft(borisTopic, 'Блок', 'task-block'));
@@ -267,7 +268,7 @@ describe('кнопка «отменить» и задачи удалённого
     await setStatus(fixture.db, done.task.id, TASK_STATUS_DONE);
     await setStatus(fixture.db, already.task.id, TASK_STATUS_CANCELLED);
 
-    const beta = await createProjectCreation(fixture.db, clock).create({
+    const beta = await createProjectCreation(fixture.db, silentLogger, clock).create({
       telegramUserId: String(rootAccount.id),
       name: 'Бета',
       description: '',
@@ -275,7 +276,7 @@ describe('кнопка «отменить» и задачи удалённого
       chat: 'private',
       idempotencyKey: 'project-beta',
     });
-    await createMembership(fixture.db, clock).add({
+    await createMembership(fixture.db, silentLogger, clock).add({
       telegramUserId: String(rootAccount.id),
       projectId: beta.project.id,
       targetTelegramUserId: String(borisAccount.id),
@@ -320,7 +321,7 @@ describe('кнопка «отменить» и задачи удалённого
       )
     `.execute(fixture.db);
     await expect(
-      createMembership(fixture.db, clock).remove({
+      createMembership(fixture.db, silentLogger, clock).remove({
         telegramUserId: String(rootAccount.id),
         projectId: fixture.alphaId,
         targetTelegramUserId: String(borisAccount.id),
@@ -336,7 +337,7 @@ describe('кнопка «отменить» и задачи удалённого
     expect(Number(stillMember.rows[0]?.n)).toBe(1);
     expect(await cancelEvents(fixture.db)).toEqual([]);
 
-    const removed = await createMembership(fixture.db, clock).remove({
+    const removed = await createMembership(fixture.db, silentLogger, clock).remove({
       telegramUserId: String(rootAccount.id),
       projectId: fixture.alphaId,
       targetTelegramUserId: String(borisAccount.id),
@@ -397,7 +398,7 @@ describe('кнопка «отменить» и задачи удалённого
       });
     }
     await fixture.db.transaction().execute((trx) =>
-      cancelRemovedMemberTasks(trx, clock, {
+      cancelRemovedMemberTasks(trx, silentLogger, clock, {
         causationId: memberEvent.id,
         projectId: fixture.alphaId,
         assigneeId: fixture.borisId,
@@ -450,11 +451,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -463,7 +464,7 @@ async function seed(): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  const membership = createMembership(handle.db, clock);
+  const membership = createMembership(handle.db, silentLogger, clock);
   await membership.add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
@@ -478,7 +479,7 @@ async function seed(): Promise<Fixture> {
   await sql`UPDATE project_members SET topic_id = ${borisTopic} WHERE user_id = ${boris.user.id}::uuid AND project_id = ${alpha.project.id}::uuid`.execute(
     handle.db,
   );
-  await createChatBinding(handle.db, clock).confirm({
+  await createChatBinding(handle.db, silentLogger, clock).confirm({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     offer: forumAdmin,

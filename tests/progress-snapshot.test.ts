@@ -27,6 +27,7 @@ import {
 } from '../src/infrastructure/migrate.ts';
 import { loadProgressDynamics, takeProgressSnapshots } from '../src/infrastructure/progress-snapshot.ts';
 import { createScheduler } from '../src/infrastructure/scheduler.ts';
+import { silentLogger } from './log-lines.ts';
 
 const repoId = '42';
 const openOnlyId = '7';
@@ -211,7 +212,7 @@ describe('снимок доли раз в сутки', () => {
     opened.push(handle);
     await seed(handle.db);
     expect(await columnNames(handle.db)).toEqual(['created_at', 'id', 'progress', 'project_id']);
-    await takeProgressSnapshots(handle.db, now);
+    await takeProgressSnapshots(handle.db, silentLogger, now); // pragma: allowlist secret
     const stored = await rows(handle.db);
     const byProject = new Map(stored.map((row) => [row.project_id, ratioOf(row.progress)]));
     expect(byProject.get(alphaId)).toBe(half.ratio);
@@ -281,7 +282,7 @@ describe('снимок доли раз в сутки', () => {
     const handle = await openDb();
     opened.push(handle);
     await seed(handle.db);
-    await takeProgressSnapshots(handle.db, now);
+    await takeProgressSnapshots(handle.db, silentLogger, now); // pragma: allowlist secret
     expect(await loadProgressDynamics(handle.db, bareId)).toEqual([{ date: '2026-09-29', progress: null }]);
     expect(await loadProgressDynamics(handle.db, zeroId)).toEqual([{ date: '2026-09-28', progress: 0 }]);
     await sql`
@@ -289,7 +290,7 @@ describe('снимок доли раз в сутки', () => {
       SET state = 'closed', state_reason = 'completed'
       WHERE repository_id = ${repoId} AND issue_number = 1
     `.execute(handle.db);
-    await takeProgressSnapshots(handle.db, skippedToOctober);
+    await takeProgressSnapshots(handle.db, silentLogger, skippedToOctober); // pragma: allowlist secret
     const alpha = await loadProgressDynamics(handle.db, alphaId);
     expect(alpha).toEqual([
       { date: '2026-09-29', progress: half.ratio },
@@ -307,7 +308,7 @@ describe('снимок доли раз в сутки', () => {
     await seed(handle.db);
     const clock: Clock = { now: () => now };
     const scheduler = createScheduler(clock);
-    scheduler.register('A-32', (at) => takeProgressSnapshots(handle.db, at));
+    scheduler.register('A-32', (at) => takeProgressSnapshots(handle.db, silentLogger, at)); // pragma: allowlist secret
     await scheduler.run();
     const onceRows = await rows(handle.db);
     const onceEvents = await events(handle.db);
@@ -327,11 +328,11 @@ describe('снимок доли раз в сутки', () => {
       WHERE repository_id = ${repoId} AND issue_number = 1
     `.execute(handle.db);
     await scheduler.run();
-    await takeProgressSnapshots(handle.db, now);
+    await takeProgressSnapshots(handle.db, silentLogger, now); // pragma: allowlist secret
     expect(await rows(handle.db)).toEqual(onceRows);
     expect(await events(handle.db)).toEqual(onceEvents);
 
-    await takeProgressSnapshots(handle.db, laterSameMoscowDay);
+    await takeProgressSnapshots(handle.db, silentLogger, laterSameMoscowDay); // pragma: allowlist secret
     const afterBoundary = await rows(handle.db);
     const alphaRows = afterBoundary.filter((row) => row.project_id === alphaId);
     const utcRows = afterBoundary.filter((row) => row.project_id === utcId);

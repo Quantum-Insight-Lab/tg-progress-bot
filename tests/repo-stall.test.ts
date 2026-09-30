@@ -39,6 +39,7 @@ import {
   readUsersMigration,
 } from '../src/infrastructure/migrate.ts';
 import { noticeStalePullRequests, readRepositoryStall } from '../src/infrastructure/pr-stall.ts';
+import { silentLogger } from './log-lines.ts';
 
 const repositoryId = '42';
 const now = new Date('2026-09-27T22:00:00.000Z');
@@ -354,7 +355,7 @@ describe('застой репозитория', () => {
     await seed(handle.db);
     const before = await taskStatus(handle.db);
     const facts = await readRepositoryStall(handle.db, now);
-    await noticeStalePullRequests(handle.db, now);
+    await noticeStalePullRequests(handle.db, silentLogger, now);
     expect(before).toBe(TASK_STATUS_IN_PROGRESS);
     expect(await taskStatus(handle.db)).toBe(TASK_STATUS_IN_PROGRESS);
     expect(await blockerCount(handle.db)).toBe(0);
@@ -402,8 +403,8 @@ describe('застой репозитория', () => {
     const handle = await openDb();
     opened.push(handle);
     await seed(handle.db);
-    await noticeStalePullRequests(handle.db, now);
-    await noticeStalePullRequests(handle.db, now);
+    await noticeStalePullRequests(handle.db, silentLogger, now);
+    await noticeStalePullRequests(handle.db, silentLogger, now);
     expect(await stallEvents(handle.db)).toHaveLength(1);
     expect(await taskStatus(handle.db)).toBe(TASK_STATUS_IN_PROGRESS);
     expect(await blockerCount(handle.db)).toBe(0);

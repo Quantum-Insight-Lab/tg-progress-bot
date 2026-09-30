@@ -3,6 +3,7 @@ import { sql, type Kysely, type Transaction } from 'kysely';
 import { decideStaleBlock, type TaskJournalMark } from '../domain/tasks/detect-blocker.ts';
 import { taskStatus } from '../domain/tasks/status.ts';
 import { defineTask, type Task } from '../domain/tasks/task.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { commitBlockerDetected } from './tasks.ts';
 
@@ -142,6 +143,7 @@ async function lockTask(trx: Transaction<Database>, taskId: string): Promise<Can
 
 async function detectOne(
   db: Kysely<Database>,
+  logger: Logger,
   taskId: string,
   now: Date,
 ): Promise<DetectedBlocker | null> {
@@ -161,7 +163,7 @@ async function detectOne(
       now,
     });
     if (decision === null) return null;
-    const recorded = await commitBlockerDetected(trx, {
+    const recorded = await commitBlockerDetected(trx, logger, {
       task,
       blockerId: randomUUID(),
       day: decision.day,
@@ -188,6 +190,7 @@ async function detectOne(
  */
 export async function detectStaleTasks(
   db: Kysely<Database>,
+  logger: Logger,
   now: Date,
   notify: (hit: DetectedBlocker) => Promise<void>,
 ): Promise<void> {
@@ -195,7 +198,7 @@ export async function detectStaleTasks(
   const failures: unknown[] = [];
   for (const row of rows) {
     try {
-      const hit = await detectOne(db, row.id, now);
+      const hit = await detectOne(db, logger, row.id, now);
       if (hit === null) continue;
       await notify(hit);
     } catch (error) {

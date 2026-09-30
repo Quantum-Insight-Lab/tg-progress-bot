@@ -16,6 +16,7 @@ import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { replyToStart, START_REPLY_PENDING, START_REPLY_ROOT } from '../src/telegram/start.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T00:00:00.000Z') };
 
@@ -115,7 +116,7 @@ describe('INV-17 корень один — первый /start', () => {
   it('INV-17 первый /start создаёт корня и первого lead, второй корнем не становится', async () => {
     const handle = await openUsers();
     opened.push(handle);
-    const registration = createUserRegistration(handle.db, clock);
+    const registration = createUserRegistration(handle.db, silentLogger, clock);
     const rootReply = await replyToStart('private', rootAccount, registration);
     const secondReply = await replyToStart('private', secondAccount, registration);
     expect(rootReply).toBe(START_REPLY_ROOT);
@@ -162,7 +163,7 @@ describe('INV-17 корень один — первый /start', () => {
   it('INV-17 пустое имя и чужой telegram_user_id пользователя не создают', async () => {
     const handle = await openUsers();
     opened.push(handle);
-    const registration = createUserRegistration(handle.db, clock);
+    const registration = createUserRegistration(handle.db, silentLogger, clock);
     await expect(replyToStart('private', { id: 1001, is_bot: false, first_name: '   ' }, registration)).rejects.toMatchObject({
       code: DOMAIN_ERROR.BLANK_NAME,
     });
@@ -184,7 +185,7 @@ describe('INV-16 новый пользователь ничего не може�
   it('INV-16 ответ не корню не раскрывает данных и не называет его руководителем', async () => {
     const handle = await openUsers();
     opened.push(handle);
-    const registration = createUserRegistration(handle.db, clock);
+    const registration = createUserRegistration(handle.db, silentLogger, clock);
     await replyToStart('private', rootAccount, registration);
     const reply = await replyToStart('private', secondAccount, registration);
     expect(reply).toBe(START_REPLY_PENDING);
@@ -196,7 +197,7 @@ describe('INV-16 новый пользователь ничего не може�
   it('INV-16 /start вне лички не регистрирует и не отвечает', async () => {
     const handle = await openUsers();
     opened.push(handle);
-    const registration = createUserRegistration(handle.db, clock);
+    const registration = createUserRegistration(handle.db, silentLogger, clock);
     const reply = await replyToStart('supergroup', secondAccount, registration);
     expect(reply).toBeNull();
     expect(await countUsers(handle.db)).toBe(0);
@@ -214,7 +215,7 @@ describe('INV-22 повтор /start не применяется второй р
   it('INV-22 повтор того же аккаунта не создаёт второго события и не меняет имя', async () => {
     const handle = await openUsers();
     opened.push(handle);
-    const registration = createUserRegistration(handle.db, clock);
+    const registration = createUserRegistration(handle.db, silentLogger, clock);
     const first = await registration.registerOnStart({ telegramUserId: '1001', name: '  Аня  ' });
     const again = await registration.registerOnStart({ telegramUserId: '1001', name: 'Другое имя' });
     expect(first.created).toBe(true);
@@ -236,7 +237,7 @@ describe('INV-22 повтор /start не применяется второй р
     const handle = await openUsers();
     opened.push(handle);
     const userId = '00000000-0000-4000-8000-000000000009';
-    await emit(createEventJournal(handle.db), {
+    await emit(createEventJournal(handle.db, silentLogger), {
       type: EVENT_TYPES.USER_REGISTERED,
       source: 'telegram',
       idempotencyKey: '1001',
@@ -247,7 +248,7 @@ describe('INV-22 повтор /start не применяется второй р
       causationId: null,
       correlationId: null,
     });
-    const registration = createUserRegistration(handle.db, clock);
+    const registration = createUserRegistration(handle.db, silentLogger, clock);
     await expect(registration.registerOnStart({ telegramUserId: '1001', name: 'Аня' })).rejects.toMatchObject({
       code: DOMAIN_ERROR.REGISTRATION_DUPLICATE,
     });

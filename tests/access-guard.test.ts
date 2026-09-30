@@ -39,6 +39,7 @@ import { START_REPLY_PENDING } from '../src/telegram/start.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -62,6 +63,7 @@ function memoryJournal(): { journal: EventJournal; rows: EventRow[] } {
         rows.push(row);
         return { inserted: true, row };
       },
+      refuse: () => undefined,
     },
   };
 }
@@ -252,11 +254,11 @@ describe('INV-16 guard на входе всех обработчиков', () =>
         await handle.destroy();
       },
     });
-    const registration = createUserRegistration(handle, clock);
+    const registration = createUserRegistration(handle, silentLogger, clock);
     const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
     const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
     const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-    const creation = createProjectCreation(handle, clock);
+    const creation = createProjectCreation(handle, silentLogger, clock);
     const alpha = await creation.create({
       telegramUserId: String(rootAccount.id),
       name: 'Альфа',

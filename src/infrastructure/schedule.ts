@@ -10,6 +10,7 @@ import {
 } from '../domain/projects/schedule.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -112,7 +113,7 @@ function storeOf(trx: Transaction<Database>): ScheduleStore {
 }
 
 /** Расписание группы: `daily_cron`, таймзона чата и событие коммитятся одной транзакцией. */
-export function createChatSchedule(db: Kysely<Database>, clock: Clock): ScheduleActions {
+export function createChatSchedule(db: Kysely<Database>, logger: Logger, clock: Clock): ScheduleActions {
   return {
     show(input) {
       return db.transaction().execute(async (trx) => {
@@ -123,7 +124,7 @@ export function createChatSchedule(db: Kysely<Database>, clock: Clock): Schedule
     set(input): Promise<ScheduleOutcome> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return setChatSchedule(storeOf(trx), createEventJournal(trx), clock, {
+        return setChatSchedule(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           chat: input.chat,
           projectName: input.projectName,
@@ -136,7 +137,7 @@ export function createChatSchedule(db: Kysely<Database>, clock: Clock): Schedule
     clear(input): Promise<ScheduleOutcome> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return clearChatSchedule(storeOf(trx), createEventJournal(trx), clock, {
+        return clearChatSchedule(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           chat: input.chat,
           projectName: input.projectName,

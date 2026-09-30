@@ -11,6 +11,7 @@ import { defineCanvas, type Canvas } from '../domain/tasks/canvas.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { projectCalendarDate } from '../domain/shared/project-time.ts';
 import { taskPriority, taskStatus } from '../domain/tasks/status.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -132,6 +133,7 @@ async function alreadyCarried(db: Kysely<Database> | Transaction<Database>, key:
  */
 export async function carryAssigneeDay(
   db: Kysely<Database>,
+  logger: Logger,
   projectId: string,
   assigneeId: string,
   now: Date,
@@ -169,7 +171,7 @@ export async function carryAssigneeDay(
             `.execute(trx);
           },
         },
-        createEventJournal(trx),
+        createEventJournal(trx, logger),
         {
           from: pair.from,
           to: pair.to,
@@ -186,7 +188,7 @@ export async function carryAssigneeDay(
 }
 
 /** A-30 по всем канвасам. Сбой одного исполнителя не отменяет остальных, затем всплывает. */
-export async function carryOpenCanvases(db: Kysely<Database>, now: Date): Promise<void> {
+export async function carryOpenCanvases(db: Kysely<Database>, logger: Logger, now: Date): Promise<void> {
   const pairs = await sql<{ project_id: string; assignee_id: string }>`
     SELECT DISTINCT project_id::text AS project_id, assignee_id::text AS assignee_id
     FROM canvases
@@ -195,7 +197,7 @@ export async function carryOpenCanvases(db: Kysely<Database>, now: Date): Promis
   const failures: unknown[] = [];
   for (const pair of pairs.rows) {
     try {
-      await carryAssigneeDay(db, pair.project_id, pair.assignee_id, now);
+      await carryAssigneeDay(db, logger, pair.project_id, pair.assignee_id, now);
     } catch (error) {
       failures.push(error);
     }

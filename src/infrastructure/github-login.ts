@@ -8,6 +8,7 @@ import {
 } from '../domain/projects/github-login.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
@@ -112,7 +113,7 @@ function storeOf(trx: Transaction<Database>): GithubLoginStore {
 }
 
 /** Свой логин GitHub: поле и `user.github_login_set` коммитятся одной транзакцией. */
-export function createGithubLogin(db: Kysely<Database>, clock: Clock): GithubLoginActions {
+export function createGithubLogin(db: Kysely<Database>, logger: Logger, clock: Clock): GithubLoginActions {
   return {
     async find(telegramUserId) {
       const row = await db
@@ -127,7 +128,7 @@ export function createGithubLogin(db: Kysely<Database>, clock: Clock): GithubLog
       return db.transaction().execute(async (trx) => {
         const actor = await findByTelegram(trx, input.telegramUserId);
         if (actor === null) throw new DomainError(DOMAIN_ERROR.USER_NOT_FOUND, 'Пользователь не найден');
-        return setOwnGithubLogin(storeOf(trx), createEventJournal(trx), clock, {
+        return setOwnGithubLogin(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           userId: actor.id,
           chat: input.chat,

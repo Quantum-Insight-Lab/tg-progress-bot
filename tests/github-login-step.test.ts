@@ -32,6 +32,7 @@ import {
   parseGithubLoginMessage,
   replyToGithubLogin,
 } from '../src/telegram/github-login.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -61,6 +62,7 @@ function memoryJournal(): { journal: EventJournal; rows: EventRow[] } {
         rows.push(row);
         return { inserted: true, row };
       },
+      refuse: () => undefined,
     },
   };
 }
@@ -84,10 +86,10 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -164,7 +166,7 @@ describe('INV-19 свой логин GitHub человек меняет сам',
   it('INV-19 в личке человек меняет свой логин, чужой логин корень не записывает', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createGithubLogin(fixture.db, clock);
+    const actions = createGithubLogin(fixture.db, silentLogger, clock);
     const saved = await replyToGithubLogin('private', borisAccount, 'boris-ada', '  ada  ', actions);
     expect(saved).toBe(githubLoginSavedReply('ada'));
     expect(await loginOf(fixture.db, fixture.borisId)).toBe('ada');
@@ -285,7 +287,7 @@ describe('INV-20 шаг логина можно пропустить, логин
 
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createGithubLogin(fixture.db, clock);
+    const actions = createGithubLogin(fixture.db, silentLogger, clock);
     const skipped = await replyToGithubLogin('private', borisAccount, 'skip-boris', '', actions);
     expect(skipped).toBe(GITHUB_LOGIN_SKIPPED);
     expect(await loginOf(fixture.db, fixture.borisId)).toBeNull();
@@ -345,7 +347,7 @@ describe('INV-22 повтор записи логина не применяет�
   it('INV-22 тот же ключ не меняет логин и не пишет второе событие', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createGithubLogin(fixture.db, clock);
+    const actions = createGithubLogin(fixture.db, silentLogger, clock);
     const first = await replyToGithubLogin('private', borisAccount, 'same-key', 'ada', actions);
     const second = await replyToGithubLogin('private', borisAccount, 'same-key', 'grace', actions);
     expect(first).toBe(githubLoginSavedReply('ada'));
@@ -377,7 +379,7 @@ describe('INV-14 логин сопоставляется в момент пок�
   it('INV-14 действие остаётся под именем логина и к человеку приклеивается только текущим логином', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createGithubLogin(fixture.db, clock);
+    const actions = createGithubLogin(fixture.db, silentLogger, clock);
     await replyToGithubLogin('private', borisAccount, 'show-ada', 'ada', actions);
     const people = [{ id: fixture.borisId, githubLogin: 'ada', name: 'Борис' }];
     expect(showGithubAct(people, 'ADA')).toEqual({ login: 'ADA', userId: fixture.borisId });

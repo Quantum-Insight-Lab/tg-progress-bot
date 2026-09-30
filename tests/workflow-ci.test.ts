@@ -34,6 +34,7 @@ import {
 } from '../src/infrastructure/migrate.ts';
 import { mirrorGithubPullRequest } from '../src/infrastructure/pull-request-mirror.ts';
 import { mirrorGithubWorkflow } from '../src/infrastructure/workflow-mirror.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const repositoryId = '42';
@@ -152,7 +153,7 @@ async function openMirror(): Promise<Handle> {
 
 async function deliver(db: Kysely<Database>, delivery: GithubDelivery): Promise<void> {
   await db.transaction().execute(async (trx) => {
-    const result = await recordGithubDelivery(createEventJournal(trx), clock, delivery);
+    const result = await recordGithubDelivery(createEventJournal(trx, silentLogger), clock, delivery);
     if (result.status !== 'applied') return;
     if (result.eventType === EVENT_TYPES.GITHUB_PULL_REQUEST_CHANGED) {
       await mirrorGithubPullRequest(trx, result.payload, randomUUID());
@@ -177,7 +178,7 @@ async function accept(
       deliveryId,
       signature,
       body,
-      journal: createEventJournal(trx),
+      journal: createEventJournal(trx, silentLogger),
       clock,
       applyPullRequest: async (payload) => {
         await mirrorGithubPullRequest(trx, payload, randomUUID());

@@ -11,6 +11,7 @@ import {
 } from '../domain/projects/chat.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -97,7 +98,7 @@ function storeOf(trx: Transaction<Database>): ChatStore {
 }
 
 /** Привязка супергруппы: строка `chats`, `projects.chat_id` и `project.chat_bound` коммитятся вместе. */
-export function createChatBinding(db: Kysely<Database>, clock: Clock): ChatBinding {
+export function createChatBinding(db: Kysely<Database>, logger: Logger, clock: Clock): ChatBinding {
   return {
     async unboundProjects() {
       const rows = await db
@@ -125,7 +126,7 @@ export function createChatBinding(db: Kysely<Database>, clock: Clock): ChatBindi
     }): Promise<BindResult> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return bindSupergroup(storeOf(trx), createEventJournal(trx), clock, {
+        return bindSupergroup(storeOf(trx), createEventJournal(trx, logger), clock, {
           projectId: input.projectId,
           newChatId: randomUUID(),
           offer: input.offer,

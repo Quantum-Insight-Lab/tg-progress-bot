@@ -50,6 +50,7 @@ import { parseTaskMarkData, replyToTaskMark } from '../src/telegram/task-mark.ts
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const at = '2026-09-28T07:33:00.000Z';
@@ -128,11 +129,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -141,7 +142,7 @@ async function seed(): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  const membership = createMembership(handle.db, clock);
+  const membership = createMembership(handle.db, silentLogger, clock);
   await membership.add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
@@ -154,7 +155,7 @@ async function seed(): Promise<Fixture> {
     VALUES (${'00000000-0000-4000-8000-0000000000c1'}::uuid, ${alpha.project.id}::uuid, ${vera.user.id}::uuid, ${LEAD_ROLE}, ${veraTopic})
   `.execute(handle.db);
   await sql`UPDATE project_members SET topic_id = ${borisTopic} WHERE user_id = ${boris.user.id}::uuid`.execute(handle.db);
-  await createChatBinding(handle.db, clock).confirm({
+  await createChatBinding(handle.db, silentLogger, clock).confirm({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     offer: forumAdmin,
@@ -295,7 +296,7 @@ describe('галочка задачи', () => {
   it('R-640 галочка переводит задачу в REVIEW, R-316 снятие возвращает IN_PROGRESS', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const created = await createTaskActions(fixture.db, clock).create({
+    const created = await createTaskActions(fixture.db, silentLogger, clock).create({
       telegramUserId: String(borisAccount.id),
       chat: TASK_TOPIC_CHAT,
       telegramChatId,
@@ -303,7 +304,7 @@ describe('галочка задачи', () => {
       title: 'Классификация сигнала',
       idempotencyKey: 'task-1',
     });
-    const actions = createTaskMarkActions(fixture.db, clock);
+    const actions = createTaskMarkActions(fixture.db, silentLogger, clock);
     const checked = await replyToTaskMark(place(borisTopic), borisAccount, 'cb-check', created.task.number, actions);
     expect(checked?.applied).toBe(true);
     expect(checked?.closesBlocker).toBe(false);
@@ -335,7 +336,7 @@ describe('галочка задачи', () => {
   it('INV-22 повтор того же callback не пишет второе событие и не снимает галочку', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const created = await createTaskActions(fixture.db, clock).create({
+    const created = await createTaskActions(fixture.db, silentLogger, clock).create({
       telegramUserId: String(borisAccount.id),
       chat: TASK_TOPIC_CHAT,
       telegramChatId,
@@ -343,7 +344,7 @@ describe('галочка задачи', () => {
       title: 'Повтор',
       idempotencyKey: 'task-2',
     });
-    const actions = createTaskMarkActions(fixture.db, clock);
+    const actions = createTaskMarkActions(fixture.db, silentLogger, clock);
     const first = await replyToTaskMark(place(borisTopic), borisAccount, 'cb-same', 1, actions);
     const second = await replyToTaskMark(place(borisTopic), borisAccount, 'cb-same', 1, actions);
     expect(first?.applied).toBe(true);
@@ -361,7 +362,7 @@ describe('галочка задачи', () => {
   it('INV-05 галочку ставит и снимает исполнитель; событие GitHub статус не меняет', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    await createTaskActions(fixture.db, clock).create({
+    await createTaskActions(fixture.db, silentLogger, clock).create({
       telegramUserId: String(borisAccount.id),
       chat: TASK_TOPIC_CHAT,
       telegramChatId,
@@ -369,7 +370,7 @@ describe('галочка задачи', () => {
       title: 'Своя',
       idempotencyKey: 'task-boris',
     });
-    const veraTask = await createTaskActions(fixture.db, clock).create({
+    const veraTask = await createTaskActions(fixture.db, silentLogger, clock).create({
       telegramUserId: String(veraAccount.id),
       chat: TASK_TOPIC_CHAT,
       telegramChatId,
@@ -377,7 +378,7 @@ describe('галочка задачи', () => {
       title: 'Руководителя',
       idempotencyKey: 'task-vera',
     });
-    const actions = createTaskMarkActions(fixture.db, clock);
+    const actions = createTaskMarkActions(fixture.db, silentLogger, clock);
     expect(await replyToTaskMark(place(borisTopic), veraAccount, 'cb-lead', 1, actions)).toBeNull();
     expect(await replyToTaskMark(place(borisTopic), rootAccount, 'cb-root', 1, actions)).toBeNull();
     expect(await replyToTaskMark(place(veraTopic), borisAccount, 'cb-foreign', veraTask.task.number, actions)).toBeNull();
@@ -390,7 +391,7 @@ describe('галочка задачи', () => {
     expect(own?.task.status).toBe(TASK_STATUS_REVIEW);
     expect(own?.task.assigneeId).toBe(fixture.veraId);
 
-    await emit(createEventJournal(fixture.db), {
+    await emit(createEventJournal(fixture.db, silentLogger), {
       type: EVENT_TYPES.GITHUB_ISSUE_CHANGED,
       source: 'github',
       idempotencyKey: 'gh-status',
@@ -418,7 +419,7 @@ describe('галочка задачи', () => {
   it('INV-11 из BLOCKED галочка закрывает блокер и не ставит DONE; снять можно только с REVIEW', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const created = await createTaskActions(fixture.db, clock).create({
+    const created = await createTaskActions(fixture.db, silentLogger, clock).create({
       telegramUserId: String(borisAccount.id),
       chat: TASK_TOPIC_CHAT,
       telegramChatId,
@@ -427,7 +428,7 @@ describe('галочка задачи', () => {
       idempotencyKey: 'task-blocked',
     });
     await setStatus(fixture.db, created.task.id, TASK_STATUS_BLOCKED);
-    const actions = createTaskMarkActions(fixture.db, clock);
+    const actions = createTaskMarkActions(fixture.db, silentLogger, clock);
     const checked = await replyToTaskMark(place(borisTopic), borisAccount, 'cb-blocked', 1, actions);
     expect(checked?.applied).toBe(true);
     expect(checked?.closesBlocker).toBe(true);
@@ -450,7 +451,7 @@ describe('галочка задачи', () => {
   it('R-609 отмеченным пункт становится после callback, когда бот перерисовал строку', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const created = await createTaskActions(fixture.db, clock).create({
+    const created = await createTaskActions(fixture.db, silentLogger, clock).create({
       telegramUserId: String(borisAccount.id),
       chat: TASK_TOPIC_CHAT,
       telegramChatId,
@@ -459,7 +460,7 @@ describe('галочка задачи', () => {
       idempotencyKey: 'task-canvas',
     });
     const homes: CanvasHome[] = [];
-    const canvas = createCanvasPlacement(fixture.db, clock);
+    const canvas = createCanvasPlacement(fixture.db, silentLogger, clock);
     const deliver = {
       async send(home: CanvasHome): Promise<number> {
         homes.push(home);
@@ -482,7 +483,7 @@ describe('галочка задачи', () => {
     expect(before).toContain(TASK_STATUS_IN_PROGRESS);
     expect(before).not.toContain(TASK_STATUS_REVIEW);
 
-    const marked = await replyToTaskMark(place(borisTopic), borisAccount, 'cb-redraw', 1, createTaskMarkActions(fixture.db, clock));
+    const marked = await replyToTaskMark(place(borisTopic), borisAccount, 'cb-redraw', 1, createTaskMarkActions(fixture.db, silentLogger, clock));
     expect(marked).not.toBeNull();
     await canvas.show({
       projectId: fixture.alphaId,

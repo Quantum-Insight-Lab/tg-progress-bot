@@ -22,6 +22,7 @@ import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import { createEventJournal } from '../src/infrastructure/event-journal.ts';
 import { mirrorGithubMilestone } from '../src/infrastructure/milestone-mirror.ts';
 import { readEventsMigration, readMilestonesMigration, readProjectsMigration, readRepositoriesMigration } from '../src/infrastructure/migrate.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const repositoryId = '42';
@@ -117,7 +118,7 @@ async function openMilestones(): Promise<Handle> {
 
 async function deliver(db: Kysely<Database>, delivery: GithubDelivery): Promise<void> {
   await db.transaction().execute(async (trx) => {
-    const result = await recordGithubDelivery(createEventJournal(trx), clock, delivery);
+    const result = await recordGithubDelivery(createEventJournal(trx, silentLogger), clock, delivery);
     if (result.status === 'applied' && result.eventType === EVENT_TYPES.GITHUB_MILESTONE_CHANGED) {
       await mirrorGithubMilestone(trx, result.payload, randomUUID());
     }
@@ -323,7 +324,7 @@ describe('зеркало milestone по webhook', () => {
           deliveryId,
           signature: signed(body),
           body,
-          journal: createEventJournal(trx),
+          journal: createEventJournal(trx, silentLogger),
           clock,
           applyMilestone: async (payload) => {
             await mirrorGithubMilestone(trx, payload, randomUUID());
@@ -353,7 +354,7 @@ describe('зеркало milestone по webhook', () => {
       deliveryId: 'delivery-forged',
       signature: signed(Buffer.from('{}')),
       body: first,
-      journal: createEventJournal(handle.db),
+      journal: createEventJournal(handle.db, silentLogger),
       clock,
     });
     expect(forged).toBe(401);
@@ -400,7 +401,7 @@ describe('зеркало milestone по webhook', () => {
       deliveryId: 'delivery-broken',
       signature: `sha256=${createHmac('sha256', secret).update(broken).digest('hex')}`,
       body: broken,
-      journal: createEventJournal(handle.db),
+      journal: createEventJournal(handle.db, silentLogger),
       clock,
     });
     expect(rejected).toBe(400);

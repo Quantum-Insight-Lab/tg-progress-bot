@@ -15,7 +15,16 @@ export interface EventRow {
   subjectId: string;
 }
 
+/** Отказ схемы payload до записи. Пути полей и коды ошибок схемы, без значений. */
+export interface RefusedEvent {
+  eventType: string;
+  paths: readonly string[];
+  codes: readonly string[];
+}
+
 /** Единственная запись в журнал — `append`. Повтор ключа возвращает уже лежащую строку и ничего не меняет (INV-22). */
 export interface EventJournal {
   append(row: EventRow): Promise<{ inserted: boolean; row: EventRow }>;
+  /** Схема отвергла payload: в журнал ничего не пишется, реализация только отмечает отказ. */
+  refuse(event: RefusedEvent): void;
 }

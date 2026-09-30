@@ -11,6 +11,7 @@ import {
 import type { ProjectRole } from '../domain/projects/member.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -144,7 +145,7 @@ function memberOf(row: { id: string; user_id: string; role: ProjectRole; name: s
 }
 
 /** Настройки проекта: правка поля и `project.settings_changed` коммитятся одной транзакцией. */
-export function createProjectSettings(db: Kysely<Database>, clock: Clock): ProjectSettings {
+export function createProjectSettings(db: Kysely<Database>, logger: Logger, clock: Clock): ProjectSettings {
   return {
     open(input) {
       return db.transaction().execute(async (trx) => {
@@ -159,7 +160,7 @@ export function createProjectSettings(db: Kysely<Database>, clock: Clock): Proje
     change(input) {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return changeProjectSetting(storeOf(trx), createEventJournal(trx), clock, {
+        return changeProjectSetting(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           projectName: input.projectName,
           chat: input.chat,

@@ -16,6 +16,7 @@ import {
 } from '../domain/projects/connect-repository.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -119,7 +120,7 @@ function storeOf(trx: Transaction<Database>): ProjectRepositoryStore {
 }
 
 /** Подключение репозитория: ссылка и `project.repository_connected` коммитятся одной транзакцией. */
-export function createProjectRepository(db: Kysely<Database>, clock: Clock): ProjectRepositoryActions {
+export function createProjectRepository(db: Kysely<Database>, logger: Logger, clock: Clock): ProjectRepositoryActions {
   return {
     open(input): Promise<RepositoryStepView> {
       return db.transaction().execute(async (trx) => {
@@ -136,7 +137,7 @@ export function createProjectRepository(db: Kysely<Database>, clock: Clock): Pro
     connect(input): Promise<ConnectedRepository> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return connectProjectRepository(storeOf(trx), createEventJournal(trx), clock, {
+        return connectProjectRepository(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           projectId: input.projectId,
           repositoryId: input.repositoryId,
@@ -148,7 +149,7 @@ export function createProjectRepository(db: Kysely<Database>, clock: Clock): Pro
     change(input): Promise<ChangedRepository> {
       return db.transaction().execute(async (trx) => {
         const actor = await findUser(trx, input.telegramUserId);
-        return changeProjectRepository(storeOf(trx), createEventJournal(trx), clock, {
+        return changeProjectRepository(storeOf(trx), createEventJournal(trx, logger), clock, {
           actor,
           projectId: input.projectId,
           repositoryId: input.repositoryId,

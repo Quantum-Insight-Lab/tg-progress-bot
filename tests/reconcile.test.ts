@@ -43,6 +43,7 @@ import {
   readUsersMigration,
 } from '../src/infrastructure/migrate.ts';
 import { reconcileGithubMirror } from '../src/infrastructure/reconcile.ts';
+import { silentLogger } from './log-lines.ts';
 
 const now = new Date('2026-09-28T07:33:00.000Z');
 const repositoryId = '42';
@@ -229,8 +230,8 @@ describe('сверка пропущенной доставки', () => {
       defaultBranchCi: CI_STATUS_SUCCESS,
     });
     const probe = countingSource(snapshot);
-    await reconcileGithubMirror(handle.db, probe.source, now);
-    await reconcileGithubMirror(handle.db, probe.source, now);
+    await reconcileGithubMirror(handle.db, silentLogger, probe.source, now);
+    await reconcileGithubMirror(handle.db, silentLogger, probe.source, now);
     expect(probe.reads()).toBe(1);
     const events = await sql<{ event_type: string; restored: string; idempotency_key: string }>`
       SELECT event_type, payload->>'restored_facts' AS restored, idempotency_key
@@ -254,7 +255,7 @@ describe('сверка пропущенной доставки', () => {
     expect(commits.rows).toEqual([{ sha: 'abc' }]);
 
     const later = new Date(now.getTime() + RECONCILE_INTERVAL * minuteMs);
-    await reconcileGithubMirror(handle.db, probe.source, later);
+    await reconcileGithubMirror(handle.db, silentLogger, probe.source, later);
     const after = await sql<{ event_type: string; restored: string }>`
       SELECT event_type, payload->>'restored_facts' AS restored FROM events ORDER BY created_at
     `.execute(handle.db);
@@ -290,7 +291,7 @@ describe('сверка пропущенной доставки', () => {
       defaultBranchCi: CI_STATUS_FAILURE,
       issues: [issue({ number: 9, title: 'Тихий', assignees: [], updatedAt: now.toISOString() })],
     });
-    await reconcileGithubMirror(handle.db, countingSource(snapshot).source, now);
+    await reconcileGithubMirror(handle.db, silentLogger, countingSource(snapshot).source, now);
     const task = await sql<{ status: string }>`SELECT status FROM tasks`.execute(handle.db);
     expect(task.rows).toEqual([{ status: TASK_STATUS_IN_PROGRESS }]);
     expect(task.rows[0]?.status).not.toBe(TASK_STATUS_BLOCKED);
@@ -321,7 +322,7 @@ describe('сверка пропущенной доставки', () => {
     expect(source).not.toContain('domain/tasks');
     const handle = await openMirror();
     opened.push(handle);
-    await reconcileGithubMirror(handle.db, countingSource(remote()).source, now);
+    await reconcileGithubMirror(handle.db, silentLogger, countingSource(remote()).source, now);
     const events = await sql<{ event_type: string; subject_entity: string }>`
       SELECT event_type, subject_entity FROM events
     `.execute(handle.db);
@@ -334,9 +335,9 @@ describe('сверка пропущенной доставки', () => {
     const handle = await openMirror();
     opened.push(handle);
     const probe = countingSource(remote());
-    await reconcileGithubMirror(handle.db, probe.source, now);
+    await reconcileGithubMirror(handle.db, silentLogger, probe.source, now);
     const early = new Date(now.getTime() + minuteMs);
-    await reconcileGithubMirror(handle.db, probe.source, early);
+    await reconcileGithubMirror(handle.db, silentLogger, probe.source, early);
     expect(probe.reads()).toBe(1);
     const failing: GithubReconcileSource = {
       async read() {
@@ -344,7 +345,7 @@ describe('сверка пропущенной доставки', () => {
       },
     };
     const due = new Date(now.getTime() + RECONCILE_INTERVAL * minuteMs);
-    await expect(reconcileGithubMirror(handle.db, failing, due)).rejects.toThrow(DomainError);
+    await expect(reconcileGithubMirror(handle.db, silentLogger, failing, due)).rejects.toThrow(DomainError);
     const events = await sql<{ n: number }>`SELECT CAST(count(*) AS int) AS n FROM events`.execute(handle.db);
     expect(Number(events.rows[0]?.n)).toBe(1);
   });

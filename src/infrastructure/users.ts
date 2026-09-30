@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql, type Kysely, type Transaction } from 'kysely';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import {
   createRoot,
   registerOnStart as decideRegistration,
@@ -70,11 +71,11 @@ export async function registerRoot(db: Kysely<Database>, input: NewUser): Promis
 }
 
 /** `/start`: пользователь и `user.registered` коммитятся одной транзакцией. */
-export function createUserRegistration(db: Kysely<Database>, clock: Clock): UserRegistration {
+export function createUserRegistration(db: Kysely<Database>, logger: Logger, clock: Clock): UserRegistration {
   return {
     registerOnStart(input) {
       return db.transaction().execute((trx) =>
-        decideRegistration(storeOf(trx), createEventJournal(trx), clock, {
+        decideRegistration(storeOf(trx), createEventJournal(trx, logger), clock, {
           id: randomUUID(),
           telegramUserId: input.telegramUserId,
           name: input.name,

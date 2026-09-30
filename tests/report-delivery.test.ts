@@ -27,6 +27,7 @@ import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { REPORT_ACCESS, REPORT_UNBOUND, renderReportDocuments, replyToReportCommand } from '../src/telegram/report.ts';
 import { dailyReport, DAILY_REPORT_DM, DAILY_REPORT_TEAM } from '../src/projections/daily-report.ts';
 import { zonedDayStart } from '../src/infrastructure/zoned-day.ts';
+import { silentLogger } from './log-lines.ts';
 
 let now = new Date('2026-09-28T07:33:00.000Z');
 const clock: Clock = { now: () => now };
@@ -79,11 +80,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(bound: boolean, shared = false): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -92,7 +93,7 @@ async function seed(bound: boolean, shared = false): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  await createMembership(handle.db, clock).add({
+  await createMembership(handle.db, silentLogger, clock).add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     targetTelegramUserId: String(borisAccount.id),
@@ -101,7 +102,7 @@ async function seed(bound: boolean, shared = false): Promise<Fixture> {
   });
   let betaId: string | null = null;
   if (bound) {
-    await createChatBinding(handle.db, clock).confirm({
+    await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId: alpha.project.id,
       offer: forumAdmin,
@@ -118,7 +119,7 @@ async function seed(bound: boolean, shared = false): Promise<Fixture> {
       idempotencyKey: 'project-beta',
     });
     betaId = beta.project.id;
-    await createChatBinding(handle.db, clock).confirm({
+    await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId: beta.project.id,
       offer: forumAdmin,
@@ -200,14 +201,14 @@ describe('INV-24 час отчёта считается по таймзоне г
     const chatId = await chatIdOf(fixture.db);
     const sent: { topicId: number | null; text: string }[] = [];
     const beforeHour = new Date('2026-09-28T19:00:00.000Z');
-    await deliverDueReports(fixture.db, beforeHour, renderReportDocuments, async (message) => {
+    await deliverDueReports(fixture.db, silentLogger, beforeHour, renderReportDocuments, async (message) => {
       sent.push(message);
     });
     expect(sent).toEqual([]);
     expect(await reportEvents(fixture.db)).toEqual([]);
 
     const atHour = new Date('2026-09-28T20:00:00.000Z');
-    await deliverDueReports(fixture.db, atHour, renderReportDocuments, async (message) => {
+    await deliverDueReports(fixture.db, silentLogger, atHour, renderReportDocuments, async (message) => {
       sent.push(message);
     });
     expect(sent).toHaveLength(1);
@@ -221,7 +222,7 @@ describe('INV-24 час отчёта считается по таймзоне г
     expect(events[0]?.payload.period_end).toBe(atHour.toISOString());
     const payload = events[0]?.payload;
     await sql`UPDATE chats SET timezone = 'Etc/GMT+12'`.execute(fixture.db);
-    await deliverDueReports(fixture.db, atHour, renderReportDocuments, async () => {
+    await deliverDueReports(fixture.db, silentLogger, atHour, renderReportDocuments, async () => {
       throw new Error('повтор не шлётся');
     });
     expect(await reportEvents(fixture.db)).toEqual([{ key: events[0]?.key, role: events[0]?.role, payload }]);
@@ -241,17 +242,17 @@ describe('INV-22 повтор отчёта не применяется втор�
     await placeSchedule(fixture.db, 'Pacific/Auckland', '09:00', reportsTopicId);
     const atHour = new Date('2026-09-28T20:00:00.000Z');
     const sent: string[] = [];
-    await deliverDueReports(fixture.db, atHour, renderReportDocuments, async (message) => {
+    await deliverDueReports(fixture.db, silentLogger, atHour, renderReportDocuments, async (message) => {
       sent.push(message.text);
     });
-    await deliverDueReports(fixture.db, atHour, renderReportDocuments, async () => {
+    await deliverDueReports(fixture.db, silentLogger, atHour, renderReportDocuments, async () => {
       sent.push('лишнее');
     });
     expect(sent).toHaveLength(1);
     expect(await reportEvents(fixture.db)).toHaveLength(1);
 
     now = new Date('2026-09-28T07:33:00.000Z');
-    const actions = createReportCommands(fixture.db, clock, renderReportDocuments);
+    const actions = createReportCommands(fixture.db, silentLogger, clock, renderReportDocuments);
     const first = await replyToReportCommand({ type: 'private', id: String(borisAccount.id) }, borisAccount, 'upd-1', actions);
     const again = await replyToReportCommand({ type: 'private', id: String(borisAccount.id) }, borisAccount, 'upd-1', actions);
     expect(again).toBeNull();
@@ -273,19 +274,19 @@ describe('INV-27 личный /report живёт без рассылки, гру
     const loose = await seed(false);
     opened.push(loose);
     now = new Date('2026-09-28T07:33:00.000Z');
-    const looseActions = createReportCommands(loose.db, clock, renderReportDocuments);
+    const looseActions = createReportCommands(loose.db, silentLogger, clock, renderReportDocuments);
     const denied = await replyToReportCommand({ type: 'supergroup', id: telegramChatId }, borisAccount, 'group-loose', looseActions);
     expect(denied?.text).toBe(REPORT_UNBOUND);
     const personal = await replyToReportCommand({ type: 'private', id: String(borisAccount.id) }, borisAccount, 'dm-off', looseActions);
     expect(personal?.telegramChatId).toBe(String(borisAccount.id));
     expect(personal?.topicId).toBeNull();
     expect(personal?.text).toContain('Альфа');
-    expect(await deliverDueReports(loose.db, now, renderReportDocuments, async () => undefined)).toBeUndefined();
+    expect(await deliverDueReports(loose.db, silentLogger, now, renderReportDocuments, async () => undefined)).toBeUndefined();
 
     const fixture = await seed(true, true);
     opened.push(fixture);
     await placeExecutorTopic(fixture.db, fixture.borisId);
-    const actions = createReportCommands(fixture.db, clock, renderReportDocuments);
+    const actions = createReportCommands(fixture.db, silentLogger, clock, renderReportDocuments);
     const sameChat = await replyToReportCommand({ type: 'supergroup', id: telegramChatId }, borisAccount, 'group-same', actions);
     expect(sameChat?.telegramChatId).toBe(telegramChatId);
     expect(sameChat?.topicId).toBeNull();
@@ -296,7 +297,7 @@ describe('INV-27 личный /report живёт без рассылки, гру
 
     await placeSchedule(fixture.db, 'Europe/Moscow', null, null);
     const sent: unknown[] = [];
-    await deliverDueReports(fixture.db, new Date('2026-09-28T06:00:00.000Z'), renderReportDocuments, async (message) => {
+    await deliverDueReports(fixture.db, silentLogger, new Date('2026-09-28T06:00:00.000Z'), renderReportDocuments, async (message) => {
       sent.push(message);
     });
     expect(sent).toEqual([]);
@@ -319,7 +320,7 @@ describe('INV-26 личка — проекты человека, группа �
     await placeSchedule(fixture.db, 'Europe/Moscow', '09:00', reportsTopicId);
     await placeExecutorTopic(fixture.db, fixture.borisId);
     now = new Date('2026-09-28T07:33:00.000Z');
-    const actions = createReportCommands(fixture.db, clock, renderReportDocuments);
+    const actions = createReportCommands(fixture.db, silentLogger, clock, renderReportDocuments);
     const group = await replyToReportCommand({ type: 'supergroup', id: telegramChatId }, borisAccount, 'group-topic', actions);
     expect(group?.topicId).toBe(reportsTopicId);
     expect(group?.topicId).not.toBe(executorTopicId);
@@ -350,7 +351,7 @@ describe('INV-25 строки отчёта считаются из фактов'
     opened.push(fixture);
     const chatId = await chatIdOf(fixture.db);
     now = new Date('2026-09-28T07:33:00.000Z');
-    const actions = createReportCommands(fixture.db, clock, renderReportDocuments);
+    const actions = createReportCommands(fixture.db, silentLogger, clock, renderReportDocuments);
     const first = await replyToReportCommand({ type: 'private', id: String(rootAccount.id) }, rootAccount, 'root-1', actions);
     const second = await replyToReportCommand({ type: 'private', id: String(rootAccount.id) }, rootAccount, 'root-2', actions);
     const expected = dailyReport({

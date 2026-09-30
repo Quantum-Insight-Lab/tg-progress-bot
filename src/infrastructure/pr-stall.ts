@@ -10,6 +10,7 @@ import {
   type StallPullRequest,
   type StallRepository,
 } from '../domain/github/stall.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -119,7 +120,7 @@ export async function readRepositoryStall(db: Kysely<Database>, now: Date): Prom
   });
 }
 
-async function publishOne(db: Kysely<Database>, notice: PrStallNotice, now: Date): Promise<void> {
+async function publishOne(db: Kysely<Database>, logger: Logger, notice: PrStallNotice, now: Date): Promise<void> {
   await db.transaction().execute(async (trx) => {
     await publishPrStalled(
       {
@@ -132,7 +133,7 @@ async function publishOne(db: Kysely<Database>, notice: PrStallNotice, now: Date
             .then((found) => (found === undefined ? null : { eventId: found.id }));
         },
       },
-      createEventJournal(trx),
+      createEventJournal(trx, logger),
       { ...notice, occurredAt: now },
     );
   });
@@ -142,12 +143,12 @@ async function publishOne(db: Kysely<Database>, notice: PrStallNotice, now: Date
  * A-35. Открытый PR участника без движения пишет `repo.pr_stalled`.
  * Повтор в те же сутки второе событие не пишет. Задачи и блокеры не меняет.
  */
-export async function noticeStalePullRequests(db: Kysely<Database>, now: Date): Promise<void> {
+export async function noticeStalePullRequests(db: Kysely<Database>, logger: Logger, now: Date): Promise<void> {
   const facts = await readRepositoryStall(db, now);
   const failures: unknown[] = [];
   for (const notice of facts.notices) {
     try {
-      await publishOne(db, notice, now);
+      await publishOne(db, logger, notice, now);
     } catch (error) {
       failures.push(error);
     }

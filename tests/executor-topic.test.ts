@@ -40,6 +40,7 @@ import {
   topicQuestion,
   type TopicChannel,
 } from '../src/telegram/executor-topic.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 
@@ -129,11 +130,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(bound: boolean): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -142,7 +143,7 @@ async function seed(bound: boolean): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  const membership = createMembership(handle.db, clock);
+  const membership = createMembership(handle.db, silentLogger, clock);
   await membership.add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
@@ -155,7 +156,7 @@ async function seed(bound: boolean): Promise<Fixture> {
     VALUES (${leadId}::uuid, ${alpha.project.id}::uuid, ${vera.user.id}::uuid, ${LEAD_ROLE})
   `.execute(handle.db);
   if (bound) {
-    await createChatBinding(handle.db, clock).confirm({
+    await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId: alpha.project.id,
       offer: forumAdmin,
@@ -241,7 +242,7 @@ describe('INV-23 канвас живёт в одном топике исполн
   it('INV-23 пока супергруппа не привязана, топик пуст и канвас некуда ставить', async () => {
     const fixture = await seed(false);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 41);
     const screen = await replyToExecutorTopicMessage(
       'private',
@@ -276,7 +277,7 @@ describe('INV-23 канвас живёт в одном топике исполн
   it('INV-23 бот сначала спрашивает, есть ли топик, и канвас не уходит в личку', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const screen = await replyToExecutorTopicMessage(
       'private',
       rootAccount,
@@ -328,7 +329,7 @@ describe('INV-23 канвас живёт в одном топике исполн
   it('INV-23 топик есть и у lead, второй топик тому же человеку не создаётся', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     let seq = 10;
     const gate = channel(() => {
       seq += 1;
@@ -393,7 +394,7 @@ describe('INV-23 канвас живёт в одном топике исполн
   it('INV-23 участник, который не корень, топик не указывает', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 5);
     const reply = await replyToExecutorTopicMessage(
       'private',
@@ -421,7 +422,7 @@ describe('INV-22 повтор указания топика не применя�
   it('INV-22 тот же ключ не меняет топик и не пишет второе событие', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 3);
     const first = await replyToExecutorTopicMessage(
       'private',
@@ -462,7 +463,7 @@ describe('INV-22 повтор указания топика не применя�
   it('INV-22 повтор того же создания не открывает второй топик', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 21);
     const first = await replyToCreateTopic(
       'private',
@@ -502,7 +503,7 @@ describe('первое сообщение сотруднику', () => {
   it('R-102 человек открывает свой топик в группе проекта', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 42);
     await replyToExecutorTopicMessage(
       'private',
@@ -521,7 +522,7 @@ describe('первое сообщение сотруднику', () => {
   it('R-572 одним текстом в личку и R-573 тем же текстом в его топик', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 42);
     const reply = await replyToExecutorTopicMessage(
       'private',
@@ -541,7 +542,7 @@ describe('первое сообщение сотруднику', () => {
   it('INV-23 личка не дублирует канвас и не показывает меню задач', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 42);
     await replyToCreateTopic('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'canvas-home', actions, gate.api);
     const text = employeeText(42);
@@ -559,7 +560,7 @@ describe('первое сообщение сотруднику', () => {
     const fixture = await seed(true);
     opened.push(fixture);
     await sql`UPDATE users SET github_login = 'boris' WHERE id = ${fixture.borisId}::uuid`.execute(fixture.db);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const withLogin = channel(() => 42);
     await replyToExecutorTopicMessage(
       'private',
@@ -585,7 +586,7 @@ describe('первое сообщение сотруднику', () => {
   it('INV-22 повтор ключа не шлёт первое сообщение второй раз', async () => {
     const fixture = await seed(true);
     opened.push(fixture);
-    const actions = createExecutorTopics(fixture.db, clock);
+    const actions = createExecutorTopics(fixture.db, silentLogger, clock);
     const gate = channel(() => 42);
     await replyToExecutorTopicMessage(
       'private',

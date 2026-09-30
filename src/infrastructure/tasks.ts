@@ -56,6 +56,7 @@ import type { TaskPriority } from '../domain/tasks/status.ts';
 import { defineTask, type Task } from '../domain/tasks/task.ts';
 import { closesBlockerOnExit } from '../domain/tasks/transition.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
 
@@ -423,10 +424,10 @@ function removalStore(trx: Transaction<Database>): TaskRemovalStore {
 }
 
 /** «Отменить»: статус `CANCELLED` и `task.cancelled` коммитятся одной транзакцией. */
-export function createTaskCancelActions(db: Kysely<Database>, clock: Clock): TaskCancelling {
+export function createTaskCancelActions(db: Kysely<Database>, logger: Logger, clock: Clock): TaskCancelling {
   return {
     press(input: TaskCancelPress): Promise<TaskCancelResult> {
-      return db.transaction().execute((trx) => pressTaskCancel(cancelStore(trx), createEventJournal(trx), clock, input));
+      return db.transaction().execute((trx) => pressTaskCancel(cancelStore(trx), createEventJournal(trx, logger), clock, input));
     },
   };
 }
@@ -437,35 +438,36 @@ export function createTaskCancelActions(db: Kysely<Database>, clock: Clock): Tas
  */
 export function cancelRemovedMemberTasks(
   trx: Transaction<Database>,
+  logger: Logger,
   clock: Clock,
   input: RemovedMemberTasks,
 ): Promise<void> {
-  return cancelTasksOfRemovedMember(removalStore(trx), createEventJournal(trx), clock, input).then(() => undefined);
+  return cancelTasksOfRemovedMember(removalStore(trx), createEventJournal(trx, logger), clock, input).then(() => undefined);
 }
 
 /** «В план», «в работу» и слово приоритета: правка и событие коммитятся одной транзакцией. */
-export function createTaskPlanActions(db: Kysely<Database>, clock: Clock): TaskPlanning {
+export function createTaskPlanActions(db: Kysely<Database>, logger: Logger, clock: Clock): TaskPlanning {
   return {
     press(input: TaskPlanPress): Promise<TaskPlanResult> {
-      return db.transaction().execute((trx) => pressTaskPlan(planStore(trx), createEventJournal(trx), clock, input));
+      return db.transaction().execute((trx) => pressTaskPlan(planStore(trx), createEventJournal(trx, logger), clock, input));
     },
   };
 }
 
 /** «Подтвердить» и «вернуть»: статус и событие коммитятся одной транзакцией. */
-export function createTaskReviewActions(db: Kysely<Database>, clock: Clock): TaskReviewing {
+export function createTaskReviewActions(db: Kysely<Database>, logger: Logger, clock: Clock): TaskReviewing {
   return {
     press(input: TaskReviewPress): Promise<TaskReviewResult> {
-      return db.transaction().execute((trx) => pressTaskReview(reviewStore(trx), createEventJournal(trx), clock, input));
+      return db.transaction().execute((trx) => pressTaskReview(reviewStore(trx), createEventJournal(trx, logger), clock, input));
     },
   };
 }
 
 /** Нажатие кружка: статус и `task.checked` или `task.unchecked` коммитятся одной транзакцией. */
-export function createTaskMarkActions(db: Kysely<Database>, clock: Clock): TaskMarking {
+export function createTaskMarkActions(db: Kysely<Database>, logger: Logger, clock: Clock): TaskMarking {
   return {
     press(input: TaskMarkDraft): Promise<TaskMarkResult> {
-      return db.transaction().execute((trx) => pressTaskMark(markStore(trx), createEventJournal(trx), clock, input));
+      return db.transaction().execute((trx) => pressTaskMark(markStore(trx), createEventJournal(trx, logger), clock, input));
     },
   };
 }
@@ -499,6 +501,7 @@ function detectStore(trx: Transaction<Database>): BlockerDetectStore {
  */
 export function commitBlockerDetected(
   trx: Transaction<Database>,
+  logger: Logger,
   input: {
     task: Task;
     blockerId: string;
@@ -507,7 +510,7 @@ export function commitBlockerDetected(
     occurredAt: Date;
   },
 ): Promise<{ applied: boolean; eventId: string }> {
-  return publishBlockerDetected(detectStore(trx), createEventJournal(trx), input);
+  return publishBlockerDetected(detectStore(trx), createEventJournal(trx, logger), input);
 }
 
 function answerStore(trx: Transaction<Database>): BlockerAnswerStore {
@@ -551,24 +554,24 @@ function answerStore(trx: Transaction<Database>): BlockerAnswerStore {
 }
 
 /** Причина блокера и «нет блокера»: правка и событие коммитятся одной транзакцией. */
-export function createBlockerAnswerActions(db: Kysely<Database>, clock: Clock): BlockerAnswering {
+export function createBlockerAnswerActions(db: Kysely<Database>, logger: Logger, clock: Clock): BlockerAnswering {
   return {
     declare(input: BlockerReasonReply): Promise<BlockerReasonResult> {
-      return db.transaction().execute((trx) => declareBlockerReason(answerStore(trx), createEventJournal(trx), clock, input));
+      return db.transaction().execute((trx) => declareBlockerReason(answerStore(trx), createEventJournal(trx, logger), clock, input));
     },
     dismiss(input: NoBlockerPress): Promise<NoBlockerResult> {
-      return db.transaction().execute((trx) => pressNoBlocker(answerStore(trx), createEventJournal(trx), clock, input));
+      return db.transaction().execute((trx) => pressNoBlocker(answerStore(trx), createEventJournal(trx, logger), clock, input));
     },
   };
 }
 
 /** `/task`: строка `tasks` и `task.created` коммитятся одной транзакцией. */
-export function createTaskActions(db: Kysely<Database>, clock: Clock): TaskCreation {
+export function createTaskActions(db: Kysely<Database>, logger: Logger, clock: Clock): TaskCreation {
   return {
     create(input: TaskDraft): Promise<CreatedTask> {
       return db.transaction().execute(async (trx) => {
         const sender = await findSender(trx, input.telegramUserId);
-        return decideCreate(storeOf(trx), createEventJournal(trx), clock, {
+        return decideCreate(storeOf(trx), createEventJournal(trx, logger), clock, {
           id: randomUUID(),
           title: input.title,
           sender,

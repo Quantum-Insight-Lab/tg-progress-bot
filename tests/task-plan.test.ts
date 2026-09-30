@@ -61,6 +61,7 @@ import { parseTaskPlanData, replyToTaskPlan } from '../src/telegram/task-plan.ts
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
+import { silentLogger } from './log-lines.ts';
 
 const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const at = '2026-09-28T07:33:00.000Z';
@@ -135,11 +136,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const creation = createProjectCreation(handle.db, clock);
+  const creation = createProjectCreation(handle.db, silentLogger, clock);
   const alpha = await creation.create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
@@ -148,7 +149,7 @@ async function seed(): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  const membership = createMembership(handle.db, clock);
+  const membership = createMembership(handle.db, silentLogger, clock);
   await membership.add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
@@ -161,7 +162,7 @@ async function seed(): Promise<Fixture> {
     VALUES (${'00000000-0000-4000-8000-0000000000c1'}::uuid, ${alpha.project.id}::uuid, ${vera.user.id}::uuid, ${LEAD_ROLE}, ${veraTopic})
   `.execute(handle.db);
   await sql`UPDATE project_members SET topic_id = ${borisTopic} WHERE user_id = ${boris.user.id}::uuid`.execute(handle.db);
-  await createChatBinding(handle.db, clock).confirm({
+  await createChatBinding(handle.db, silentLogger, clock).confirm({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     offer: forumAdmin,
@@ -321,13 +322,13 @@ describe('кнопки плана', () => {
   it('INV-05 «в план» ставит PLANNED на том же канвасе, «в работу» возвращает в Задачи; GitHub статус не меняет', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const created = await createTaskActions(fixture.db, clock).create(draft(borisTopic, 'Классификация сигнала', 'task-1'));
+    const created = await createTaskActions(fixture.db, silentLogger, clock).create(draft(borisTopic, 'Классификация сигнала', 'task-1'));
     expect(created.task.priority).toBe(TASK_PRIORITY_NORMAL);
     expect(created.task.status).toBe(TASK_STATUS_IN_PROGRESS);
-    const actions = createTaskPlanActions(fixture.db, clock);
+    const actions = createTaskPlanActions(fixture.db, silentLogger, clock);
     const homes: CanvasHome[] = [];
     const edited: number[] = [];
-    const canvas = createCanvasPlacement(fixture.db, clock);
+    const canvas = createCanvasPlacement(fixture.db, silentLogger, clock);
     const deliver = {
       async send(home: CanvasHome): Promise<number> {
         homes.push(home);
@@ -396,7 +397,7 @@ describe('кнопки плана', () => {
     expect(homes[2]?.tasks.map((task) => task.status)).toEqual([TASK_STATUS_IN_PROGRESS]);
     expect(homes).toHaveLength(3);
 
-    await emit(createEventJournal(fixture.db), {
+    await emit(createEventJournal(fixture.db, silentLogger), {
       type: EVENT_TYPES.GITHUB_ISSUE_CHANGED,
       source: 'github',
       idempotencyKey: 'gh-status',
@@ -416,7 +417,7 @@ describe('кнопки плана', () => {
       causationId: null,
       correlationId: null,
     });
-    await emit(createEventJournal(fixture.db), {
+    await emit(createEventJournal(fixture.db, silentLogger), {
       type: EVENT_TYPES.DIVERGENCE_DETECTED,
       source: 'system',
       idempotencyKey: 'div-status',
@@ -449,9 +450,9 @@ describe('кнопки плана', () => {
   it('INV-07 «в план», «в работу» и слово приоритета нажимает только исполнитель', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const own = await createTaskActions(fixture.db, clock).create(draft(borisTopic, 'Своя', 'task-boris'));
-    const leadTask = await createTaskActions(fixture.db, clock).create(draft(veraTopic, 'Руководителя', 'task-vera', veraAccount));
-    const actions = createTaskPlanActions(fixture.db, clock);
+    const own = await createTaskActions(fixture.db, silentLogger, clock).create(draft(borisTopic, 'Своя', 'task-boris'));
+    const leadTask = await createTaskActions(fixture.db, silentLogger, clock).create(draft(veraTopic, 'Руководителя', 'task-vera', veraAccount));
+    const actions = createTaskPlanActions(fixture.db, silentLogger, clock);
     expect(await replyToTaskPlan(place(borisTopic), veraAccount, 'cb-lead', 1, TASK_TRANSITION_PLAN, actions)).toBeNull();
     expect(await replyToTaskPlan(place(borisTopic), rootAccount, 'cb-root', 1, TASK_TRANSITION_PLAN, actions)).toBeNull();
     expect(await replyToTaskPlan(place(veraTopic), borisAccount, 'cb-foreign', leadTask.task.number, TASK_TRANSITION_PLAN, actions)).toBeNull();
@@ -475,10 +476,10 @@ describe('кнопки плана', () => {
   it('INV-08 слово приоритета на канвасе крутит normal → high → low → normal и задаёт порядок плана', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const actions = createTaskPlanActions(fixture.db, clock);
-    const first = await createTaskActions(fixture.db, clock).create(draft(borisTopic, 'Ранняя', 'task-early'));
-    const second = await createTaskActions(fixture.db, clock).create(draft(borisTopic, 'Поздняя', 'task-late'));
-    const third = await createTaskActions(fixture.db, clock).create(draft(borisTopic, 'Средняя', 'task-mid'));
+    const actions = createTaskPlanActions(fixture.db, silentLogger, clock);
+    const first = await createTaskActions(fixture.db, silentLogger, clock).create(draft(borisTopic, 'Ранняя', 'task-early'));
+    const second = await createTaskActions(fixture.db, silentLogger, clock).create(draft(borisTopic, 'Поздняя', 'task-late'));
+    const third = await createTaskActions(fixture.db, silentLogger, clock).create(draft(borisTopic, 'Средняя', 'task-mid'));
     expect(first.task.priority).toBe(TASK_PRIORITY_NORMAL);
     const high = await replyToTaskPlan(place(borisTopic), borisAccount, 'cb-high', first.task.number, TASK_PRIORITY_ACT, actions);
     expect(high?.task.priority).toBe(TASK_PRIORITY_HIGH);
@@ -530,8 +531,8 @@ describe('кнопки плана', () => {
   it('INV-22 повтор того же callback не пишет второе событие и не крутит задачу ещё раз', async () => {
     const fixture = await seed();
     opened.push(fixture);
-    const created = await createTaskActions(fixture.db, clock).create(draft(borisTopic, 'Повтор', 'task-2'));
-    const actions = createTaskPlanActions(fixture.db, clock);
+    const created = await createTaskActions(fixture.db, silentLogger, clock).create(draft(borisTopic, 'Повтор', 'task-2'));
+    const actions = createTaskPlanActions(fixture.db, silentLogger, clock);
     const first = await replyToTaskPlan(place(borisTopic), borisAccount, 'cb-same', 1, TASK_TRANSITION_PLAN, actions);
     const second = await replyToTaskPlan(place(borisTopic), borisAccount, 'cb-same', 1, TASK_TRANSITION_PLAN, actions);
     expect(first?.applied).toBe(true);

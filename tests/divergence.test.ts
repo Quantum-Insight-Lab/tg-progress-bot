@@ -37,6 +37,7 @@ import {
   readUsersMigration,
 } from '../src/infrastructure/migrate.ts';
 import { createScheduler } from '../src/infrastructure/scheduler.ts';
+import { silentLogger } from './log-lines.ts';
 
 const repo = '42';
 const otherRepo = '7';
@@ -379,7 +380,7 @@ describe('сигнал расхождения за сутки', () => {
         ${duringClosedDay.toISOString()}::timestamptz
       )
     `.execute(handle.db);
-    await noticeProjectDivergence(handle.db, now);
+    await noticeProjectDivergence(handle.db, silentLogger, now);
     expect(await tasksOf(handle.db)).toEqual(beforeTasks);
     expect(await blockersOf(handle.db)).toEqual(beforeBlockers);
     const factsWritten = await eventsOf(handle.db);
@@ -448,14 +449,14 @@ describe('сигнал расхождения за сутки', () => {
     `.execute(handle.db);
     const clock: Clock = { now: () => now };
     const scheduler = createScheduler(clock);
-    scheduler.register('A-36', (at) => noticeProjectDivergence(handle.db, at));
+    scheduler.register('A-36', (at) => noticeProjectDivergence(handle.db, silentLogger, at));
     await scheduler.run();
     const once = await eventsOf(handle.db);
     expect(once.map((item) => item.key).sort()).toEqual(
       [divergenceDetectedKey(alphaId, closedMoscow), divergenceDetectedKey(betaId, closedMoscow), divergenceDetectedKey(utcId, closedMoscow)].sort(),
     );
     await scheduler.run();
-    await noticeProjectDivergence(handle.db, now);
+    await noticeProjectDivergence(handle.db, silentLogger, now);
     expect(await eventsOf(handle.db)).toEqual(once);
     expect(await tasksOf(handle.db)).toEqual([
       { status: 'IN_PROGRESS', updated_at: new Date(weekBefore.toISOString()) },

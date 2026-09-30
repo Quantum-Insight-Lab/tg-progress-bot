@@ -19,6 +19,7 @@ import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import { createEventJournal } from '../src/infrastructure/event-journal.ts';
 import { readEventsMigration, readProjectsMigration, readTasksMigration, readUsersMigration } from '../src/infrastructure/migrate.ts';
+import { silentLogger } from './log-lines.ts';
 
 const at = '2026-09-28T07:33:00.000Z';
 const occurredAt = new Date(at);
@@ -227,7 +228,7 @@ describe('задача не выводится из GitHub', () => {
       'project_id->projects',
     ]);
 
-    const journal = createEventJournal(handle.db);
+    const journal = createEventJournal(handle.db, silentLogger);
     for (const fact of stream) await publish(journal, fact);
     const tasks = await sql<{ n: number }>`SELECT CAST(count(*) AS int) AS n FROM tasks`.execute(handle.db);
     expect(Number(tasks.rows[0]?.n)).toBe(0);

@@ -57,6 +57,7 @@ import {
   type TopicChannel,
 } from '../src/telegram/executor-topic.ts';
 import { replyToTaskCommand } from '../src/telegram/task-command.ts';
+import { silentLogger } from './log-lines.ts';
 
 const noon = new Date('2026-09-28T12:00:00.000Z');
 const clock: Clock = { now: () => noon };
@@ -182,11 +183,11 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 
 async function seed(bound: boolean): Promise<Fixture> {
   const handle = await openDb();
-  const registration = createUserRegistration(handle.db, clock);
+  const registration = createUserRegistration(handle.db, silentLogger, clock);
   await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
-  const alpha = await createProjectCreation(handle.db, clock).create({
+  const alpha = await createProjectCreation(handle.db, silentLogger, clock).create({
     telegramUserId: String(rootAccount.id),
     name: 'Альфа',
     description: '',
@@ -194,7 +195,7 @@ async function seed(bound: boolean): Promise<Fixture> {
     chat: 'private',
     idempotencyKey: 'project-alpha',
   });
-  await createMembership(handle.db, clock).add({
+  await createMembership(handle.db, silentLogger, clock).add({
     telegramUserId: String(rootAccount.id),
     projectId: alpha.project.id,
     targetTelegramUserId: String(borisAccount.id),
@@ -206,7 +207,7 @@ async function seed(bound: boolean): Promise<Fixture> {
     VALUES (${leadId}::uuid, ${alpha.project.id}::uuid, ${vera.user.id}::uuid, ${LEAD_ROLE})
   `.execute(handle.db);
   if (bound) {
-    await createChatBinding(handle.db, clock).confirm({
+    await createChatBinding(handle.db, silentLogger, clock).confirm({
       telegramUserId: String(rootAccount.id),
       projectId: alpha.project.id,
       offer: forumAdmin,
@@ -347,11 +348,11 @@ describe('канвас выставляется в топик', () => {
       fixture.alphaId,
       String(borisAccount.id),
       'create-boris',
-      createExecutorTopics(fixture.db, clock),
+      createExecutorTopics(fixture.db, silentLogger, clock),
       talking,
       {
         posted(input) {
-          return showCanvasForTopic(fixture.db, {
+          return showCanvasForTopic(fixture.db, silentLogger, {
             ...input,
             now: noon,
             causationId: null,
@@ -392,10 +393,10 @@ describe('канвас выставляется в топик', () => {
       borisAccount,
       'task-boris',
       'Сделать',
-      createTaskActions(fixture.db, clock),
+      createTaskActions(fixture.db, silentLogger, clock),
       {
         redraw(input) {
-          return showCanvas(fixture.db, {
+          return showCanvas(fixture.db, silentLogger, {
             projectId: input.projectId,
             assigneeId: input.assigneeId,
             destination: CANVAS_DESTINATION_TOPIC,
@@ -422,7 +423,7 @@ describe('канвас выставляется в топик', () => {
     expect(edited[0]?.causationId).toBeTruthy();
 
     await expect(
-      showCanvas(fixture.db, {
+      showCanvas(fixture.db, silentLogger, {
         projectId: fixture.alphaId,
         assigneeId: fixture.borisId,
         destination: CANVAS_DESTINATION_TOPIC,
@@ -438,7 +439,7 @@ describe('канвас выставляется в топик', () => {
 
     const refused = io();
     await expect(
-      showCanvas(fixture.db, {
+      showCanvas(fixture.db, silentLogger, {
         projectId: fixture.alphaId,
         assigneeId: fixture.borisId,
         destination: CANVAS_DESTINATION_PRIVATE,
@@ -462,7 +463,7 @@ describe('канвас выставляется в топик', () => {
       fixture.alphaId,
       String(borisAccount.id),
       'create-unbound',
-      createExecutorTopics(fixture.db, clock),
+      createExecutorTopics(fixture.db, silentLogger, clock),
       {
         async create() {
           return 42;
@@ -486,7 +487,7 @@ describe('канвас выставляется в топик', () => {
     await setTopic(fixture.db, fixture.borisId, 42);
     const gate = io();
     await expect(
-      showCanvasForTopic(fixture.db, {
+      showCanvasForTopic(fixture.db, silentLogger, {
         telegramUserId: String(borisAccount.id),
         topicId: 42,
         now: noon,
@@ -529,7 +530,7 @@ describe('канвас выставляется в топик', () => {
       `.execute(fixture.db);
     }
     const gate = io();
-    const first = await showCanvas(fixture.db, {
+    const first = await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -539,7 +540,7 @@ describe('канвас выставляется в топик', () => {
       edit: gate.edit,
     });
     expect(first.action).toBe('post');
-    const again = await showCanvas(fixture.db, {
+    const again = await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -552,7 +553,7 @@ describe('канвас выставляется в топик', () => {
     expect(again.canvas.messageId).toBe(first.canvas.messageId);
     expect(again.canvas.id).toBe(first.canvas.id);
     const nextDay = new Date('2026-09-28T21:00:00.000Z');
-    const tomorrow = await showCanvas(fixture.db, {
+    const tomorrow = await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -608,7 +609,7 @@ describe('канвас выставляется в топик', () => {
       `.execute(fixture.db);
     }
     const gate = io();
-    await showCanvas(fixture.db, {
+    await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -642,7 +643,7 @@ describe('канвас выставляется в топик', () => {
       UPDATE tasks SET status = ${TASK_STATUS_IN_PROGRESS}
       WHERE number = 6 AND project_id = ${fixture.alphaId}::uuid
     `.execute(fixture.db);
-    await showCanvas(fixture.db, {
+    await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -699,7 +700,7 @@ describe('канвас выставляется в топик', () => {
       `.execute(fixture.db);
     }
     const gate = io();
-    await showCanvas(fixture.db, {
+    await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -754,9 +755,9 @@ describe('канвас выставляется в топик', () => {
       send: gate.send,
       edit: gate.edit,
     };
-    const posted = await showCanvas(fixture.db, { ...input, now: noon, causationId: null });
+    const posted = await showCanvas(fixture.db, silentLogger, { ...input, now: noon, causationId: null });
     await setTimezone(fixture.db, fixture.alphaId, 'Pacific/Honolulu');
-    const sameDay = await showCanvas(fixture.db, { ...input, now: noon, causationId: causationB });
+    const sameDay = await showCanvas(fixture.db, silentLogger, { ...input, now: noon, causationId: causationB });
     expect(sameDay.action).toBe('edit');
     expect(sameDay.canvas).toMatchObject({
       id: posted.canvas.id,
@@ -764,7 +765,7 @@ describe('канвас выставляется в топик', () => {
       canvasDate: '2026-09-28',
     });
     await setTimezone(fixture.db, fixture.alphaId, 'Pacific/Kiritimati');
-    const shifted = await showCanvas(fixture.db, { ...input, now: noon, causationId: null });
+    const shifted = await showCanvas(fixture.db, silentLogger, { ...input, now: noon, causationId: null });
     expect(shifted.action).toBe('post');
     expect(shifted.canvas.canvasDate).toBe('2026-09-29');
     expect(gate.sent.map((item) => item.canvasDate)).toEqual(['2026-09-28', '2026-09-29']);
@@ -795,15 +796,15 @@ describe('канвас выставляется в топик', () => {
     opened.push(fixture);
     await setTopic(fixture.db, fixture.borisId, 42);
     const gate = io();
-    await ensureTodayCanvases(fixture.db, noon, gate.send);
+    await ensureTodayCanvases(fixture.db, silentLogger, noon, gate.send);
     expect(gate.sent).toEqual([shown('2026-09-28')]);
     const once = await canvasesOf(fixture.db);
-    await ensureTodayCanvases(fixture.db, noon, gate.send);
+    await ensureTodayCanvases(fixture.db, silentLogger, noon, gate.send);
     expect(gate.sent).toHaveLength(1);
     expect(await canvasesOf(fixture.db)).toEqual(once);
     expect(await eventTypes(fixture.db, EVENT_TYPES.CANVAS_EDITED)).toEqual([]);
     const nextDay = new Date('2026-09-28T21:00:00.000Z');
-    await ensureTodayCanvases(fixture.db, nextDay, gate.send);
+    await ensureTodayCanvases(fixture.db, silentLogger, nextDay, gate.send);
     expect(gate.sent).toEqual([shown('2026-09-28'), shown('2026-09-29')]);
     expect((await canvasesOf(fixture.db)).map((row) => row.canvasDate)).toEqual(['2026-09-28', '2026-09-29']);
   });
@@ -815,7 +816,7 @@ describe('канвас выставляется в топик', () => {
     const gate = io();
     const redraw = {
       redraw(input: { projectId: string; assigneeId: string; causationId: string }) {
-        return showCanvas(fixture.db, {
+        return showCanvas(fixture.db, silentLogger, {
           projectId: input.projectId,
           assigneeId: input.assigneeId,
           destination: CANVAS_DESTINATION_TOPIC,
@@ -831,7 +832,7 @@ describe('канвас выставляется в топик', () => {
       borisAccount,
       'appear',
       'Классификация сигнала',
-      createTaskActions(fixture.db, clock),
+      createTaskActions(fixture.db, silentLogger, clock),
       redraw,
     );
     expect(reply).toContain('Классификация сигнала');
@@ -860,7 +861,7 @@ describe('канвас выставляется в топик', () => {
     const veraId = vera.rows[0]?.id;
     if (veraId === undefined) throw new Error('Веры нет');
     await setTopic(fixture.db, veraId, 43);
-    const actions = createTaskActions(fixture.db, clock);
+    const actions = createTaskActions(fixture.db, silentLogger, clock);
     await actions.create({
       telegramUserId: String(borisAccount.id),
       chat: 'supergroup',
@@ -878,7 +879,7 @@ describe('канвас выставляется в топик', () => {
       idempotencyKey: 'vera-own',
     });
     const gate = io();
-    await showCanvas(fixture.db, {
+    await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -904,10 +905,10 @@ describe('канвас выставляется в топик', () => {
     opened.push(fixture);
     await setTopic(fixture.db, fixture.borisId, 42);
     const gate = io();
-    const actions = createTaskActions(fixture.db, clock);
+    const actions = createTaskActions(fixture.db, silentLogger, clock);
     const redraw = {
       redraw(input: { projectId: string; assigneeId: string; causationId: string }) {
-        return showCanvas(fixture.db, {
+        return showCanvas(fixture.db, silentLogger, {
           projectId: input.projectId,
           assigneeId: input.assigneeId,
           destination: CANVAS_DESTINATION_TOPIC,
@@ -934,7 +935,7 @@ describe('канвас выставляется в топик', () => {
     const gate = io();
     const cause = '9001';
     await expect(
-      showCanvas(fixture.db, {
+      showCanvas(fixture.db, silentLogger, {
         projectId: fixture.alphaId,
         assigneeId: fixture.borisId,
         destination: CANVAS_DESTINATION_TOPIC,
@@ -957,7 +958,7 @@ describe('канвас выставляется в топик', () => {
       canvas_date: '2026-09-28',
     });
     await expect(
-      showCanvas(fixture.db, {
+      showCanvas(fixture.db, silentLogger, {
         projectId: fixture.alphaId,
         assigneeId: fixture.borisId,
         destination: CANVAS_DESTINATION_TOPIC,
@@ -975,7 +976,7 @@ describe('канвас выставляется в топик', () => {
     const fixture = await seed(true);
     opened.push(fixture);
     await setTopic(fixture.db, fixture.borisId, 42);
-    const actions = createTaskActions(fixture.db, clock);
+    const actions = createTaskActions(fixture.db, silentLogger, clock);
     await actions.create({
       telegramUserId: String(borisAccount.id),
       chat: 'supergroup',
@@ -985,7 +986,7 @@ describe('канвас выставляется в топик', () => {
       idempotencyKey: 'stay',
     });
     const gate = io();
-    const posted = await showCanvas(fixture.db, {
+    const posted = await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -994,7 +995,7 @@ describe('канвас выставляется в топик', () => {
       send: gate.send,
       edit: gate.edit,
     });
-    await showCanvas(fixture.db, {
+    await showCanvas(fixture.db, silentLogger, {
       projectId: fixture.alphaId,
       assigneeId: fixture.borisId,
       destination: CANVAS_DESTINATION_TOPIC,
@@ -1008,7 +1009,7 @@ describe('канвас выставляется в топик', () => {
     expect(await taskStatuses(fixture.db)).toEqual([TASK_STATUS_IN_PROGRESS]);
     const before = await canvasesOf(fixture.db);
     await expect(
-      showCanvas(fixture.db, {
+      showCanvas(fixture.db, silentLogger, {
         projectId: fixture.alphaId,
         assigneeId: fixture.borisId,
         destination: CANVAS_DESTINATION_TOPIC,
@@ -1031,7 +1032,7 @@ describe('канвас выставляется в топик', () => {
     await setTopic(fixture.db, fixture.borisId, 42);
     const edge = new Date('2026-09-28T21:30:00.000Z');
     const refuse = (cause: string) =>
-      showCanvas(fixture.db, {
+      showCanvas(fixture.db, silentLogger, {
         projectId: fixture.alphaId,
         assigneeId: fixture.borisId,
         destination: CANVAS_DESTINATION_TOPIC,
