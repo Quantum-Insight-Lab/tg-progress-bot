@@ -1,0 +1,12 @@
+# Оба webhook на одном TLS-хосте. Сертификат выпускает Caddy.
+{$PUBLIC_HOST:bot.example.com} {
+	handle /telegram/webhook {
+		reverse_proxy app:8080
+	}
+	handle /github/webhook {
+		reverse_proxy app:8080
+	}
+	handle {
+		respond 404
+	}
+}
