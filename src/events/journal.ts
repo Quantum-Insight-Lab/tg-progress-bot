@@ -1,4 +1,4 @@
-/** Строка журнала. `createdAt` — `occurred_at` конверта: в таблице это колонка `created_at` (R-933). */
+/** Строка журнала. `createdAt` — `occurred_at` конверта: в таблице это колонка `created_at`. */
 export interface EventRow {
   id: string;
   source: string;

@@ -954,8 +954,28 @@ export function formatReport(result: CheckResult): string {
 
 const shown = (id: string): string => (id.startsWith('EV-') ? id.slice(3) : id);
 
+/** Соседний слой теста (10.8, I-92): INV, E, L, A, P и имя события. У атома view к ним добавляется его ID. */
+const TRACE_ELEMENT = /^(?:INV|E|L|A|P)-\d+$/;
+
+export function traceKeys(refs: readonly string[], atomId: string, kind: string): string[] {
+  const keys = refs.filter((ref) => TRACE_ELEMENT.test(ref) || ref.startsWith('EV-')).map((ref) => (ref.startsWith('EV-') ? ref.slice(3) : ref));
+  if (kind === 'view') keys.push(atomId);
+  return keys;
+}
+
+/**
+ * Атом без пути к тесту (I-92).
+ * «тест» — ID стоит в названии теста, либо обратная кавычка текста есть среди полей схемы, которые тест называет.
+ * «сессия» — ни того, ни другого: прогон I-93.
+ */
+export function gapBucket(atomId: string, text: string, tests: ReadonlyMap<string, readonly string[]>, fieldHits: ReadonlySet<string>): 'test' | 'session' {
+  if ((tests.get(atomId)?.length ?? 0) > 0) return 'test';
+  const ticks = [...text.matchAll(/`([^`]+)`/g)].map((match) => match[1] ?? '');
+  return ticks.some((tick) => fieldHits.has(tick)) ? 'test' : 'session';
+}
+
 /** tz:trace (10.8): атом → элементы PDA → issues → тесты. Трасса вычисляется, руками не ведётся. */
-export function formatTrace(result: CheckResult, ids: string[], testsByInvariant: Map<string, string[]>): string {
+export function formatTrace(result: CheckResult, ids: string[], testsByKey: Map<string, string[]>): string {
   const texts = atomTexts(result.blocks);
   const rows = new Map(coverage(result.registry, result.elements, texts).map((row) => [row.id, row]));
   const lines: string[] = [];
@@ -973,11 +993,52 @@ export function formatTrace(result: CheckResult, ids: string[], testsByInvariant
       const item = issue.atoms.find((a) => a.id === id);
       return item ? [`${issue.id}${issue.github === undefined ? '' : ` #${issue.github}`}${item.done ? ' ✓' : ''}`] : [];
     });
-    const tests = [...new Set(refs.filter((ref) => ref.startsWith('INV-')).flatMap((inv) => testsByInvariant.get(inv) ?? []))];
+    const tests = [...new Set(traceKeys(refs, id, atom.kind).flatMap((key) => testsByKey.get(key) ?? []))];
     lines.push(`${id}  §${entry?.section ?? '?'}  ${status}`, `  «${entry?.text ?? ''}»`);
     lines.push(`  → ${refs.map(shown).join(', ') || '—'}`, `  → ${issues.join(', ') || '—'}`, `  → ${tests.join(', ') || '—'}`);
   }
   return lines.join('\n');
+}
+
+/** Сводка пути к тесту по всем атомам MVP. Списки — только атомы без пути. */
+export function formatTraceSummary(result: CheckResult, testsByKey: Map<string, string[]>, fieldHits: ReadonlySet<string>): string {
+  const texts = atomTexts(result.blocks);
+  const rows = coverage(result.registry, result.elements, texts);
+  let path = 0;
+  let viaInv = 0;
+  let viaElement = 0;
+  let viaEvent = 0;
+  let viaView = 0;
+  const tested: string[] = [];
+  const session: string[] = [];
+  for (const row of rows) {
+    const keys = traceKeys(row.refs, row.id, row.kind);
+    const linked = (key: string): boolean => (testsByKey.get(key)?.length ?? 0) > 0;
+    const inv = keys.some((key) => key.startsWith('INV-') && linked(key));
+    const element = keys.some((key) => /^(?:E|L|A|P)-\d+$/.test(key) && linked(key));
+    const event = keys.some((key) => key.includes('.') && linked(key));
+    const view = row.kind === 'view' && linked(row.id);
+    if (inv) viaInv += 1;
+    if (element) viaElement += 1;
+    if (event) viaEvent += 1;
+    if (view) viaView += 1;
+    if (inv || element || event || view) path += 1;
+    else (gapBucket(row.id, texts.get(row.id)?.text ?? '', testsByKey, fieldHits) === 'test' ? tested : session).push(row.id);
+  }
+  const list = (ids: string[]): string => (ids.length === 0 ? '—' : ids.join(' '));
+  return [
+    `tz:trace MVP  атомов ${rows.length}`,
+    `путь к тесту: ${path} из ${rows.length}`,
+    `  через INV: ${viaInv}`,
+    `  через E, L, A, P: ${viaElement}`,
+    `  через имя события: ${viaEvent}`,
+    `  view, ID в названии теста: ${viaView}`,
+    `без пути: ${tested.length + session.length}`,
+    `  проверяется тестом: ${tested.length}`,
+    `    ${list(tested)}`,
+    `  сессия I-93: ${session.length}`,
+    `    ${list(session)}`,
+  ].join('\n');
 }
 
 function readDocs(dir: string, pattern: RegExp): PdaDoc[] {
@@ -998,18 +1059,76 @@ function readBacklog(): { issues: PdaDoc[]; index?: string } | undefined {
   return existsSync(index) ? { issues, index: readFileSync(index, 'utf8') } : { issues };
 }
 
-function testsByInvariant(): Map<string, string[]> {
-  const map = new Map<string, string[]>();
+/** Тесты реестра и генератора цитируют примеры событий. Это не путь атома к продуктовому тесту. */
+const TOOLING_TESTS = new Set(['tests/tz-check.test.ts', 'tests/codegen-events.test.ts']);
+const TEST_TITLE = /\b(?:it|test|describe)(?:\.(?:each\([^)]*\)|skip|only|todo))?\(\s*['"`]([^'"`]*)['"`]/g;
+const TITLE_KEY = /\b(?:E|L|A|P)-\d+\b|\bR-\d{3,}\b/g;
+
+function testFiles(): { path: string; text: string }[] {
+  const files: { path: string; text: string }[] = [];
   const walk = (dir: string): void => {
     if (!existsSync(dir)) return;
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
       if (entry.isDirectory()) walk(path);
-      else if (entry.name.endsWith('.test.ts')) for (const inv of testIds([readFileSync(path, 'utf8')])) map.set(inv, [...(map.get(inv) ?? []), path]);
+      else if (entry.name.endsWith('.test.ts')) files.push({ path, text: readFileSync(path, 'utf8') });
     }
   };
   walk(TESTS_DIR);
+  return files;
+}
+
+function hasToken(text: string, token: string): boolean {
+  let from = 0;
+  while (from < text.length) {
+    const at = text.indexOf(token, from);
+    if (at < 0) return false;
+    const before = at === 0 ? '' : (text[at - 1] ?? '');
+    const after = text[at + token.length] ?? '';
+    if (!/[A-Za-z0-9_.]/.test(before) && !/[A-Za-z0-9_.]/.test(after)) return true;
+    from = at + token.length;
+  }
+  return false;
+}
+
+function remember(map: Map<string, string[]>, key: string, path: string): void {
+  const list = map.get(key);
+  if (list === undefined) map.set(key, [path]);
+  else if (!list.includes(path)) list.push(path);
+}
+
+/** Индекс тестов для трассы: INV в начале названия, E/L/A/P и ID атома в названии, имя события в файле. */
+function testsByKey(eventNames: readonly string[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const file of testFiles()) {
+    if (TOOLING_TESTS.has(file.path)) continue;
+    for (const inv of testIds([file.text])) remember(map, inv, file.path);
+    for (const title of file.text.matchAll(TEST_TITLE)) {
+      for (const key of (title[1] ?? '').matchAll(TITLE_KEY)) remember(map, key[0], file.path);
+    }
+    for (const name of eventNames) {
+      const constant = `EVENT_TYPES.${name.toUpperCase().replaceAll('.', '_')}`;
+      if (hasToken(file.text, name) || file.text.includes(constant)) remember(map, name, file.path);
+    }
+  }
   return map;
+}
+
+/** Поле схемы, которое продуктовый тест называет идентификатором. Короткие имена вроде `id` тоже считаются. */
+function schemaFieldHits(elements: PdaElement[]): Set<string> {
+  const fields = new Set<string>();
+  for (const element of elements) {
+    if (!element.id.startsWith('E-')) continue;
+    for (const field of backticked(element.cells[FIELDS_COLUMN])) {
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(field)) fields.add(field);
+    }
+  }
+  const hits = new Set<string>();
+  const files = testFiles().filter((file) => !TOOLING_TESTS.has(file.path));
+  for (const field of fields) {
+    if (files.some((file) => hasToken(file.text, field))) hits.add(field);
+  }
+  return hits;
 }
 
 function main(argv: string[]): number {
@@ -1022,8 +1141,14 @@ function main(argv: string[]): number {
     readBacklog(),
   );
   if (argv.includes('--trace')) {
+    const names = result.elements.filter((element) => element.id.startsWith('EV-')).map((element) => element.id.slice(3));
+    const tests = testsByKey(names);
+    if (argv.includes('--mvp')) {
+      console.log(formatTraceSummary(result, tests, schemaFieldHits(result.elements)));
+      return 0;
+    }
     const ids = argv.filter((arg) => /^R-\d{3,}$/.test(arg));
-    console.log(formatTrace(result, ids, testsByInvariant()));
+    console.log(formatTrace(result, ids, tests));
     return ids.every((id) => result.registry.atoms.has(id)) ? 0 : 1;
   }
   console.log(formatReport(result));
