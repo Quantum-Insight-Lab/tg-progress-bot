@@ -159,7 +159,10 @@ function messageBody(updateId: number, account: { id: number; first_name: string
     from: { id: account.id, is_bot: false, first_name: account.first_name },
     text,
   };
-  if (command) message.entities = [{ type: 'bot_command', offset: 0, length: text.length }];
+  if (command) {
+    const token = text.split(/\s/, 1)[0] ?? text;
+    message.entities = [{ type: 'bot_command', offset: 0, length: token.length }];
+  }
   return JSON.stringify({ update_id: updateId, message });
 }
 
@@ -293,6 +296,17 @@ describe('INV-16 guard на входе всех обработчиков', () =>
     });
     running.bot.api.config.use(captureReplies(sent));
 
+    const spoken = new Set<GuardedHandler>([
+      'chat-binding',
+      'task',
+      'task-mark',
+      'task-plan',
+      'task-review',
+      'task-cancel',
+      'blocker-answer',
+      'report',
+      'rebuild',
+    ]);
     const leaked = ['Аня', 'Борис', 'Вера', 'Альфа', 'Секрет'];
     let updateId = 810;
     for (const handler of GUARDED_HANDLERS) {
@@ -305,8 +319,8 @@ describe('INV-16 guard на входе всех обработчиков', () =>
         `.execute(handle);
         expect(Number(known.rows[0]?.n)).toBe(1);
       } else {
-        expect(replies).toEqual([ACCESS_DENIED_REPLY]);
-        for (const word of leaked) expect(replies[0]).not.toContain(word);
+        expect(replies).toEqual(spoken.has(handler) ? [ACCESS_DENIED_REPLY] : []);
+        for (const word of leaked) for (const reply of replies) expect(reply).not.toContain(word);
         const known = await sql<{ n: number }>`
           SELECT CAST(count(*) AS int) AS n FROM users WHERE telegram_user_id::text = ${String(account.id)}
         `.execute(handle);
@@ -315,18 +329,20 @@ describe('INV-16 guard на входе всех обработчиков', () =>
       updateId += 1;
     }
 
+    const chatter = await fresh(messageBody(updateId, { id: 4999, first_name: 'Чужой' }, 'просто текст'));
+    expect(chatter).toEqual([]);
+    updateId += 1;
+
     const borisBody = bodyFor('new-project', updateId, borisAccount);
     const borisDenied = await fresh(borisBody);
-    expect(borisDenied).toEqual([ACCESS_DENIED_REPLY]);
-    expect(borisDenied[0]).not.toContain('Секрет');
-    expect(borisDenied[0]).not.toContain('Альфа');
+    expect(borisDenied).toEqual([]);
     const projects = await sql<{ n: number }>`SELECT CAST(count(*) AS int) AS n FROM projects`.execute(handle);
     expect(Number(projects.rows[0]?.n)).toBe(1);
     const members = await sql<{ user_id: string }>`SELECT user_id::text AS user_id FROM project_members`.execute(handle);
     expect(members.rows.map((row) => row.user_id)).toEqual([vera.user.id]);
 
     const repeated = await fresh(borisBody);
-    expect(repeated).toEqual([ACCESS_DENIED_REPLY]);
+    expect(repeated).toEqual([]);
     const deniedEvents = await sql<{ n: number }>`
       SELECT CAST(count(*) AS int) AS n FROM events
       WHERE event_type = ${EVENT_TYPES.ACCESS_DENIED} AND idempotency_key = ${String(updateId)}

@@ -41,7 +41,6 @@ interface ProbeResponse {
 interface WebhookInfo {
   url: string;
   pendingUpdateCount: number;
-  lastErrorMessage: string;
 }
 
 interface SmokePaths {
@@ -124,10 +123,8 @@ async function readWebhookInfo(token: string): Promise<WebhookInfo> {
   const result = json.result;
   const url = result.url;
   const pending = result.pending_update_count;
-  const last = result.last_error_message;
   if (typeof url !== 'string' || typeof pending !== 'number') throw new Error('getWebhookInfo: отказ');
-  if (last !== undefined && typeof last !== 'string') throw new Error('getWebhookInfo: отказ');
-  return { url, pendingUpdateCount: pending, lastErrorMessage: last ?? '' };
+  return { url, pendingUpdateCount: pending };
 }
 
 /** Живые запросы: TLS с проверкой имени, коды webhook, `getWebhookInfo`, адрес здоровья. */
@@ -167,7 +164,6 @@ async function webhookInfoStep(target: SmokeTarget, probe: SmokeProbe): Promise<
   }
   const reasons: string[] = [];
   if (first.url !== target.telegramUrl || second.url !== target.telegramUrl) reasons.push('getWebhookInfo.url');
-  if (first.lastErrorMessage !== '' || second.lastErrorMessage !== '') reasons.push('getWebhookInfo.last_error_message');
   if (second.pendingUpdateCount > first.pendingUpdateCount) reasons.push('getWebhookInfo.pending_update_count');
   return reasons.length === 0 ? null : reasons.join(', ');
 }
