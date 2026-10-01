@@ -38,6 +38,7 @@ src/config         ничего не импортирует из src
 | Проверки | `npm run ci`: типы, ESLint, dependency-cruiser, сверка генерации, S-7, тесты, `tz:check --gate --pda` с TR-7 и TR-8 по backlog | есть |
 | Трасса атома | `npm run tz:trace -- R-xxx`: атом → элементы PDA → issues → тесты | есть |
 | Публикация backlog | `npm run backlog:publish`: сухой прогон по умолчанию, `--apply` — запись в GitHub, `--preview I-xx` — тело issue | есть |
+| Проверка после сборки | `npm run smoke`: `src/smoke-main.ts` и `src/infrastructure/smoke.ts`; сервис `smoke` в профиле `tools` | есть |
 
 ## Запреты
 

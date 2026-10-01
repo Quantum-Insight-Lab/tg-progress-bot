@@ -1,4 +1,4 @@
-import { CompiledQuery, Kysely, PostgresDialect, type DatabaseConnection } from 'kysely';
+import { CompiledQuery, Kysely, PostgresDialect, sql, type DatabaseConnection } from 'kysely';
 import { Pool } from 'pg';
 import type { Database } from './database.ts';
 
@@ -52,6 +52,11 @@ export async function withMigrationSql<T>(connectionString: string, run: (sql: M
   } finally {
     await pool.end();
   }
+}
+
+/** База отвечает. Пустой SELECT: в ответ наружу данные не попадают. */
+export async function databaseResponds(db: Kysely<Database>): Promise<void> {
+  await sql`SELECT 1`.execute(db);
 }
 
 /** Единственный пул процесса (B-14). Повторный вызов возвращает тот же экземпляр. */

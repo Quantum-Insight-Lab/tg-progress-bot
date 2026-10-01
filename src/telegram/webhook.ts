@@ -6,8 +6,13 @@ import type { Logger } from '../domain/shared/logger.ts';
 /** Путь приёма обновлений, если окружение его не задаёт. `setWebhook` — в развёртывании. */
 export const TELEGRAM_WEBHOOK_PATH = '/telegram/webhook';
 
+/** Живость процесса на том же порту. Снаружи прокси его не отдаёт. Тело ответа пустое. */
+export const HEALTH_PATH = '/healthz';
+
+const STATUS_OK = 200;
 const STATUS_NOT_FOUND = 404;
 const STATUS_FAILED = 500;
+const STATUS_UNAVAILABLE = 503;
 const STEP_HTTP = 'http.request';
 
 /** Дополнительный POST-путь на том же порту. Адаптеры друг друга не импортируют. */
@@ -24,6 +29,11 @@ export interface WebhookListenOptions {
   port: number;
   host: string;
   routes?: readonly WebhookRoute[];
+  /**
+   * GET /healthz. `true` — 200, `false` или отказ — 503, тело пустое.
+   * Нет функции — путь закрыт, как любой другой GET.
+   */
+  health?: () => Promise<boolean>;
   /** Строка на каждый запрос: метод, путь, код, длительность. Заголовки и тело не пишутся. */
   logger: Logger;
   clock: Clock;
@@ -90,6 +100,9 @@ export async function startTelegramWebhook(options: WebhookListenOptions): Promi
     if (!route.path.startsWith('/')) throw new Error('путь webhook');
     if (route.path === options.path) throw new Error('путь webhook занят');
   }
+  if (options.health !== undefined && (options.path === HEALTH_PATH || routes.some((route) => route.path === HEALTH_PATH))) {
+    throw new Error('путь webhook занят');
+  }
   const handle = webhookCallback(options.bot, 'http', { secretToken: options.secretToken });
   const server = createServer((req, res) => {
     const startedAt = options.clock.now().getTime();
@@ -115,6 +128,23 @@ export async function startTelegramWebhook(options: WebhookListenOptions): Promi
         },
       );
     };
+    const health = options.health;
+    if (req.method === 'GET' && path === HEALTH_PATH && health !== undefined) {
+      serve(
+        health().then(
+          (ok) => {
+            res.statusCode = ok ? STATUS_OK : STATUS_UNAVAILABLE;
+            res.end();
+          },
+          (error: unknown) => {
+            res.statusCode = STATUS_UNAVAILABLE;
+            res.end();
+            throw error;
+          },
+        ),
+      );
+      return;
+    }
     if (req.method !== 'POST') {
       notFound(res);
       logEntry();

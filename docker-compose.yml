@@ -3,6 +3,8 @@
 # на 127.0.0.1:APP_HOST_PORT, пример — deploy/nginx.conf.example.
 # setWebhook: docker compose run --rm register-webhooks, когда PUBLIC_HOST уже отвечает по HTTPS.
 # URL GitHub App — тот же хост и путь /github/webhook; бот его в GitHub не записывает.
+# GET /healthz на порту app: 200 и пустое тело, иначе 503. Caddy и nginx этот путь не проксируют.
+# Проверка после сборки: docker compose run --rm --no-deps smoke.
 x-logging: &logging
   driver: json-file
   options:
@@ -61,6 +63,16 @@ services:
       - "8080"
     ports:
       - "127.0.0.1:${APP_HOST_PORT:-8088}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(async(r)=>{const b=await r.arrayBuffer();process.exit(r.status===200&&b.byteLength===0?0:1)}).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     logging: *logging
   caddy:
     image: caddy:2
@@ -74,7 +86,8 @@ services:
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     logging: *logging
   register-webhooks:
     build: .
@@ -90,6 +103,22 @@ services:
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       TELEGRAM_WEBHOOK_PATH: ${TELEGRAM_WEBHOOK_PATH:-/telegram/webhook}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+    logging: *logging
+  smoke:
+    build: .
+    profiles: [tools]
+    command:
+      - node
+      - --experimental-strip-types
+      - --disable-warning=ExperimentalWarning
+      - src/smoke-main.ts
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-}
+      PUBLIC_WEBHOOK_ORIGIN: ${PUBLIC_WEBHOOK_ORIGIN:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_PATH: ${TELEGRAM_WEBHOOK_PATH:-/telegram/webhook}
+      HEALTH_URL: http://app:8080/healthz
+      APP_HOST_PORT: ${APP_HOST_PORT:-8088}
     logging: *logging
 
 volumes:

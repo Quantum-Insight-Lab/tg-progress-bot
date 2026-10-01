@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { Clock } from '../src/domain/shared/clock.ts';
 import { GITHUB_WEBHOOK_PATH } from '../src/github/webhook.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
-import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
+import { HEALTH_PATH, TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
 import { captureLog } from './log-lines.ts';
@@ -74,6 +74,7 @@ describe('один процесс', () => {
       'X-GitHub-Delivery': 'delivery-1',
     });
     expect(github).toBe(404);
+    expect(await httpStatus(running.port, 'GET', HEALTH_PATH, '', {})).toBe(200);
     await expect(startProcess(readProcessConfig(env(), clock))).rejects.toThrow('процесс уже запущен');
   });
 
@@ -89,6 +90,7 @@ describe('один процесс', () => {
         host: '127.0.0.1',
         telegramWebhookPath: TELEGRAM_WEBHOOK_PATH,
         githubWebhookPath: null,
+        healthPath: HEALTH_PATH,
         schedulerIntervalMs: 60000,
         reconcileIntervalMs: null,
         githubApp: false,
@@ -97,6 +99,7 @@ describe('один процесс', () => {
     expect(log.steps('http.request').map((line) => [line.level, line.method, line.path, line.status])).toEqual([
       ['info', 'POST', TELEGRAM_WEBHOOK_PATH, 200],
       ['info', 'POST', GITHUB_WEBHOOK_PATH, 404],
+      ['info', 'GET', HEALTH_PATH, 200],
     ]);
     expect(log.steps('telegram.update')).toEqual([
       expect.objectContaining({ level: 'info', updateId: 7, kind: 'message', chatId: '1', chatType: 'private', fromId: '2', command: null }),
