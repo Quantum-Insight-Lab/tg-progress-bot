@@ -4,6 +4,7 @@ import {
   check,
   coverage,
   formatTrace,
+  gapBucket,
   MAX_ATOMS_PER_STEP,
   parseEventRegistry,
   parseIssue,
@@ -461,5 +462,48 @@ describe('Backlog: TR-7, TR-8 и ссылки issues', () => {
       issues: [issue('I-01', ['x:R-003', ...acts.slice(1, 5)]), issue('I-02', ['R-003', ...acts.slice(5)])],
     });
     expect(formatTrace(result, ['R-003'], new Map()).split('\n')).toEqual(['R-003  §  covered', '  «текст R-003»', '  → A-1', '  → I-01 ✓, I-02', '  → —']);
+  });
+
+  it('tz:trace: путь к тесту через A, P, имя события и ID атома view', () => {
+    const viewAtoms = ['  R-001: { kind: scope, release: mvp }', '  R-002: { kind: view, scope: R-001 }', '  R-003: { kind: reaction, scope: R-001 }', ''].join('\n');
+    const viewTz = '{R-001} объём\n\n{R-002} поле экрана\n\n{R-003} реакция';
+    const viewPda = ['| ID | Что | Из ТЗ |', '| --- | --- | --- |', '| P-3 | экран | R-002 |', '| A-4 | акт | R-003 |'].join('\n');
+    const event = [
+      'events:',
+      '  - type: task.created',
+      '    version: 1',
+      '    context: tasks',
+      '    actor: assignee',
+      '    subject: Task',
+      '    payload: { task_id: string }',
+      '    idempotency_key: id',
+      '    invariants: []',
+      '    owner: max',
+      '    realizes: [R-003]',
+    ].join('\n');
+    const graph = ['| ID | Сущность | Контекст | Из ТЗ |', '| --- | --- | --- | --- |', '| E-1 | Задача | `tasks` | derived: пример |'].join('\n');
+    const result = check(registry(viewAtoms), () => viewTz, { gate: false }, [
+      { file: 'p.md', text: viewPda },
+      { file: 'g.md', text: graph },
+    ], event);
+    const tests = new Map<string, string[]>([
+      ['P-3', ['tests/screen.test.ts']],
+      ['R-002', ['tests/screen.test.ts']],
+      ['A-4', ['tests/act.test.ts']],
+      ['task.created', ['tests/reaction.test.ts']],
+    ]);
+    const lines = formatTrace(result, ['R-002', 'R-003'], tests).split('\n');
+    expect(lines[2]).toBe('  → P-3');
+    expect(lines[4]).toBe('  → tests/screen.test.ts');
+    expect(lines[7]).toBe('  → A-4, task.created');
+    expect(lines[9]).toBe('  → tests/act.test.ts, tests/reaction.test.ts');
+  });
+
+  it('атом без пути: поле схемы в тесте или сессия', () => {
+    const tests = new Map<string, string[]>([['R-100', ['tests/named.test.ts']]]);
+    const fields = new Set(['telegram_user_id']);
+    expect(gapBucket('R-100', 'проза', tests, fields)).toBe('test');
+    expect(gapBucket('R-101', '`telegram_user_id` уникален', tests, fields)).toBe('test');
+    expect(gapBucket('R-102', 'человек входит в группу', tests, fields)).toBe('session');
   });
 });
