@@ -8,7 +8,7 @@ import { startReconcileLoop } from '../src/infrastructure/reconcile.ts';
 import { createScheduler, startSchedulerLoop, SYSTEM_ACTION_IDS, type Scheduler } from '../src/infrastructure/scheduler.ts';
 import { readProcessConfig } from '../src/process.ts';
 import { createTelegramBot } from '../src/telegram/bot.ts';
-import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from '../src/telegram/webhook.ts';
+import { HEALTH_PATH, startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookServer } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
 import { captureLog, silentLogger, type LogLine } from './log-lines.ts';
@@ -135,6 +135,7 @@ describe('B-17 вход HTTP: строка на каждый код ответа
   };
   const noop = async (): Promise<void> => undefined;
   let githubFails = false;
+  let healthOk = true;
   let server: WebhookServer;
 
   beforeAll(async () => {
@@ -151,6 +152,10 @@ describe('B-17 вход HTTP: строка на каждый код ответа
       host: '127.0.0.1',
       logger: log.logger,
       clock: tickingClock(5),
+      health: async () => {
+        if (!healthOk) throw new Error('база недоступна');
+        return true;
+      },
       routes: [
         {
           path: GITHUB_WEBHOOK_PATH,
@@ -212,6 +217,19 @@ describe('B-17 вход HTTP: строка на каждый код ответа
   it('400 — info: доставка GitHub без события', async () => {
     const line = await lineOf('POST', GITHUB_WEBHOOK_PATH, '{}', { 'X-GitHub-Delivery': 'delivery-2', 'X-Hub-Signature-256': signature('{}') });
     expect(line).toMatchObject({ level: 'info', status: 400, path: GITHUB_WEBHOOK_PATH });
+  });
+
+  it('200 — info: адрес здоровья', async () => {
+    const line = await lineOf('GET', HEALTH_PATH, '', {});
+    expect(line).toMatchObject({ level: 'info', step: 'http.request', method: 'GET', path: HEALTH_PATH, status: 200, durationMs: 5 });
+  });
+
+  it('503 — error: адрес здоровья без базы', async () => {
+    healthOk = false;
+    const line = await lineOf('GET', HEALTH_PATH, '', {});
+    healthOk = true;
+    expect(line).toMatchObject({ level: 'error', step: 'http.request', method: 'GET', path: HEALTH_PATH, status: 503 });
+    expect(line.reason).toBe('база недоступна');
   });
 
   it('404 — info: чужой путь и не-POST', async () => {

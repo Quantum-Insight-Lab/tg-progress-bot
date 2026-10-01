@@ -6,9 +6,10 @@ import { parse as parseYaml } from 'yaml';
 import { GITHUB_WEBHOOK_PATH } from '../src/github/webhook.ts';
 import { applyMigrations, listMigrationFiles } from '../src/infrastructure/apply-migrations.ts';
 import type { Database } from '../src/infrastructure/database.ts';
-import { assumeJournalRole, JOURNAL_ROLE, withMigrationSql, type MigrationSql } from '../src/infrastructure/db.ts';
+import { assumeJournalRole, databaseResponds, JOURNAL_ROLE, withMigrationSql, type MigrationSql } from '../src/infrastructure/db.ts';
+import { SMOKE_SAMPLE_GAP_MS } from '../src/infrastructure/smoke.ts';
 import { registerBotWebhook, webhookUrls } from '../src/infrastructure/webhook-host.ts';
-import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
+import { HEALTH_PATH, TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 
 const WRITE_CALLS = [
   'issues.create',
@@ -190,7 +191,7 @@ describe('развёртывание', () => {
     const { services } = compose();
     for (const name of ['postgres', 'app', 'caddy']) expect(field(services, name).restart).toBe('unless-stopped');
     expect(field(services, 'migrate').restart).toBe('no');
-    expect(Object.keys(services).sort()).toEqual(['app', 'caddy', 'migrate', 'postgres', 'register-webhooks']);
+    expect(Object.keys(services).sort()).toEqual(['app', 'caddy', 'migrate', 'postgres', 'register-webhooks', 'smoke']);
     for (const service of Object.values(services)) {
       expect(service.logging).toEqual({ driver: 'json-file', options: { 'max-size': '10m', 'max-file': '5' } });
     }
@@ -213,6 +214,15 @@ describe('развёртывание', () => {
     expect(nginx.match(/proxy_pass /g)).toHaveLength(2);
     expect(nginx).toContain('return 404;');
     expect(nginx).toContain('server_name bot.example.com;');
+    expect(nginx).not.toContain(HEALTH_PATH);
+    const caddy = readFileSync('deploy/Caddyfile', 'utf8');
+    expect(caddy).not.toContain(HEALTH_PATH);
+    const app = field(services, 'app');
+    const health = app.healthcheck;
+    expect(health).toMatchObject({ interval: '30s', timeout: '5s', retries: 3, start_period: '20s' });
+    expect(JSON.stringify(health)).toContain(HEALTH_PATH);
+    expect(JSON.stringify(health)).toContain('byteLength===0');
+    expect(field(services, 'caddy').depends_on).toEqual({ app: { condition: 'service_healthy' } });
   });
 
   it('register-webhooks из образа: профиль tools, окружение из .env, значений секретов в compose нет', () => {
@@ -230,5 +240,52 @@ describe('развёртывание', () => {
         if (SECRET_KEYS.includes(key) || key === 'PUBLIC_WEBHOOK_ORIGIN') expect(value).toBe(`\${${key}:-}`);
       }
     }
+  });
+
+  it('smoke из образа: профиль tools, окружение из .env, значений секретов в compose нет', () => {
+    const { services } = compose();
+    const smoke = field(services, 'smoke');
+    expect(smoke.profiles).toEqual(['tools']);
+    expect(smoke.build).toBe(field(services, 'app').build);
+    expect(smoke.command).toEqual(['node', '--experimental-strip-types', '--disable-warning=ExperimentalWarning', 'src/smoke-main.ts']);
+    const main = readFileSync('src/smoke-main.ts', 'utf8');
+    const read = [...main.matchAll(/process\.env(?:, |\.)'?([A-Z_]+)'?/g)].map((match) => match[1] ?? '');
+    expect(read.length).toBeGreaterThan(0);
+    expect(Object.keys(environment(smoke)).sort()).toEqual([...new Set(read)].sort());
+  });
+
+  it('адрес здоровья читает базу пустым SELECT и падает, когда соединения нет', async () => {
+    const pglite = new PGlite();
+    await applyMigrations(pgliteSql(pglite));
+    const db = new Kysely<Database>({
+      dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
+    });
+    await expect(databaseResponds(db)).resolves.toBeUndefined();
+    await db.destroy();
+    await expect(databaseResponds(db)).rejects.toThrow();
+  });
+
+  it('runbook после сборки: у каждого шага команда и ожидаемый результат', () => {
+    const section = readFileSync('deploy/README.md', 'utf8').split('## Проверка после сборки')[1] ?? '';
+    expect(section.length).toBeGreaterThan(0);
+    for (const needle of [
+      'npm run ci',
+      'миграции уже применены',
+      '"step":"process.started"',
+      'smoke: ok 5/5',
+      'getWebhookInfo',
+      '"step":"github.delivery"',
+      '"step":"telegram.update"',
+      '"step":"telegram.guard"',
+      '"step":"event.recorded"',
+      '"step":"telegram.outcome"',
+      '"step":"scheduler.run"',
+      '"step":"reconcile.finished"',
+      'docker compose run --rm --no-deps smoke',
+      HEALTH_PATH,
+    ]) {
+      expect(section).toContain(needle);
+    }
+    expect(section).toContain(`sleep ${SMOKE_SAMPLE_GAP_MS / 1000}`);
   });
 });

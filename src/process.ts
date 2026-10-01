@@ -9,6 +9,7 @@ import { createGithubAppClient, readGithubAppCredentials } from './github/client
 import { createGithubReconcileSource } from './github/reconcile.ts';
 import { acceptGithubWebhookHttp, GITHUB_WEBHOOK_PATH } from './github/webhook.ts';
 import type { Database } from './infrastructure/database.ts';
+import { databaseResponds } from './infrastructure/db.ts';
 import { createProcessLogger } from './infrastructure/logger.ts';
 import { createScheduler, startSchedulerLoop, type Scheduler } from './infrastructure/scheduler.ts';
 import { createAccessGate } from './infrastructure/access.ts';
@@ -88,7 +89,7 @@ import { sendBlockerQuestion } from './telegram/blocker-question.ts';
 import { attachBlockerAnswer } from './telegram/blocker-answer.ts';
 import { sendReviewReminder } from './telegram/review-reminder.ts';
 import { attachUpdateLog } from './telegram/update-log.ts';
-import { startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookRoute, type WebhookServer } from './telegram/webhook.ts';
+import { HEALTH_PATH, startTelegramWebhook, TELEGRAM_WEBHOOK_PATH, type WebhookRoute, type WebhookServer } from './telegram/webhook.ts';
 
 const DEFAULT_HOST = '0.0.0.0';
 
@@ -418,6 +419,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
         }),
     });
   }
+  const database = config.db;
   const webhook: WebhookServer = await startTelegramWebhook({
     bot,
     secretToken: config.webhookSecret,
@@ -425,12 +427,16 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     port: config.port,
     host: config.host,
     routes,
+    health: async () => {
+      if (database === undefined) return true;
+      await databaseResponds(database);
+      return true;
+    },
     logger: config.logger,
     clock: config.clock,
   });
   const loop = startSchedulerLoop(scheduler, config.schedulerIntervalMs, logger);
   const reconcileSource = reconcileSourceOf(config);
-  const database = config.db;
   const reconcileLoop =
     database !== undefined && reconcileSource !== null
       ? startReconcileLoop((now) => reconcileGithubMirror(database, logger, reconcileSource, now), config.clock, reconcileIntervalMs(), logger)
@@ -440,6 +446,7 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     host: config.host,
     telegramWebhookPath: config.webhookPath,
     githubWebhookPath: routes.some((route) => route.path === GITHUB_WEBHOOK_PATH) ? GITHUB_WEBHOOK_PATH : null,
+    healthPath: HEALTH_PATH,
     schedulerIntervalMs: config.schedulerIntervalMs,
     reconcileIntervalMs: reconcileLoop === undefined ? null : reconcileIntervalMs(),
     githubApp: reconcileSource !== null,
