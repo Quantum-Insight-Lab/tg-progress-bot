@@ -133,15 +133,15 @@ docker compose logs app | grep '"step":"process.started"'
 curl -sS -o /dev/null -w '%{http_code} %{ssl_verify_result}\n' "https://$PUBLIC_HOST/"
 ```
 
-4. `getWebhookInfo`: адрес — `PUBLIC_WEBHOOK_ORIGIN` + `TELEGRAM_WEBHOOK_PATH`, `last_error_message` пуст, `pending_update_count` за 2 секунды не вырос. Токен остаётся в окружении контейнера и в команду не подставляется.
+4. `getWebhookInfo`: адрес — `PUBLIC_WEBHOOK_ORIGIN` + `TELEGRAM_WEBHOOK_PATH`, `pending_update_count` за 2 секунды не вырос. Токен остаётся в окружении контейнера и в команду не подставляется. `last_error_message` в критерий не входит: Telegram хранит текст последней ошибки и не стирает его после успешной доставки.
 
 ```sh
-docker compose exec -T app node -e 'fetch("https://api.telegram.org/bot"+process.env.TELEGRAM_BOT_TOKEN+"/getWebhookInfo").then(async(r)=>{if(!r.ok){console.log("getWebhookInfo: HTTP "+r.status);return}const w=(await r.json()).result||{};console.log(w.url||"");console.log(w.last_error_message||"");console.log(w.pending_update_count)}).catch(()=>console.log("getWebhookInfo: нет ответа"))'
+docker compose exec -T app node -e 'fetch("https://api.telegram.org/bot"+process.env.TELEGRAM_BOT_TOKEN+"/getWebhookInfo").then(async(r)=>{if(!r.ok){console.log("getWebhookInfo: HTTP "+r.status);return}const w=(await r.json()).result||{};console.log(w.url||"");console.log(w.pending_update_count)}).catch(()=>console.log("getWebhookInfo: нет ответа"))'
 sleep 2
-docker compose exec -T app node -e 'fetch("https://api.telegram.org/bot"+process.env.TELEGRAM_BOT_TOKEN+"/getWebhookInfo").then(async(r)=>{if(!r.ok){console.log("getWebhookInfo: HTTP "+r.status);return}const w=(await r.json()).result||{};console.log(w.url||"");console.log(w.last_error_message||"");console.log(w.pending_update_count)}).catch(()=>console.log("getWebhookInfo: нет ответа"))'
+docker compose exec -T app node -e 'fetch("https://api.telegram.org/bot"+process.env.TELEGRAM_BOT_TOKEN+"/getWebhookInfo").then(async(r)=>{if(!r.ok){console.log("getWebhookInfo: HTTP "+r.status);return}const w=(await r.json()).result||{};console.log(w.url||"");console.log(w.pending_update_count)}).catch(()=>console.log("getWebhookInfo: нет ответа"))'
 ```
 
-Ожидание: первая строка совпадает с адресом webhook Telegram, вторая пустая, третье число во втором запуске не больше первого. Сообщение, оставшееся после простоя, этот шаг не проходит, пока поле снова не пусто.
+Ожидание: первая строка совпадает с адресом webhook Telegram, число во втором запуске не больше первого.
 
 5. Ping GitHub App — кнопка в настройках App, бот в GitHub не пишет. Ожидание: доставка `2xx`. В логе строка `github.delivery`.
 

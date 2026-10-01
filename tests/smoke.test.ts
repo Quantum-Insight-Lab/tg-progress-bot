@@ -35,7 +35,7 @@ function probe(partial: Partial<SmokeProbe> = {}): SmokeProbe & { slept: number[
     tls: () => Promise.resolve({ status: 404, body: '' }),
     post: (url) => Promise.resolve({ status: 401, body: url }),
     get: (url) => Promise.resolve({ status: url.startsWith('https:') ? 404 : 200, body: '' }),
-    webhookInfo: () => Promise.resolve({ url: TELEGRAM_URL, pendingUpdateCount: 1, lastErrorMessage: '' }),
+    webhookInfo: () => Promise.resolve({ url: TELEGRAM_URL, pendingUpdateCount: 1 }),
     sleep: (ms) => {
       slept.push(ms);
       return Promise.resolve();
@@ -81,13 +81,13 @@ describe('проверка после сборки', () => {
       }),
     );
     expect(smokeReport(posts)).toBe('smoke: fail 4/5 — POST /telegram/webhook');
-    const queue = await runSmoke(
+    const stale = await runSmoke(
       target(),
       probe({
-        webhookInfo: () => Promise.resolve({ url: TELEGRAM_URL, pendingUpdateCount: 4, lastErrorMessage: 'осталось с простоя' }),
+        webhookInfo: () => Promise.resolve({ url: TELEGRAM_URL, pendingUpdateCount: 4 }),
       }),
     );
-    expect(smokeReport(queue)).toBe('smoke: fail 4/5 — getWebhookInfo.last_error_message');
+    expect(smokeReport(stale)).toBe('smoke: ok 5/5');
     let pending = 1;
     const growing = await runSmoke(
       target(),
@@ -95,20 +95,19 @@ describe('проверка после сборки', () => {
         webhookInfo: () => {
           const current = pending;
           pending += 1;
-          return Promise.resolve({ url: TELEGRAM_URL, pendingUpdateCount: current, lastErrorMessage: '' });
+          return Promise.resolve({ url: TELEGRAM_URL, pendingUpdateCount: current });
         },
       }),
     );
     expect(smokeReport(growing)).toBe('smoke: fail 4/5 — getWebhookInfo.pending_update_count');
-    expect(smokeReport(queue)).not.toContain(TOKEN);
-    expect(smokeReport(queue)).not.toContain('осталось с простоя');
+    expect(smokeReport(stale)).not.toContain(TOKEN);
   });
 
   it('несовпадение адреса и отказ getWebhookInfo не печатают токен', async () => {
     const wrong = await runSmoke(
       target(),
       probe({
-        webhookInfo: () => Promise.resolve({ url: 'https://other.example/hook', pendingUpdateCount: 0, lastErrorMessage: '' }),
+        webhookInfo: () => Promise.resolve({ url: 'https://other.example/hook', pendingUpdateCount: 0 }),
       }),
     );
     expect(smokeReport(wrong)).toBe('smoke: fail 4/5 — getWebhookInfo.url');
@@ -150,7 +149,6 @@ describe('проверка после сборки', () => {
     await expect(liveSmokeProbe().webhookInfo(TOKEN)).resolves.toEqual({
       url: TELEGRAM_URL,
       pendingUpdateCount: 2,
-      lastErrorMessage: '',
     });
     vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ ok: false }), { status: 200 })));
     await expect(liveSmokeProbe().webhookInfo(TOKEN)).rejects.toThrow('getWebhookInfo: отказ');
