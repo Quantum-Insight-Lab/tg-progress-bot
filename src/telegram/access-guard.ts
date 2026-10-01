@@ -14,10 +14,17 @@ function updateKind(ctx: Context): string {
   return 'update';
 }
 
+/** Отказ вслух только там, где человек обратился к боту: команда или кнопка. */
+function speaksDenial(ctx: Context): boolean {
+  return commandOf(ctx) !== null || ctx.callbackQuery !== undefined;
+}
+
 /**
  * Единственный вход во все обработчики из `GUARDED_HANDLERS`.
  * `/start` проходит дальше: так человек становится известен боту.
- * Остальные обновления постороннего сюда не пускают и отвечают отказом.
+ * Остальные обновления постороннего сюда не пускают.
+ * «Нет доступа.» — на команду и на кнопку. Обычный текст в группе молчит:
+ * бот-админ видит каждое сообщение.
  */
 export function attachAccessGuard(bot: Bot, gate: AccessGate): void {
   bot.use(async (ctx, next) => {
@@ -42,6 +49,7 @@ export function attachAccessGuard(bot: Bot, gate: AccessGate): void {
       await next();
       return;
     }
+    if (!speaksDenial(ctx)) return;
     if (ctx.callbackQuery !== undefined) await ctx.answerCallbackQuery();
     if (ctx.chat !== undefined) await ctx.reply(ACCESS_DENIED_REPLY);
   });
