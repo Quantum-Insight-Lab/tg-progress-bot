@@ -73,7 +73,7 @@ export interface MembershipActions {
     targetTelegramUserId: string;
     chat: string;
     idempotencyKey: string;
-  }): Promise<{ name: string; role: typeof MEMBER_ROLE }>;
+  }): Promise<{ name: string; role: typeof MEMBER_ROLE; projectName: string }>;
   describeRemoval(input: {
     telegramUserId: string;
     projectId: string;

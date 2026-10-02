@@ -1,5 +1,6 @@
 import type { Bot } from 'grammy';
 import type { UserRegistration } from '../domain/projects/user.ts';
+import { rootStartReply } from '../projections/onboarding-next.ts';
 import { traceHandler } from './update-log.ts';
 
 /** Первый `/start`: человек — руководитель и может завести проект. */
@@ -9,7 +10,7 @@ export const START_REPLY_ROOT = 'Вы руководитель и можете �
 export const START_REPLY_PENDING = 'Доступ появится, когда корень добавит вас в проект.';
 
 export function startReply(isRoot: boolean): string {
-  return isRoot ? START_REPLY_ROOT : START_REPLY_PENDING;
+  return isRoot ? rootStartReply(START_REPLY_ROOT) : START_REPLY_PENDING;
 }
 
 interface TelegramAccount {

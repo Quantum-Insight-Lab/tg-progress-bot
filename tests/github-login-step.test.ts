@@ -263,7 +263,7 @@ describe('INV-20 шаг логина можно пропустить, логин
     expect(parseGithubLoginMessage(`${GITHUB_LOGIN_HEADING}\nada`)).toEqual({ login: 'ada' });
     expect(parseGithubLoginMessage(`${GITHUB_LOGIN_HEADING}\n`)).toEqual({ login: '' });
     expect(parseGithubLoginMessage('привет')).toBeNull();
-    expect(isMemberAddedReply(addedReply('Борис'))).toBe(true);
+    expect(isMemberAddedReply(addedReply('Борис', 'Альфа'))).toBe(true);
     expect(isMemberAddedReply('Уже в проекте.')).toBe(false);
     expect(GITHUB_LOGIN_ASK).toContain('Шаг можно пропустить.');
     expect(GITHUB_LOGIN_ASK).toContain('не на каждый проект');
