@@ -194,7 +194,9 @@ export function createMembership(db: Kysely<Database>, logger: Logger, clock: Cl
           idempotencyKey: input.idempotencyKey,
         });
         if (member.role !== MEMBER_ROLE) throw new DomainError(DOMAIN_ERROR.PROJECT_ROLE, 'роль добавления — member');
-        return { name: target.name, role: member.role };
+        const project = await trx.selectFrom('projects').select('name').where('id', '=', input.projectId).executeTakeFirst();
+        if (project === undefined) throw new DomainError(DOMAIN_ERROR.MEMBER_PROJECT_MISSING, 'проект не найден');
+        return { name: target.name, role: member.role, projectName: project.name };
       });
     },
     describeRemoval(input) {

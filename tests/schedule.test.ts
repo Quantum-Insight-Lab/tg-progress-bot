@@ -231,7 +231,7 @@ describe('INV-24 час отчёта считается по таймзоне г
       'set-hour',
       actions,
     );
-    expect(saved).toBe(scheduleSavedReply('09:00', 'Pacific/Auckland'));
+    expect(saved).toBe(scheduleSavedReply('09:00', 'Pacific/Auckland', 'Альфа'));
     const after = await stored(fixture.db);
     expect(after.chats).toBe(1);
     expect(after.dailyCron).toBe('09:00');
@@ -383,7 +383,7 @@ describe('INV-22 повтор расписания не применяется �
       'same-key',
       actions,
     );
-    expect(first).toBe(scheduleSavedReply('09:00', 'Europe/Moscow'));
+    expect(first).toBe(scheduleSavedReply('09:00', 'Europe/Moscow', 'Альфа'));
     const second = await replyToScheduleMessage(
       'private',
       rootAccount,

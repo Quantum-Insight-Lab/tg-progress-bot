@@ -216,7 +216,7 @@ describe('экран участников', () => {
   });
 
   it('R-591 строка добавления называет роль member', () => {
-    expect(addedReply('Борис')).toBe('Борис добавлен как member.');
+    expect(addedReply('Борис', 'Альфа')).toContain('Борис добавлен как member.');
   });
 
   it('R-251 перед удалением текст говорит, что незакрытые задачи снимают', () => {
@@ -289,7 +289,7 @@ describe('INV-18 добавление member и снятие незакрыты�
     opened.push(fixture);
     const membership = createMembership(fixture.db, silentLogger, clock);
     const reply = await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-boris', membership);
-    expect(reply?.text).toBe(addedReply('Борис'));
+    expect(reply?.text).toBe(addedReply('Борис', 'Альфа'));
     expect(leadsTasks(MEMBER_ROLE)).toBe(true);
     expectMembership(fixture, await membersOf(fixture.db), [
       { projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE },
@@ -314,7 +314,7 @@ describe('INV-18 добавление member и снятие незакрыты�
       VALUES (${memberId}::uuid, ${fixture.betaId}::uuid, ${fixture.borisId}::uuid, ${LEAD_ROLE})
     `.execute(fixture.db);
     const reply = await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-boris-alpha', membership);
-    expect(reply?.text).toBe(addedReply('Борис'));
+    expect(reply?.text).toBe(addedReply('Борис', 'Альфа'));
     expectMembership(fixture, await membersOf(fixture.db), [
       { projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE },
       { projectId: fixture.betaId, userId: fixture.borisId, role: LEAD_ROLE },
@@ -520,7 +520,7 @@ describe('INV-22 повтор добавления и удаления не пр
     const membership = createMembership(fixture.db, silentLogger, clock);
     const first = await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'same-add', membership);
     const second = await replyToAddMember('private', rootAccount, fixture.alphaId, String(veraAccount.id), 'same-add', membership);
-    expect(first?.text).toBe(addedReply('Борис'));
+    expect(first?.text).toBe(addedReply('Борис', 'Альфа'));
     expect(second).toBeNull();
     expectMembership(fixture, await membersOf(fixture.db), [
       { projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE },

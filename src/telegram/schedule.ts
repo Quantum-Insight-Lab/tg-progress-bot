@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { ScheduleActions, ScheduleBoard } from '../domain/projects/schedule.ts';
+import { withParticipantsStep } from '../projections/onboarding-next.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
 
@@ -54,8 +55,11 @@ export function afterReportsTopic(done: string): string {
   return [done, '', SCHEDULE_ASK, SCHEDULE_OFF, scheduleTemplate('<проект>')].join('\n');
 }
 
-export function scheduleSavedReply(dailyTime: string, timezone: string): string {
-  return `Время отчёта группы: ${dailyTime}. Таймзона группы: ${timezone}. ${SCHEDULE_ON}`;
+export function scheduleSavedReply(dailyTime: string, timezone: string, projectName: string): string {
+  return withParticipantsStep(
+    `Время отчёта группы: ${dailyTime}. Таймзона группы: ${timezone}. ${SCHEDULE_ON}`,
+    projectName,
+  );
 }
 
 export function renderSchedule(view: { projectName: string; bound: boolean; dailyTime: string | null; timezone: string | null; mailing: boolean }): string {
@@ -175,7 +179,7 @@ export async function replyToScheduleMessage(
       idempotencyKey,
     });
     if (outcome.board.dailyTime === null || outcome.board.timezone === null) return SCHEDULE_NEED_BOTH;
-    return scheduleSavedReply(outcome.board.dailyTime, outcome.board.timezone);
+    return scheduleSavedReply(outcome.board.dailyTime, outcome.board.timezone, outcome.board.project.name);
   } catch (error) {
     return replyOf(error);
   }

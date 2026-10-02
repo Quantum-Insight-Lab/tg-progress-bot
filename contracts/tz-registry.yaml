@@ -1181,3 +1181,8 @@ atoms:
 
   # Звук сообщений бота
   R-963: { kind: tech, scope: R-001 }
+
+  # Инструкция следующего шага онбординга
+  R-964: { kind: view, scope: R-035 }
+  R-965: { kind: view, scope: R-033 }
+  R-966: { kind: view, scope: R-040 }

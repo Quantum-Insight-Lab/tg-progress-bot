@@ -13,7 +13,7 @@ import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { emit, EVENT_TYPES } from '../src/events/index.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
-import { replyToStart, START_REPLY_PENDING, START_REPLY_ROOT } from '../src/telegram/start.ts';
+import { replyToStart, startReply, START_REPLY_PENDING, START_REPLY_ROOT } from '../src/telegram/start.ts';
 import { testBotInfo } from './bot-info.ts';
 import { httpStatus } from './http.ts';
 import { silentLogger } from './log-lines.ts';
@@ -119,7 +119,7 @@ describe('INV-17 корень один — первый /start', () => {
     const registration = createUserRegistration(handle.db, silentLogger, clock);
     const rootReply = await replyToStart('private', rootAccount, registration);
     const secondReply = await replyToStart('private', secondAccount, registration);
-    expect(rootReply).toBe(START_REPLY_ROOT);
+    expect(rootReply).toBe(startReply(true));
     expect(secondReply).toBe(START_REPLY_PENDING);
     expect(await countUsers(handle.db)).toBe(2);
     expect(await countUsers(handle.db, true)).toBe(1);
@@ -294,7 +294,7 @@ describe('/start в процессе', () => {
     expect(root).toBe(200);
     const member = await post(3, secondAccount, { id: secondAccount.id, type: 'private' });
     expect(member).toBe(200);
-    expect(sent).toEqual([START_REPLY_ROOT, START_REPLY_PENDING]);
+    expect(sent).toEqual([startReply(true), START_REPLY_PENDING]);
     expect(sent[1]).not.toContain('Аня');
     expect(sent[1]).not.toContain('Секретный проект');
     expect(await countUsers(handle.db)).toBe(2);

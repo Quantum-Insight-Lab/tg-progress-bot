@@ -1,6 +1,7 @@
 import { InlineKeyboard, type Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { MembershipActions, ParticipantsView } from '../domain/projects/membership.ts';
+import { withExecutorTopicStep } from '../projections/onboarding-next.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
 
@@ -47,12 +48,12 @@ interface TelegramAccount {
   is_bot: boolean;
 }
 
-export function addedReply(name: string): string {
-  return `${name} добавлен как member.`;
+export function addedReply(name: string, projectName: string): string {
+  return withExecutorTopicStep(`${name} добавлен как member.`, projectName);
 }
 
 export function isMemberAddedReply(text: string): boolean {
-  return text.endsWith(' добавлен как member.');
+  return text.includes(' добавлен как member.');
 }
 
 export function removeConfirmText(name: string): string {
@@ -220,7 +221,7 @@ export async function replyToAddMember(
       chat: chatType,
       idempotencyKey,
     });
-    return { text: addedReply(added.name) };
+    return { text: addedReply(added.name, added.projectName) };
   } catch (error) {
     return replyOf(error);
   }
