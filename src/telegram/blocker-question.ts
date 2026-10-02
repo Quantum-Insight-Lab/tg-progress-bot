@@ -11,5 +11,6 @@ export async function sendBlockerQuestion(
   await api.sendMessage(input.chatId, blockerQuestionText(input.taskNumber, input.day), {
     message_thread_id: input.messageThreadId,
     reply_markup: keyboard,
+    disable_notification: false,
   });
 }

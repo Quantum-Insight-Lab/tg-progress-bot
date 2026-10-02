@@ -9,5 +9,6 @@ export async function sendReviewReminder(
   await api.sendMessage(input.chatId, reviewReminderText(input.taskNumber, input.leads), {
     message_thread_id: input.messageThreadId,
     parse_mode: 'HTML',
+    disable_notification: false,
   });
 }

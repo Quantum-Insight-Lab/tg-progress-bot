@@ -1,7 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Api } from 'grammy';
 import { describe, expect, it } from 'vitest';
-import { createTelegramBot, getTelegramBot } from '../src/telegram/bot.ts';
+import { createTelegramBot, getTelegramBot, silenceGroupPayload } from '../src/telegram/bot.ts';
+import { sendBlockerQuestion } from '../src/telegram/blocker-question.ts';
+import { sendReviewReminder } from '../src/telegram/review-reminder.ts';
 import { testBotInfo } from './bot-info.ts';
 
 function filesIn(dir: string): string[] {
@@ -21,6 +24,29 @@ describe('единственный клиент Telegram', () => {
 
   it('пустой токен не создаёт экземпляр', () => {
     expect(() => createTelegramBot('')).toThrow('токен бота пуст');
+  });
+
+  it('сообщение бота в группу уходит без звука, личка и явный звук остаются', () => {
+    const flag = (payload: object): boolean | undefined =>
+      'disable_notification' in payload && typeof payload.disable_notification === 'boolean' ? payload.disable_notification : undefined;
+    expect(flag(silenceGroupPayload('sendMessage', { chat_id: '-1002757819468', text: 'канвас' }))).toBe(true);
+    expect(flag(silenceGroupPayload('sendRichMessage', { chat_id: -100 }))).toBe(true);
+    expect(flag(silenceGroupPayload('sendMessage', { chat_id: '457051957', text: 'личка' }))).toBeUndefined();
+    expect(flag(silenceGroupPayload('sendMessage', { chat_id: '-100', text: 'вопрос', disable_notification: false }))).toBe(false);
+    expect(flag(silenceGroupPayload('editMessageText', { chat_id: '-100', text: 'правка' }))).toBeUndefined();
+  });
+
+  it('вопрос о блокере и напоминание руководителю просят звук', async () => {
+    const sent: Array<boolean | undefined> = [];
+    const api = {
+      sendMessage: async (_chat: string | number, _text: string, extra?: { disable_notification?: boolean }) => {
+        sent.push(extra?.disable_notification);
+        return { message_id: 1 } as Awaited<ReturnType<Api['sendMessage']>>;
+      },
+    } satisfies Pick<Api, 'sendMessage'>;
+    await sendBlockerQuestion(api, { chatId: '-100', messageThreadId: 7, taskNumber: 1, day: 3 });
+    await sendReviewReminder(api, { chatId: '-100', messageThreadId: 7, taskNumber: 1, leads: [] });
+    expect(sent).toEqual([false, false]);
   });
 
   it('grammY и new Bot живут только в src/telegram', () => {
