@@ -10,6 +10,7 @@ import {
 } from '../domain/projects/schedule.ts';
 import type { User } from '../domain/projects/user.ts';
 import type { Clock } from '../domain/shared/clock.ts';
+import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
 import { createEventJournal } from './event-journal.ts';
@@ -140,6 +141,19 @@ export function createChatSchedule(db: Kysely<Database>, logger: Logger, clock: 
           actor,
           chat: input.chat,
           projectName: input.projectName,
+          idempotencyKey: input.idempotencyKey,
+        });
+      });
+    },
+    clearById(input): Promise<ScheduleOutcome> {
+      return db.transaction().execute(async (trx) => {
+        const actor = await findUser(trx, input.telegramUserId);
+        const project = await trx.selectFrom('projects').select('name').where('id', '=', input.projectId).executeTakeFirst();
+        if (project === undefined) throw new DomainError(DOMAIN_ERROR.SCHEDULE_PROJECT_MISSING, 'проект не найден');
+        return clearChatSchedule(storeOf(trx), createEventJournal(trx, logger), clock, {
+          actor,
+          chat: input.chat,
+          projectName: project.name,
           idempotencyKey: input.idempotencyKey,
         });
       });
