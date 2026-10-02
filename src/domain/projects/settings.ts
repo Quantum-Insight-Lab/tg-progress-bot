@@ -2,6 +2,7 @@ import { emit, EVENT_TYPES, type EventJournal } from '../../events/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
 import { projectCalendarDate } from '../shared/project-time.ts';
+import { isLocalHour, offsetFromLocalHour } from '../shared/utc-offset.ts';
 import { supergroupId } from './chat.ts';
 import { PRIVATE_CHAT } from './create-project.ts';
 import { defineProjectMember, type ProjectRole } from './member.ts';
@@ -160,7 +161,9 @@ async function apply(store: SettingsStore, clock: Clock, project: StoredProject,
       return description;
     }
     case 'timezone': {
-      const next = defineProject({ ...project, repositoryId: null, timezone: update.value.trim() });
+      const raw = update.value.trim();
+      const timezone = isLocalHour(raw) ? offsetFromLocalHour(Number(raw), clock.now()) : raw;
+      const next = defineProject({ ...project, repositoryId: null, timezone });
       projectCalendarDate(clock.now(), next.timezone);
       await store.saveTimezone(project.id, next.timezone);
       return next.timezone;

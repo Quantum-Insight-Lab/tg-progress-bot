@@ -611,7 +611,7 @@ describe('привязка супергруппы в боте', () => {
           date: 1700000000,
           chat: { id: rootAccount.id, type: 'private' },
           from: { id: rootAccount.id, is_bot: false, first_name: rootAccount.first_name },
-          text: projectText('Альфа', 'Europe/Moscow'),
+          text: projectText('Альфа', '10'),
         },
       }),
     );
@@ -664,7 +664,7 @@ describe('привязка супергруппы в боте', () => {
           date: 1700000000,
           chat: { id: rootAccount.id, type: 'private' },
           from: { id: rootAccount.id, is_bot: false, first_name: rootAccount.first_name },
-          text: projectText('Бета', 'Asia/Yekaterinburg'),
+          text: projectText('Бета', '12'),
         },
       }),
     );

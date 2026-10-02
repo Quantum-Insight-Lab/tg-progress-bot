@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import { PRIVATE_CHAT, type ProjectCreation, type ProjectDraft } from '../domain/projects/create-project.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
+import { isLocalHour } from '../domain/shared/utc-offset.ts';
 import type { SupergroupReply } from './chat-binding.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
 
@@ -9,7 +10,7 @@ export const NEW_PROJECT_HEADING = 'Новый проект';
 
 export const NEW_PROJECT_REFUSAL = 'Завести проект может корень.';
 
-export const NEW_PROJECT_FIELDS = 'Нужны имя и таймзона.';
+export const NEW_PROJECT_FIELDS = 'Нужны имя и час, сколько сейчас: 0–23.';
 
 export function projectCreatedReply(name: string): string {
   return `Проект «${name}» заведён.`;
@@ -53,6 +54,7 @@ export async function replyToNewProject(
   creation: ProjectCreation,
 ): Promise<string | null> {
   if (chatType !== PRIVATE_CHAT || from === undefined || from.is_bot) return null;
+  if (!isLocalHour(fields.timezone)) return NEW_PROJECT_FIELDS;
   const draft: ProjectDraft = {
     telegramUserId: String(from.id),
     name: fields.name,
@@ -69,7 +71,11 @@ export async function replyToNewProject(
     if (!(error instanceof DomainError)) throw error;
     if (error.code === DOMAIN_ERROR.PROJECT_DUPLICATE) return null;
     if (error.code === DOMAIN_ERROR.PROJECT_CREATOR) return NEW_PROJECT_REFUSAL;
-    if (error.code === DOMAIN_ERROR.PROJECT_NAME_BLANK || error.code === DOMAIN_ERROR.PROJECT_TIMEZONE_BLANK) {
+    if (
+      error.code === DOMAIN_ERROR.PROJECT_NAME_BLANK ||
+      error.code === DOMAIN_ERROR.PROJECT_TIMEZONE_BLANK ||
+      error.code === DOMAIN_ERROR.SETTINGS_TIMEZONE
+    ) {
       return NEW_PROJECT_FIELDS;
     }
     throw error;

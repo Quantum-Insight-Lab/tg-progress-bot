@@ -16,7 +16,7 @@ describe('P-20 следующий шаг онбординга', () => {
   it('R-964 первый /start корня содержит образец «Новый проект»', () => {
     const reply = rootStartReply(START_REPLY_ROOT);
     expect(reply.startsWith(START_REPLY_ROOT)).toBe(true);
-    expect(newProjectSample().split('\n')).toEqual([NEW_PROJECT_HEADING, '<имя>', '<описание>', '<таймзона>']);
+    expect(newProjectSample().split('\n')).toEqual([NEW_PROJECT_HEADING, '<имя>', '<описание>', '<час>']);
     expect(reply).toContain(newProjectSample());
   });
 

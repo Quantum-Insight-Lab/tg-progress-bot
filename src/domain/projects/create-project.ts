@@ -1,6 +1,7 @@
 import { emit, EVENT_TYPES, type EventJournal } from '../../events/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { isLocalHour, offsetFromLocalHour } from '../shared/utc-offset.ts';
 import { defineProjectMember, type ProjectMember } from './member.ts';
 import { defineProject, type Project } from './project.ts';
 import type { User } from './user.ts';
@@ -75,7 +76,7 @@ export async function createProject(
     id: input.id,
     name: input.name.trim(),
     description: input.description.trim(),
-    timezone: input.timezone.trim(),
+    timezone: isLocalHour(input.timezone) ? offsetFromLocalHour(Number(input.timezone.trim()), clock.now()) : input.timezone.trim(),
     chatId: null,
     repositoryId: null,
     createdAt: now.toISOString(),

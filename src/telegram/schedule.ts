@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { ScheduleActions, ScheduleBoard } from '../domain/projects/schedule.ts';
+import { offsetLabel } from '../domain/shared/utc-offset.ts';
 import { withParticipantsStep } from '../projections/onboarding-next.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
@@ -8,7 +9,7 @@ import { traceHandler, traceRefusal } from './update-log.ts';
 /** Строка настроек: время отчёта группы. */
 export const SCHEDULE_HEADING = 'Время отчёта';
 
-export const SCHEDULE_ASK = 'Время ежедневной отправки и таймзона группы.';
+export const SCHEDULE_ASK = 'Время ежедневной отправки.';
 
 export const SCHEDULE_OFF = 'Пока время не названо, расписание выключено.';
 
@@ -41,13 +42,12 @@ interface TelegramAccount {
 
 export type ScheduleRequest =
   | { kind: 'show'; projectName: string }
-  | { kind: 'set'; projectName: string; dailyTime: string; timezone: string }
-  | { kind: 'clear'; projectName: string }
-  | { kind: 'need-timezone' };
+  | { kind: 'set'; projectName: string; dailyTime: string }
+  | { kind: 'clear'; projectName: string };
 
-/** Четыре строки: имя проекта, время, таймзона группы. */
+/** Три строки: имя проекта и час отчёта. Сдвиг группы уже записан. */
 export function scheduleTemplate(projectName: string): string {
-  return [SCHEDULE_HEADING, projectName, '<время>', '<таймзона>'].join('\n');
+  return [SCHEDULE_HEADING, projectName, '<время>'].join('\n');
 }
 
 /** Вопрос сразу после командного топика: время и таймзона, пока время пустое — рассылка выключена. */
@@ -74,7 +74,7 @@ export function renderSchedule(view: { projectName: string; bound: boolean; dail
   }
   lines.push(
     `Время отчёта группы: ${view.dailyTime}`,
-    `Таймзона группы: ${view.timezone}`,
+    `Таймзона группы: ${offsetLabel(view.timezone)}`,
     SCHEDULE_ON,
     SCHEDULE_CLEAR_HINT,
     scheduleTemplate(view.projectName),
@@ -89,17 +89,10 @@ export function parseScheduleMessage(text: string): ScheduleRequest | null {
   const projectName = lines[1]?.trim() ?? '';
   if (projectName.length === 0) return null;
   if (lines.length === 2) return { kind: 'show', projectName };
-  if (lines.length === 3) {
-    const dailyTime = lines[2]?.trim() ?? '';
-    if (dailyTime.length === 0) return { kind: 'clear', projectName };
-    return { kind: 'need-timezone' };
-  }
-  if (lines.length !== 4) return null;
+  if (lines.length !== 3) return null;
   const dailyTime = lines[2]?.trim() ?? '';
-  const timezone = lines[3]?.trim() ?? '';
   if (dailyTime.length === 0) return { kind: 'clear', projectName };
-  if (timezone.length === 0) return { kind: 'need-timezone' };
-  return { kind: 'set', projectName, dailyTime, timezone };
+  return { kind: 'set', projectName, dailyTime };
 }
 
 function replyOf(error: unknown): string | null {
@@ -154,7 +147,6 @@ export async function replyToScheduleMessage(
   actions: ScheduleActions,
 ): Promise<string | null> {
   if (!inPrivate(chatType, from) || from === undefined) return null;
-  if (request.kind === 'need-timezone') return SCHEDULE_NEED_BOTH;
   try {
     if (request.kind === 'show') {
       const view = await actions.show({ telegramUserId: String(from.id), projectName: request.projectName, chat: chatType });
@@ -174,7 +166,6 @@ export async function replyToScheduleMessage(
       telegramUserId: String(from.id),
       projectName: request.projectName,
       dailyTime: request.dailyTime,
-      timezone: request.timezone,
       chat: chatType,
       idempotencyKey,
     });

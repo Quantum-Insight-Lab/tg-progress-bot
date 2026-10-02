@@ -1,6 +1,7 @@
 import type { Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { ProjectSettings, SettingsView, SettingUpdate } from '../domain/projects/settings.ts';
+import { offsetLabel } from '../domain/shared/utc-offset.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
@@ -20,7 +21,7 @@ export const SETTINGS_NEED_NAME = 'Нужно имя.';
 
 export const SETTINGS_NEED_ZONE = 'Нужна таймзона проекта.';
 
-export const SETTINGS_BAD_ZONE = 'Таймзона не распознана.';
+export const SETTINGS_BAD_ZONE = 'Нужен час от 0 до 23, сколько сейчас.';
 
 export const SETTINGS_CHAT_UNKNOWN = 'Такой супергруппы бот ещё не знает.';
 
@@ -104,7 +105,7 @@ export function renderSettings(view: SettingsView): string {
     '',
     `Имя: ${view.name}`,
     `Описание: ${view.description}`,
-    `Таймзона проекта: ${view.timezone}`,
+    `Таймзона проекта: ${offsetLabel(view.timezone)}`,
     `Супергруппа: ${supergroup}`,
     'Роли:',
     ...view.members.map((member) => `${member.name} — ${member.role}`),

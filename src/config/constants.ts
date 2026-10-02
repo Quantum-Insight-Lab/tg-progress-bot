@@ -26,3 +26,11 @@ export const COMMITS_TAIL_DAYS = 7;
 export const GITHUB_RATE_FLOOR = 20;
 /** C-13, во сколько интервалов сверки укладывается свежий факт зеркала. */
 export const MIRROR_LAG_INTERVALS = 2;
+/** C-14, минут в часе: сдвиг хранится целыми часами. */
+export const MINUTES_PER_HOUR = 60;
+/** C-15, часов в сутках. Обёртка сдвига не переходит через них. */
+export const HOURS_PER_DAY = 24;
+/** C-16, самый западный сдвиг, часы к западу от UTC. */
+export const UTC_OFFSET_WEST_HOURS = 12;
+/** C-17, самый восточный сдвиг, часы к востоку от UTC. */
+export const UTC_OFFSET_EAST_HOURS = 14;
