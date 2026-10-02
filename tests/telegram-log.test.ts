@@ -96,7 +96,7 @@ interface HandlerCase {
 const CASES: Record<GuardedHandler, HandlerCase> = {
   start: { update: (id, from) => command(id, from, 'private', '/start'), refusal: DOMAIN_ERROR.BLANK_NAME },
   'new-project': {
-    update: (id, from) => message(id, from, 'private', `${NEW_PROJECT_HEADING}\nАльфа\n\nEurope/Moscow`),
+    update: (id, from) => message(id, from, 'private', `${NEW_PROJECT_HEADING}\nАльфа\n\n10`),
     refusal: DOMAIN_ERROR.PROJECT_CREATOR,
   },
   'chat-binding': {
