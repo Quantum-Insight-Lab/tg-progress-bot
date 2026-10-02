@@ -97,6 +97,7 @@ export interface ScheduleActions {
     idempotencyKey: string;
   }): Promise<ScheduleOutcome>;
   clear(input: { telegramUserId: string; projectName: string; chat: string; idempotencyKey: string }): Promise<ScheduleOutcome>;
+  clearById(input: { telegramUserId: string; projectId: string; chat: string; idempotencyKey: string }): Promise<ScheduleOutcome>;
 }
 
 async function authorize(store: ScheduleStore, actor: User | null, chat: string, projectId: string): Promise<User> {

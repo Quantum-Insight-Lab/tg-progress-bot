@@ -1,4 +1,4 @@
-import type { Bot } from 'grammy';
+import { InlineKeyboard, type Bot } from 'grammy';
 import { PRIVATE_CHAT } from '../domain/projects/create-project.ts';
 import type { ScheduleActions, ScheduleBoard } from '../domain/projects/schedule.ts';
 import { offsetLabel } from '../domain/shared/utc-offset.ts';
@@ -15,7 +15,7 @@ export const SCHEDULE_OFF = 'Пока время не названо, распи
 
 export const SCHEDULE_ON = 'Рассылка включена.';
 
-export const SCHEDULE_CLEAR_HINT = 'Чтобы выключить рассылку, время стирают: третья строка пустая.';
+export const SCHEDULE_OFF_LABEL = 'Выключить';
 
 export const SCHEDULE_UNBOUND = 'Пока супергруппа не привязана, расписания нет.';
 
@@ -69,14 +69,13 @@ export function renderSchedule(view: { projectName: string; bound: boolean; dail
     return lines.join('\n');
   }
   if (!view.mailing || view.dailyTime === null || view.timezone === null) {
-    lines.push(SCHEDULE_OFF, SCHEDULE_ASK, scheduleTemplate(view.projectName), SCHEDULE_CLEAR_HINT);
+    lines.push(SCHEDULE_OFF, SCHEDULE_ASK, scheduleTemplate(view.projectName));
     return lines.join('\n');
   }
   lines.push(
     `Время отчёта группы: ${view.dailyTime}`,
     `Таймзона группы: ${offsetLabel(view.timezone)}`,
     SCHEDULE_ON,
-    SCHEDULE_CLEAR_HINT,
     scheduleTemplate(view.projectName),
   );
   return lines.join('\n');
@@ -93,6 +92,26 @@ export function parseScheduleMessage(text: string): ScheduleRequest | null {
   const dailyTime = lines[2]?.trim() ?? '';
   if (dailyTime.length === 0) return { kind: 'clear', projectName };
   return { kind: 'set', projectName, dailyTime };
+}
+
+export function clearScheduleData(projectId: string): string {
+  return `so:${projectId}`;
+}
+
+export function parseClearScheduleData(data: string): string | null {
+  const match = /^so:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(data);
+  return match?.[1] ?? null;
+}
+
+/** Кнопка есть, только пока рассылка включена. */
+export function scheduleKeyboard(view: { mailing: boolean; projectId: string }): InlineKeyboard | undefined {
+  if (!view.mailing) return undefined;
+  return new InlineKeyboard().text(SCHEDULE_OFF_LABEL, clearScheduleData(view.projectId));
+}
+
+export interface ScheduleScreen {
+  text: string;
+  markup?: InlineKeyboard;
 }
 
 function replyOf(error: unknown): string | null {
@@ -138,6 +157,13 @@ function textOf(view: ScheduleBoard): string {
   });
 }
 
+function screenOf(view: ScheduleBoard): ScheduleScreen {
+  const text = textOf(view);
+  const markup = scheduleKeyboard({ mailing: view.mailing, projectId: view.project.id });
+  if (markup === undefined) return { text };
+  return { text, markup };
+}
+
 /** Экран времени отчёта в личке. Вне лички молчит. */
 export async function replyToScheduleMessage(
   chatType: string | undefined,
@@ -145,12 +171,12 @@ export async function replyToScheduleMessage(
   request: ScheduleRequest,
   idempotencyKey: string,
   actions: ScheduleActions,
-): Promise<string | null> {
+): Promise<ScheduleScreen | null> {
   if (!inPrivate(chatType, from) || from === undefined) return null;
   try {
     if (request.kind === 'show') {
       const view = await actions.show({ telegramUserId: String(from.id), projectName: request.projectName, chat: chatType });
-      return textOf(view);
+      return screenOf(view);
     }
     if (request.kind === 'clear') {
       const outcome = await actions.clear({
@@ -159,8 +185,8 @@ export async function replyToScheduleMessage(
         chat: chatType,
         idempotencyKey,
       });
-      if (!outcome.changed) return SCHEDULE_OFF;
-      return SCHEDULE_CLEARED;
+      if (!outcome.changed) return { text: SCHEDULE_OFF };
+      return { text: SCHEDULE_CLEARED };
     }
     const outcome = await actions.set({
       telegramUserId: String(from.id),
@@ -169,14 +195,46 @@ export async function replyToScheduleMessage(
       chat: chatType,
       idempotencyKey,
     });
-    if (outcome.board.dailyTime === null || outcome.board.timezone === null) return SCHEDULE_NEED_BOTH;
-    return scheduleSavedReply(outcome.board.dailyTime, outcome.board.timezone, outcome.board.project.name);
+    if (outcome.board.dailyTime === null || outcome.board.timezone === null) return { text: SCHEDULE_NEED_BOTH };
+    return { text: scheduleSavedReply(outcome.board.dailyTime, outcome.board.timezone, outcome.board.project.name) };
   } catch (error) {
-    return replyOf(error);
+    const text = replyOf(error);
+    if (text === null) return null;
+    return { text };
   }
 }
 
-/** «Время отчёта» в личке: вопрос, запись времени и таймзоны или стирание времени. */
+/** Нажатие «Выключить»: то же стирание времени, что и пустая третья строка. */
+export async function replyToClearSchedule(
+  chatType: string | undefined,
+  from: TelegramAccount | undefined,
+  projectId: string,
+  idempotencyKey: string,
+  actions: ScheduleActions,
+): Promise<ScheduleScreen | null> {
+  if (!inPrivate(chatType, from) || from === undefined) return null;
+  try {
+    const outcome = await actions.clearById({
+      telegramUserId: String(from.id),
+      projectId,
+      chat: chatType,
+      idempotencyKey,
+    });
+    if (!outcome.changed) return { text: SCHEDULE_OFF };
+    return { text: SCHEDULE_CLEARED };
+  } catch (error) {
+    const text = replyOf(error);
+    if (text === null) return null;
+    return { text };
+  }
+}
+
+function send(ctx: { reply: (text: string, extra?: { reply_markup: InlineKeyboard }) => Promise<unknown> }, screen: ScheduleScreen): Promise<unknown> {
+  if (screen.markup === undefined) return ctx.reply(screen.text);
+  return ctx.reply(screen.text, { reply_markup: screen.markup });
+}
+
+/** «Время отчёта» в личке: вопрос, запись времени или кнопка «Выключить». */
 export function attachSchedule(bot: Bot, actions: ScheduleActions): void {
   bot.use(async (ctx, next) => {
     const text = ctx.message?.text;
@@ -191,7 +249,17 @@ export function attachSchedule(bot: Bot, actions: ScheduleActions): void {
     }
     traceHandler('schedule');
     const reply = await replyToScheduleMessage(ctx.chat?.type, ctx.from, request, String(ctx.update.update_id), actions);
-    if (reply !== null) await ctx.reply(reply);
+    if (reply !== null) await send(ctx, reply);
     await next();
   });
+
+  bot.callbackQuery(/^so:/, async (ctx) => {
+    traceHandler('schedule');
+    await ctx.answerCallbackQuery();
+    const projectId = parseClearScheduleData(ctx.callbackQuery.data);
+    if (projectId === null || ctx.from.is_bot) return;
+    const reply = await replyToClearSchedule(ctx.chat?.type, ctx.from, projectId, String(ctx.update.update_id), actions);
+    if (reply !== null) await send(ctx, reply);
+  });
 }
+

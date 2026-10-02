@@ -26,17 +26,19 @@ import {
   afterReportsTopic,
   parseScheduleMessage,
   renderSchedule,
+  replyToClearSchedule,
   replyToScheduleMessage,
   SCHEDULE_ACTOR,
   SCHEDULE_ASK,
-  SCHEDULE_CLEAR_HINT,
   SCHEDULE_CLEAR_ROOT,
   SCHEDULE_CLEARED,
   SCHEDULE_HEADING,
   SCHEDULE_OFF,
+  SCHEDULE_OFF_LABEL,
   SCHEDULE_ON,
   SCHEDULE_ROOT_ONLY,
   SCHEDULE_UNBOUND,
+  scheduleKeyboard,
   scheduleSavedReply,
   scheduleTemplate,
 } from '../src/telegram/schedule.ts';
@@ -192,8 +194,8 @@ describe('вопрос времени и таймзоны', () => {
     const off = renderSchedule({ projectName: 'Альфа', bound: true, dailyTime: null, timezone: 'Europe/Moscow', mailing: false });
     expect(off).toContain(SCHEDULE_OFF);
     expect(off).toContain(SCHEDULE_ASK);
+    expect(off).not.toContain('третья строка пустая');
     expect(off).toContain(scheduleTemplate('Альфа'));
-    expect(off).toContain(SCHEDULE_CLEAR_HINT);
     const on = renderSchedule({ projectName: 'Альфа', bound: true, dailyTime: '09:00', timezone: 'Pacific/Auckland', mailing: true });
     expect(on).toContain('Время отчёта группы: 09:00');
     expect(on).toContain('Таймзона группы: Pacific/Auckland');
@@ -229,7 +231,7 @@ describe('INV-24 час отчёта считается по таймзоне г
       'set-hour',
       actions,
     );
-    expect(saved).toBe(scheduleSavedReply('09:00', 'Europe/Moscow', 'Альфа'));
+    expect(saved?.text).toBe(scheduleSavedReply('09:00', 'Europe/Moscow', 'Альфа'));
     const after = await stored(fixture.db);
     expect(after.chats).toBe(1);
     expect(after.dailyCron).toBe('09:00');
@@ -272,15 +274,16 @@ describe('INV-27 рассылка живёт на группе и включен
       'show-loose',
       createChatSchedule(loose.db, silentLogger, clock),
     );
-    expect(unbound).toContain(SCHEDULE_UNBOUND);
+    expect(unbound?.text).toContain(SCHEDULE_UNBOUND);
     expect((await stored(loose.db)).chats).toBe(0);
 
     const fixture = await seed(true, true);
     opened.push(fixture);
     const actions = createChatSchedule(fixture.db, silentLogger, clock);
     const asked = await replyToScheduleMessage('private', rootAccount, { kind: 'show', projectName: 'Бета' }, 'show-off', actions);
-    expect(asked).toContain(SCHEDULE_OFF);
-    expect(asked).toContain(SCHEDULE_ASK);
+    expect(asked?.text).toContain(SCHEDULE_OFF);
+    expect(asked?.text).toContain(SCHEDULE_ASK);
+    expect(asked?.markup).toBeUndefined();
     expect((await stored(fixture.db)).dailyCron).toBeNull();
 
     const columns = await sql<{ column_name: string }>`
@@ -301,9 +304,10 @@ describe('INV-27 рассылка живёт на группе и включен
     expect(on.chatTimezone).toBe('Europe/Moscow');
     expect(on.projects.map((project) => project.chatId)).toEqual([on.projects[0]?.chatId, on.projects[0]?.chatId]);
     const shown = await replyToScheduleMessage('private', rootAccount, { kind: 'show', projectName: 'Бета' }, 'show-on', actions);
-    expect(shown).toContain(SCHEDULE_ON);
-    expect(shown).toContain('Время отчёта группы: 18:30');
-    expect(shown).toContain('Таймзона группы: Europe/Moscow');
+    expect(shown?.text).toContain(SCHEDULE_ON);
+    expect(shown?.text).toContain('Время отчёта группы: 18:30');
+    expect(shown?.text).toContain('Таймзона группы: Europe/Moscow');
+    expect(shown?.markup).toBeDefined();
 
     const member = await replyToScheduleMessage(
       'private',
@@ -312,7 +316,7 @@ describe('INV-27 рассылка живёт на группе и включен
       'member-set',
       actions,
     );
-    expect(member).toBe(SCHEDULE_ACTOR);
+    expect(member?.text).toBe(SCHEDULE_ACTOR);
     const leadChange = await replyToScheduleMessage(
       'private',
       veraAccount,
@@ -320,9 +324,9 @@ describe('INV-27 рассылка живёт на группе и включен
       'lead-change',
       actions,
     );
-    expect(leadChange).toBe(SCHEDULE_ROOT_ONLY);
+    expect(leadChange?.text).toBe(SCHEDULE_ROOT_ONLY);
     const leadClear = await replyToScheduleMessage('private', veraAccount, { kind: 'clear', projectName: 'Альфа' }, 'lead-clear', actions);
-    expect(leadClear).toBe(SCHEDULE_CLEAR_ROOT);
+    expect(leadClear?.text).toBe(SCHEDULE_CLEAR_ROOT);
     expect((await stored(fixture.db)).dailyCron).toBe('18:30');
 
     const outside = await replyToScheduleMessage(
@@ -334,7 +338,7 @@ describe('INV-27 рассылка живёт на группе и включен
     );
     expect(outside).toBeNull();
     const cleared = await replyToScheduleMessage('private', rootAccount, { kind: 'clear', projectName: 'Бета' }, 'clear-root', actions);
-    expect(cleared).toBe(SCHEDULE_CLEARED);
+    expect(cleared?.text).toBe(SCHEDULE_CLEARED);
     const off = await stored(fixture.db);
     expect(off.dailyCron).toBeNull();
     expect(off.chatTimezone).toBe('Europe/Moscow');
@@ -345,7 +349,7 @@ describe('INV-27 рассылка живёт на группе и включен
     ]);
     expect(reportSchedule({ id: 'chat', timezone: off.chatTimezone, dailyCron: off.dailyCron })).toBeNull();
     const again = await replyToScheduleMessage('private', rootAccount, { kind: 'clear', projectName: 'Альфа' }, 'clear-again', actions);
-    expect(again).toBe(SCHEDULE_OFF);
+    expect(again?.text).toBe(SCHEDULE_OFF);
     expect(await scheduleEvents(fixture.db, EVENT_TYPES.CHAT_SCHEDULE_SET)).toHaveLength(1);
     expect(await scheduleEvents(fixture.db, EVENT_TYPES.CHAT_SCHEDULE_CLEARED)).toEqual([
       {
@@ -356,6 +360,45 @@ describe('INV-27 рассылка живёт на группе и включен
     ]);
     const roles = await sql<{ role: string }>`SELECT role FROM project_members ORDER BY role`.execute(fixture.db);
     expect(roles.rows.map((row) => row.role)).toEqual([LEAD_ROLE, LEAD_ROLE, LEAD_ROLE, MEMBER_ROLE]);
+  });
+
+  it('INV-27 кнопка «Выключить» есть, пока рассылка включена; корень стирает время группы, таймзона остаётся', async () => {
+    const fixture = await seed(true, true);
+    opened.push(fixture);
+    if (fixture.betaId === null) throw new Error('нет второго проекта');
+    const actions = createChatSchedule(fixture.db, silentLogger, clock);
+    expect(scheduleKeyboard({ mailing: false, projectId: fixture.alphaId })).toBeUndefined();
+
+    await actions.set({
+      telegramUserId: String(rootAccount.id),
+      projectName: 'Альфа',
+      dailyTime: '19:00',
+      chat: 'private',
+      idempotencyKey: 'set-for-button',
+    });
+    const shown = await replyToScheduleMessage('private', rootAccount, { kind: 'show', projectName: 'Бета' }, 'show-button', actions);
+    expect(shown?.markup?.inline_keyboard[0]?.[0]).toEqual({
+      text: SCHEDULE_OFF_LABEL,
+      callback_data: `so:${fixture.betaId}`,
+    });
+
+    const denied = await replyToClearSchedule('private', veraAccount, fixture.alphaId, 'button-lead', actions);
+    expect(denied?.text).toBe(SCHEDULE_CLEAR_ROOT);
+    expect((await stored(fixture.db)).dailyCron).toBe('19:00');
+
+    const outside = await replyToClearSchedule('supergroup', rootAccount, fixture.alphaId, 'button-group', actions);
+    expect(outside).toBeNull();
+
+    const cleared = await replyToClearSchedule('private', rootAccount, fixture.alphaId, 'button-root', actions);
+    expect(cleared?.text).toBe(SCHEDULE_CLEARED);
+    const row = await stored(fixture.db);
+    expect(row.dailyCron).toBeNull();
+    expect(row.chatTimezone).toBe('Europe/Moscow');
+    expect(await scheduleEvents(fixture.db, EVENT_TYPES.CHAT_SCHEDULE_CLEARED)).toHaveLength(1);
+
+    const again = await replyToClearSchedule('private', rootAccount, fixture.betaId, 'button-again', actions);
+    expect(again?.text).toBe(SCHEDULE_OFF);
+    expect(await scheduleEvents(fixture.db, EVENT_TYPES.CHAT_SCHEDULE_CLEARED)).toHaveLength(1);
   });
 });
 
@@ -377,7 +420,7 @@ describe('INV-22 повтор расписания не применяется �
       'same-key',
       actions,
     );
-    expect(first).toBe(scheduleSavedReply('09:00', 'Europe/Moscow', 'Альфа'));
+    expect(first?.text).toBe(scheduleSavedReply('09:00', 'Europe/Moscow', 'Альфа'));
     const second = await replyToScheduleMessage(
       'private',
       rootAccount,
