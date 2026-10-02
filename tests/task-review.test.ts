@@ -576,6 +576,7 @@ describe('кнопки руководителя в проекте', () => {
     await markReview(fixture, borisAccount, borisTopic, borisTask.task.number, 'cb-boris-mark');
     const actions = createTaskReviewActions(fixture.db, silentLogger, clock);
 
+    await sql`UPDATE project_members SET role = ${MEMBER_ROLE} WHERE user_id = ${fixture.rootId}::uuid`.execute(fixture.db);
     expect(await replyToTaskReview(place(veraTopic), borisAccount, 'cb-member', veraTask.task.number, TASK_TRANSITION_CONFIRM, actions)).toBeNull();
     expect(await replyToTaskReview(place(veraTopic), rootAccount, 'cb-root', veraTask.task.number, TASK_TRANSITION_CONFIRM, actions)).toBeNull();
     expect(await replyToTaskReview(place(undefined), veraAccount, 'cb-general', veraTask.task.number, TASK_TRANSITION_CONFIRM, actions)).toBeNull();
@@ -587,10 +588,7 @@ describe('кнопки руководителя в проекте', () => {
     expect(own?.closesBlocker).toBe(false);
     expect(standsInTasksBlock(TASK_STATUS_DONE)).toBe(false);
 
-    await sql`
-      INSERT INTO project_members (id, project_id, user_id, role)
-      VALUES (${'00000000-0000-4000-8000-0000000000d1'}::uuid, ${fixture.alphaId}::uuid, ${fixture.rootId}::uuid, ${LEAD_ROLE})
-    `.execute(fixture.db);
+    await sql`UPDATE project_members SET role = ${LEAD_ROLE} WHERE user_id = ${fixture.rootId}::uuid`.execute(fixture.db);
     expect(
       await replyToTaskReview(place(borisTopic), borisAccount, 'cb-self-member', borisTask.task.number, TASK_TRANSITION_CONFIRM, actions),
     ).toBeNull();

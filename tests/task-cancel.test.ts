@@ -175,7 +175,7 @@ describe('кнопка «отменить» и задачи удалённого
     await Promise.all(opened.splice(0).map((item) => item.close()));
   });
 
-  it('R-247 R-248 R-644 руководитель или исполнитель переводят задачу в CANCELLED, чужой и корень — нет', async () => {
+  it('R-247 R-248 R-644 руководитель или исполнитель переводят задачу в CANCELLED, чужой — нет', async () => {
     const fixture = await seed();
     opened.push(fixture);
     const actions = createTaskCancelActions(fixture.db, silentLogger, clock);
@@ -188,7 +188,9 @@ describe('кнопка «отменить» и задачи удалённого
     await setStatus(fixture.db, done.task.id, TASK_STATUS_DONE);
 
     expect(await replyToTaskCancel(place(veraTopic), borisAccount, 'cb-member', foreign.task.number, actions)).toBeNull();
-    expect(await replyToTaskCancel(place(borisTopic), rootAccount, 'cb-root', own.task.number, actions)).toBeNull();
+    const byRoot = await replyToTaskCancel(place(veraTopic), rootAccount, 'cb-root', foreign.task.number, actions);
+    expect(byRoot?.applied).toBe(true);
+    expect(byRoot?.task.status).toBe(TASK_STATUS_CANCELLED);
     expect(await replyToTaskCancel(place(undefined), borisAccount, 'cb-general', own.task.number, actions)).toBeNull();
     expect(await replyToTaskCancel(place(borisTopic), { ...borisAccount, is_bot: true }, 'cb-bot', own.task.number, actions)).toBeNull();
     expect(await replyToTaskCancel(place(borisTopic), borisAccount, 'cb-done', done.task.number, actions)).toBeNull();
@@ -212,12 +214,12 @@ describe('кнопка «отменить» и задачи удалённого
 
     const stored = await tasksOf(fixture.db);
     expect(stored.find((task) => task.id === own.task.id)?.status).toBe(TASK_STATUS_CANCELLED);
-    expect(stored.find((task) => task.id === foreign.task.id)?.status).toBe(TASK_STATUS_IN_PROGRESS);
+    expect(stored.find((task) => task.id === foreign.task.id)?.status).toBe(TASK_STATUS_CANCELLED);
     expect(stored.find((task) => task.id === done.task.id)?.status).toBe(TASK_STATUS_DONE);
     expect(carriedToNextCanvas(TASK_STATUS_CANCELLED)).toBe(false);
 
     const events = await cancelEvents(fixture.db);
-    expect(events.map((event) => event.key).sort()).toEqual(['cb-blocked', 'cb-lead', 'cb-own']);
+    expect(events.map((event) => event.key).sort()).toEqual(['cb-blocked', 'cb-lead', 'cb-own', 'cb-root']);
     expect(events.find((event) => event.key === 'cb-own')).toMatchObject({
       payload: { task_id: own.task.id, cancelled_by: fixture.borisId, reason: TASK_CANCEL_REASON_BUTTON },
       actorId: fixture.borisId,
@@ -227,6 +229,11 @@ describe('кнопка «отменить» и задачи удалённого
     expect(events.find((event) => event.key === 'cb-lead')).toMatchObject({
       payload: { task_id: planned.task.id, cancelled_by: fixture.veraId, reason: TASK_CANCEL_REASON_BUTTON },
       actorId: fixture.veraId,
+      actorRole: TASK_ASSIGNEE_LEAD,
+    });
+    expect(events.find((event) => event.key === 'cb-root')).toMatchObject({
+      payload: { task_id: foreign.task.id, cancelled_by: fixture.rootId, reason: TASK_CANCEL_REASON_BUTTON },
+      actorId: fixture.rootId,
       actorRole: TASK_ASSIGNEE_LEAD,
     });
     for (const event of events) {

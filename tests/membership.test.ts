@@ -121,6 +121,16 @@ interface MemberRow {
   role: string;
 }
 
+function expectMembership(fixture: Fixture, rows: MemberRow[], extra: MemberRow[] = []): void {
+  const expected = [
+    { projectId: fixture.alphaId, userId: fixture.rootId, role: LEAD_ROLE },
+    { projectId: fixture.betaId, userId: fixture.rootId, role: LEAD_ROLE },
+    ...extra,
+  ];
+  expect(rows).toHaveLength(expected.length);
+  expect(rows).toEqual(expect.arrayContaining(expected));
+}
+
 async function membersOf(db: Kysely<Database>): Promise<MemberRow[]> {
   const result = await sql<{ project_id: string; user_id: string; role: string }>`
     SELECT project_id::text AS project_id, user_id::text AS user_id, role
@@ -247,11 +257,11 @@ describe('INV-16 состав видит только корень', () => {
     expect(reply?.text).not.toContain('Альфа');
     expect(reply?.text).not.toContain('Вера');
     expect(reply?.text).not.toContain('Аня');
-    expect(await membersOf(fixture.db)).toEqual([]);
+    expectMembership(fixture, await membersOf(fixture.db));
 
     const added = await replyToAddMember('private', borisAccount, fixture.alphaId, String(veraAccount.id), 'outsider-add', membership);
     expect(added?.text).toBe(PARTICIPANTS_ACCESS);
-    expect(await membersOf(fixture.db)).toEqual([]);
+    expectMembership(fixture, await membersOf(fixture.db));
     expect(await eventsOf(fixture.db, EVENT_TYPES.PROJECT_MEMBER_ADDED)).toEqual([]);
   });
 
@@ -281,7 +291,9 @@ describe('INV-18 добавление member и снятие незакрыты�
     const reply = await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-boris', membership);
     expect(reply?.text).toBe(addedReply('Борис'));
     expect(leadsTasks(MEMBER_ROLE)).toBe(true);
-    expect(await membersOf(fixture.db)).toEqual([{ projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE }]);
+    expectMembership(fixture, await membersOf(fixture.db), [
+      { projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE },
+    ]);
     const events = await eventsOf(fixture.db, EVENT_TYPES.PROJECT_MEMBER_ADDED);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -303,10 +315,10 @@ describe('INV-18 добавление member и снятие незакрыты�
     `.execute(fixture.db);
     const reply = await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-boris-alpha', membership);
     expect(reply?.text).toBe(addedReply('Борис'));
-    const rows = await membersOf(fixture.db);
-    expect(rows).toContainEqual({ projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE });
-    expect(rows).toContainEqual({ projectId: fixture.betaId, userId: fixture.borisId, role: LEAD_ROLE });
-    expect(rows).toHaveLength(2);
+    expectMembership(fixture, await membersOf(fixture.db), [
+      { projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE },
+      { projectId: fixture.betaId, userId: fixture.borisId, role: LEAD_ROLE },
+    ]);
     const screen = await replyToParticipantsMessage('private', rootAccount, { projectName: 'Альфа' }, membership);
     expect(screen?.text).toContain('Борис — member');
     expect(screen?.text).not.toContain('Борис — lead');
@@ -428,7 +440,9 @@ describe('INV-18 добавление member и снятие незакрыты�
       membership,
     );
     expect(reply).toBeNull();
-    expect(await membersOf(fixture.db)).toEqual([{ projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE }]);
+    expectMembership(fixture, await membersOf(fixture.db), [
+      { projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE },
+    ]);
     const events = await eventsOf(fixture.db, EVENT_TYPES.PROJECT_MEMBER_REMOVED);
     expect(events).toHaveLength(1);
     expect(events[0]?.actorId).toBe('seed');
@@ -450,12 +464,14 @@ describe('INV-19 участников меняет корень в личке', 
     expect(screen?.text.startsWith(`${PARTICIPANTS_HEADING}\nАльфа\n`)).toBe(true);
     expect(screen?.text).toContain('Борис');
     expect(screen?.text).toContain('Вера');
-    expect(screen?.text).not.toContain('Аня');
+    const waiting = screen?.text.split(PARTICIPANTS_IN_PROJECT)[0] ?? '';
+    expect(waiting).not.toContain('Аня');
+    expect(screen?.text).toContain('Аня — lead');
     expect(screen?.markup).toBeDefined();
 
     const outside = await replyToParticipantsMessage('supergroup', rootAccount, { projectName: 'Альфа' }, membership);
     expect(outside).toBeNull();
-    expect(await membersOf(fixture.db)).toEqual([]);
+    expectMembership(fixture, await membersOf(fixture.db));
 
     const missing = await replyToParticipantsMessage('private', rootAccount, { projectName: 'Нет такого' }, membership);
     expect(missing?.text).toBe(PARTICIPANTS_NO_PROJECT);
@@ -469,12 +485,14 @@ describe('INV-19 участников меняет корень в личке', 
     await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'add-for-remove', membership);
     const ask = await replyToRemovalRequest('private', rootAccount, fixture.alphaId, String(borisAccount.id), membership);
     expect(ask?.text).toBe(removeConfirmText('Борис'));
-    expect(await membersOf(fixture.db)).toEqual([{ projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE }]);
+    expectMembership(fixture, await membersOf(fixture.db), [
+      { projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE },
+    ]);
     expect(await eventsOf(fixture.db, EVENT_TYPES.PROJECT_MEMBER_REMOVED)).toEqual([]);
 
     const removed = await replyToConfirmRemoval('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'rm-boris', membership);
     expect(removed?.text).toBe(removedReply('Борис'));
-    expect(await membersOf(fixture.db)).toEqual([]);
+    expectMembership(fixture, await membersOf(fixture.db));
     const events = await eventsOf(fixture.db, EVENT_TYPES.PROJECT_MEMBER_REMOVED);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -504,7 +522,9 @@ describe('INV-22 повтор добавления и удаления не пр
     const second = await replyToAddMember('private', rootAccount, fixture.alphaId, String(veraAccount.id), 'same-add', membership);
     expect(first?.text).toBe(addedReply('Борис'));
     expect(second).toBeNull();
-    expect(await membersOf(fixture.db)).toEqual([{ projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE }]);
+    expectMembership(fixture, await membersOf(fixture.db), [
+      { projectId: fixture.alphaId, userId: fixture.borisId, role: MEMBER_ROLE },
+    ]);
     expect(await eventsOf(fixture.db, EVENT_TYPES.PROJECT_MEMBER_ADDED)).toHaveLength(1);
 
     const duplicatePerson = await replyToAddMember('private', rootAccount, fixture.alphaId, String(borisAccount.id), 'other-add', membership);
@@ -534,7 +554,7 @@ describe('INV-22 повтор добавления и удаления не пр
         idempotencyKey: '   ',
       }),
     ).rejects.toMatchObject({ code: DOMAIN_ERROR.MEMBER_IDEMPOTENCY_KEY });
-    expect(await membersOf(fixture.db)).toEqual([]);
+    expectMembership(fixture, await membersOf(fixture.db));
   });
 });
 

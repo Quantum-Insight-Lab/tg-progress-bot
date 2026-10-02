@@ -339,7 +339,7 @@ describe('INV-16 guard на входе всех обработчиков', () =>
     const projects = await sql<{ n: number }>`SELECT CAST(count(*) AS int) AS n FROM projects`.execute(handle);
     expect(Number(projects.rows[0]?.n)).toBe(1);
     const members = await sql<{ user_id: string }>`SELECT user_id::text AS user_id FROM project_members`.execute(handle);
-    expect(members.rows.map((row) => row.user_id)).toEqual([vera.user.id]);
+    expect(members.rows.map((row) => row.user_id).sort()).toEqual([root.user.id, vera.user.id].sort());
 
     const repeated = await fresh(borisBody);
     expect(repeated).toEqual([]);
@@ -365,7 +365,7 @@ describe('INV-16 guard на входе всех обработчиков', () =>
     const rootMembership = await sql<{ n: number }>`
       SELECT CAST(count(*) AS int) AS n FROM project_members WHERE user_id = ${root.user.id}::uuid
     `.execute(handle);
-    expect(Number(rootMembership.rows[0]?.n)).toBe(0);
+    expect(Number(rootMembership.rows[0]?.n)).toBe(1);
     expect(boris.user.isRoot).toBe(false);
     expect(root.user.isRoot).toBe(true);
   });

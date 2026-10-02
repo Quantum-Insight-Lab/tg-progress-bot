@@ -1,6 +1,7 @@
 import { emit, EVENT_TYPES, type EventJournal } from '../../events/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { defineProjectMember, type ProjectMember } from './member.ts';
 import { defineProject, type Project } from './project.ts';
 import type { User } from './user.ts';
 
@@ -10,14 +11,16 @@ export const PROJECT_CREATOR_ROLE = 'lead';
 /** Личка — единственный вход, где заводят проект. */
 export const PRIVATE_CHAT = 'private';
 
-/** Порт таблицы `projects` внутри уже открытой транзакции. */
+/** Порт таблиц `projects` и `project_members` внутри уже открытой транзакции. */
 export interface ProjectStore {
   insert(project: Project): Promise<void>;
+  insertMember(member: ProjectMember): Promise<void>;
 }
 
 /** Команда «Новый проект»: три поля и кто их прислал. `creator` пуст, если аккаунта нет. */
 export interface NewProject {
   id: string;
+  memberId: string;
   name: string;
   description: string;
   timezone: string;
@@ -78,6 +81,14 @@ export async function createProject(
     createdAt: now.toISOString(),
   });
   await store.insert(project);
+  await store.insertMember(
+    defineProjectMember({
+      id: input.memberId,
+      projectId: project.id,
+      userId: creator.id,
+      role: PROJECT_CREATOR_ROLE,
+    }),
+  );
   const published = await emit(journal, {
     type: EVENT_TYPES.PROJECT_CREATED,
     source: 'telegram',
