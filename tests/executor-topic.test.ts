@@ -62,6 +62,7 @@ interface Fixture {
   db: Kysely<Database>;
   close: () => Promise<void>;
   alphaId: string;
+  rootId: string;
   borisId: string;
   veraId: string;
 }
@@ -131,7 +132,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 async function seed(bound: boolean): Promise<Fixture> {
   const handle = await openDb();
   const registration = createUserRegistration(handle.db, silentLogger, clock);
-  await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
+  const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
   const creation = createProjectCreation(handle.db, silentLogger, clock);
@@ -167,6 +168,7 @@ async function seed(bound: boolean): Promise<Fixture> {
     db: handle.db,
     close: handle.close,
     alphaId: alpha.project.id,
+    rootId: root.user.id,
     borisId: boris.user.id,
     veraId: vera.user.id,
   };
@@ -225,10 +227,14 @@ describe('топик исполнителя — колонка project_members.t
       UPDATE project_members SET topic_id = -1 WHERE user_id = ${fixture.borisId}::uuid
     `.execute(fixture.db);
     await expect(negative).rejects.toThrow(/project_members_topic_id_positive|23514/);
-    expect(await topicsOf(fixture.db)).toEqual([
-      { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
-      { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
-    ]);
+    expect(await topicsOf(fixture.db)).toEqual(
+      expect.arrayContaining([
+        { userId: fixture.rootId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
+      ]),
+    );
+    expect(await topicsOf(fixture.db)).toHaveLength(3);
   });
 });
 
@@ -267,10 +273,14 @@ describe('INV-23 канвас живёт в одном топике исполн
     expect(gate.opened).toEqual([]);
     expect(gate.told).toEqual([]);
     expect(gate.directed).toEqual([]);
-    expect(await topicsOf(fixture.db)).toEqual([
-      { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
-      { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
-    ]);
+    expect(await topicsOf(fixture.db)).toEqual(
+      expect.arrayContaining([
+        { userId: fixture.rootId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
+      ]),
+    );
+    expect(await topicsOf(fixture.db)).toHaveLength(3);
     expect(await topicEvents(fixture.db)).toEqual([]);
   });
 
@@ -297,10 +307,14 @@ describe('INV-23 канвас живёт в одном топике исполн
     expect(has).toEqual({ action: 'has', projectId: fixture.alphaId, telegramUserId: String(borisAccount.id) });
     const hint = await replyToHasTopic('private', rootAccount, fixture.alphaId, String(borisAccount.id), actions);
     expect(hint?.text).toBe([EXECUTOR_TOPIC_HEADING, 'Альфа', 'Борис', '<номер>'].join('\n'));
-    expect(await topicsOf(fixture.db)).toEqual([
-      { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
-      { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
-    ]);
+    expect(await topicsOf(fixture.db)).toEqual(
+      expect.arrayContaining([
+        { userId: fixture.rootId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
+      ]),
+    );
+    expect(await topicsOf(fixture.db)).toHaveLength(3);
 
     const gate = channel(() => 77);
     const specified = await replyToExecutorTopicMessage(

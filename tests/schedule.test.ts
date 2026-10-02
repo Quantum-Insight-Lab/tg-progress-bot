@@ -361,7 +361,7 @@ describe('INV-27 рассылка живёт на группе и включен
       },
     ]);
     const roles = await sql<{ role: string }>`SELECT role FROM project_members ORDER BY role`.execute(fixture.db);
-    expect(roles.rows.map((row) => row.role)).toEqual([LEAD_ROLE, MEMBER_ROLE]);
+    expect(roles.rows.map((row) => row.role)).toEqual([LEAD_ROLE, LEAD_ROLE, LEAD_ROLE, MEMBER_ROLE]);
   });
 });
 

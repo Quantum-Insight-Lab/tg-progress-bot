@@ -50,10 +50,21 @@ function storeOf(trx: Transaction<Database>): ProjectStore {
         })
         .execute();
     },
+    async insertMember(member) {
+      await trx
+        .insertInto('project_members')
+        .values({
+          id: member.id,
+          project_id: member.projectId,
+          user_id: member.userId,
+          role: member.role,
+        })
+        .execute();
+    },
   };
 }
 
-/** «Новый проект»: строка `projects` и `project.created` коммитятся одной транзакцией. */
+/** «Новый проект»: `projects`, создатель как `lead` и `project.created` коммитятся одной транзакцией. */
 export function createProjectCreation(db: Kysely<Database>, logger: Logger, clock: Clock): ProjectCreation {
   return {
     create(input: ProjectDraft): Promise<CreatedProject> {
@@ -61,6 +72,7 @@ export function createProjectCreation(db: Kysely<Database>, logger: Logger, cloc
         const creator = await findCreator(trx, input.telegramUserId);
         return decideCreate(storeOf(trx), createEventJournal(trx, logger), clock, {
           id: randomUUID(),
+          memberId: randomUUID(),
           name: input.name,
           description: input.description,
           timezone: input.timezone,

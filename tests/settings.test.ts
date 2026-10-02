@@ -368,10 +368,14 @@ describe('INV-19 настройки меняет только корень в л
     });
     expect(after.find((project) => project.id === beta.id)).toEqual(beta);
     expect(await roles(fixture.db, alpha.id)).toEqual([
+      { name: 'Аня', role: LEAD_ROLE },
       { name: 'Борис', role: LEAD_ROLE },
       { name: 'Вера', role: LEAD_ROLE },
     ]);
-    expect(await roles(fixture.db, beta.id)).toEqual([{ name: 'Борис', role: MEMBER_ROLE }]);
+    expect(await roles(fixture.db, beta.id)).toEqual([
+      { name: 'Аня', role: LEAD_ROLE },
+      { name: 'Борис', role: MEMBER_ROLE },
+    ]);
     expect(await settingsEvents(fixture.db)).toEqual([
       {
         idempotencyKey: 'chat',

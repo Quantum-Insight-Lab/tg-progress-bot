@@ -236,6 +236,16 @@ describe('INV-17 корень в заведённом проекте — lead', 
     });
     expect(events[0]?.subjectId).toBe(rows.find((row) => row.name === 'Альфа')?.id);
     expect(events[1]?.payload).toMatchObject({ name: 'Бета', description: '', created_by: rootId });
+
+    const members = await sql<{ project_id: string; user_id: string; role: string }>`
+      SELECT project_id::text AS project_id, user_id::text AS user_id, role
+      FROM project_members
+    `.execute(handle.db);
+    expect(members.rows).toHaveLength(2);
+    expect(members.rows).toEqual(
+      expect.arrayContaining(rows.map((row) => ({ project_id: row.id, user_id: rootId, role: PROJECT_CREATOR_ROLE }))),
+    );
+    expect(await projectEvents(handle.db)).toHaveLength(2);
   });
 
   it('INV-17 не-корень проект не заводит и корнем не становится', async () => {
@@ -341,6 +351,10 @@ describe('INV-22 повтор «Новый проект» не применяе�
       actorRole: PROJECT_CREATOR_ROLE,
       payload: { name: 'Альфа', created_by: rootId },
     });
+    const members = await sql<{ n: number }>`
+      SELECT CAST(count(*) AS int) AS n FROM project_members WHERE user_id = ${rootId}::uuid AND role = ${PROJECT_CREATOR_ROLE}
+    `.execute(handle.db);
+    expect(Number(members.rows[0]?.n)).toBe(1);
   });
 
   it('INV-22 пустой ключ проект не записывает', async () => {

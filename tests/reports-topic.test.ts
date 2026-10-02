@@ -68,6 +68,7 @@ interface Fixture {
   db: Kysely<Database>;
   close: () => Promise<void>;
   alphaId: string;
+  rootId: string;
   borisId: string;
   veraId: string;
 }
@@ -112,7 +113,7 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
 async function seed(bound: boolean): Promise<Fixture> {
   const handle = await openDb();
   const registration = createUserRegistration(handle.db, silentLogger, clock);
-  await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
+  const root = await registration.registerOnStart({ telegramUserId: String(rootAccount.id), name: rootAccount.first_name });
   const boris = await registration.registerOnStart({ telegramUserId: String(borisAccount.id), name: borisAccount.first_name });
   const vera = await registration.registerOnStart({ telegramUserId: String(veraAccount.id), name: veraAccount.first_name });
   const creation = createProjectCreation(handle.db, silentLogger, clock);
@@ -147,6 +148,7 @@ async function seed(bound: boolean): Promise<Fixture> {
     db: handle.db,
     close: handle.close,
     alphaId: alpha.project.id,
+    rootId: root.user.id,
     borisId: boris.user.id,
     veraId: vera.user.id,
   };
@@ -275,10 +277,14 @@ describe('INV-27 командный топик общий у группы и о�
     );
     expect(set?.text).toBe(afterReportsTopic(REPORTS_TOPIC_SET));
     expect(await storedReports(fixture.db)).toMatchObject({ topicId: '42', chats: 1, projectChats: 1 });
-    expect(await memberTopics(fixture.db)).toEqual([
-      { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
-      { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
-    ]);
+    expect(await memberTopics(fixture.db)).toEqual(
+      expect.arrayContaining([
+        { userId: fixture.rootId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
+      ]),
+    );
+    expect(await memberTopics(fixture.db)).toHaveLength(3);
     expect(await reportsEvents(fixture.db)).toEqual([
       {
         idempotencyKey: 'specify-vera',
@@ -330,10 +336,14 @@ describe('INV-27 командный топик общий у группы и о�
         payload: { chat_id: expect.any(String) as string, topic_id: 15, created: true },
       },
     ]);
-    expect(await memberTopics(fixture.db)).toEqual([
-      { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
-      { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
-    ]);
+    expect(await memberTopics(fixture.db)).toEqual(
+      expect.arrayContaining([
+        { userId: fixture.rootId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.veraId, role: LEAD_ROLE, topicId: null },
+        { userId: fixture.borisId, role: MEMBER_ROLE, topicId: null },
+      ]),
+    );
+    expect(await memberTopics(fixture.db)).toHaveLength(3);
 
     const beta = await createProjectCreation(fixture.db, silentLogger, clock).create({
       telegramUserId: String(rootAccount.id),
