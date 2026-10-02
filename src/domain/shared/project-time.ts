@@ -1,5 +1,6 @@
 import { STALE_DAYS } from '../../config/constants.ts';
 import { DOMAIN_ERROR, DomainError } from './errors.ts';
+import { zoneForClock } from './utc-offset.ts';
 
 /**
  * Сутки проекта — календарная дата в его таймзоне (INV-24).
@@ -13,7 +14,7 @@ function parts(instant: Date, timezone: string): { year: number; month: number; 
   let bag: Intl.DateTimeFormatPart[];
   try {
     bag = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
+      timeZone: zoneForClock(timezone),
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -57,7 +58,7 @@ export function projectClock(instant: Date, timezone: string): { date: string; t
   let bag: Intl.DateTimeFormatPart[];
   try {
     bag = new Intl.DateTimeFormat('en-US', {
-      timeZone: zone,
+      timeZone: zoneForClock(zone),
       hourCycle: 'h23',
       year: 'numeric',
       month: '2-digit',

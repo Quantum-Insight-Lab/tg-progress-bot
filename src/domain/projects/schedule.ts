@@ -79,7 +79,6 @@ export interface ShowSchedule extends ScheduleCommand {
 
 export interface SetSchedule extends ShowSchedule {
   dailyTime: string;
-  timezone: string;
   idempotencyKey: string;
 }
 
@@ -94,7 +93,6 @@ export interface ScheduleActions {
     telegramUserId: string;
     projectName: string;
     dailyTime: string;
-    timezone: string;
     chat: string;
     idempotencyKey: string;
   }): Promise<ScheduleOutcome>;
@@ -181,11 +179,11 @@ export async function setChatSchedule(
   const chatId = requireChat(project);
   const dailyTime = defineDailyCron(input.dailyTime);
   if (dailyTime === null) throw new DomainError(DOMAIN_ERROR.SCHEDULE_TIME_BLANK, 'время отчёта не названо');
-  const timezone = input.timezone.trim();
-  if (timezone.length === 0) throw new DomainError(DOMAIN_ERROR.SCHEDULE_TIMEZONE_BLANK, 'таймзона группы не названа');
   await store.lockChat(chatId);
   const current = await store.readChat(chatId);
   if (current === null) throw new DomainError(DOMAIN_ERROR.SCHEDULE_UNBOUND, 'пока супергруппа не привязана, расписания нет');
+  const timezone = current.timezone.trim();
+  if (timezone.length === 0) throw new DomainError(DOMAIN_ERROR.SCHEDULE_TIMEZONE_BLANK, 'таймзона группы не названа');
   if (mailingEnabled(current.dailyCron) && !actor.isRoot) {
     throw new DomainError(DOMAIN_ERROR.SCHEDULE_ROOT, 'время отчёта меняет корень');
   }

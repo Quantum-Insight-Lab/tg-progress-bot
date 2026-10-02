@@ -31,7 +31,7 @@ const clock: Clock = { now: () => new Date('2026-09-28T07:33:00.000Z') };
 const rootAccount = { id: 1001, is_bot: false, first_name: 'Аня' };
 const secondAccount = { id: 1002, is_bot: false, first_name: 'Борис' };
 
-const projectText = `${NEW_PROJECT_HEADING}\nАльфа\nучёт команды\nEurope/Moscow`;
+const projectText = `${NEW_PROJECT_HEADING}\nАльфа\nучёт команды\n10`;
 
 function env(): NodeJS.ProcessEnv {
   return {
@@ -198,7 +198,7 @@ describe('INV-17 корень в заведённом проекте — lead', 
     const fields = parseNewProjectMessage(projectText);
     if (fields === null) throw new Error('сообщение проекта');
     const first = await replyToNewProject('private', rootAccount, '42', fields, creation);
-    const secondText = `${NEW_PROJECT_HEADING}\nБета\n\nAsia/Yekaterinburg`;
+    const secondText = `${NEW_PROJECT_HEADING}\nБета\n\n12`;
     const secondFields = parseNewProjectMessage(secondText);
     if (secondFields === null) throw new Error('сообщение второго проекта');
     const second = await replyToNewProject('private', rootAccount, '43', secondFields, creation);
@@ -214,10 +214,10 @@ describe('INV-17 корень в заведённом проекте — lead', 
     expect(rows[0]).toMatchObject({
       name: 'Альфа',
       description: 'учёт команды',
-      timezone: 'Europe/Moscow',
+      timezone: '+180',
       chatId: null,
     });
-    expect(rows[1]).toMatchObject({ name: 'Бета', description: '', timezone: 'Asia/Yekaterinburg', chatId: null });
+    expect(rows[1]).toMatchObject({ name: 'Бета', description: '', timezone: '+300', chatId: null });
     expect(rows[0]?.createdAt.startsWith('2026-09-28')).toBe(true);
 
     const events = await projectEvents(handle.db);
@@ -230,7 +230,7 @@ describe('INV-17 корень в заведённом проекте — lead', 
       payload: {
         name: 'Альфа',
         description: 'учёт команды',
-        timezone: 'Europe/Moscow',
+        timezone: '+180',
         created_by: rootId,
       },
     });
@@ -290,7 +290,7 @@ describe('INV-19 проект заводится в личке', () => {
         telegramUserId: String(rootAccount.id),
         name: 'Альфа',
         description: 'учёт команды',
-        timezone: 'Europe/Moscow',
+        timezone: '+180',
         chat: 'supergroup',
         idempotencyKey: '45',
       }),
@@ -335,7 +335,7 @@ describe('INV-22 повтор «Новый проект» не применяе�
     const fields = parseNewProjectMessage(projectText);
     if (fields === null) throw new Error('сообщение проекта');
     const first = await replyToNewProject('private', rootAccount, '48', fields, creation);
-    const other = parseNewProjectMessage(`${NEW_PROJECT_HEADING}\nДругое\nдругое описание\nUTC`);
+    const other = parseNewProjectMessage(`${NEW_PROJECT_HEADING}\nДругое\nдругое описание\n11`);
     if (other === null) throw new Error('второе сообщение');
     const again = await replyToNewProject('private', rootAccount, '48', other, creation);
     expect(first).toBe(projectCreatedReply('Альфа'));
@@ -343,7 +343,7 @@ describe('INV-22 повтор «Новый проект» не применяе�
     expect(await countProjects(handle.db)).toBe(1);
     const rows = await projectsOf(handle.db);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ name: 'Альфа', description: 'учёт команды', timezone: 'Europe/Moscow' });
+    expect(rows[0]).toMatchObject({ name: 'Альфа', description: 'учёт команды', timezone: '+180' });
     const events = await projectEvents(handle.db);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -367,7 +367,7 @@ describe('INV-22 повтор «Новый проект» не применяе�
         telegramUserId: String(rootAccount.id),
         name: 'Альфа',
         description: '',
-        timezone: 'Europe/Moscow',
+        timezone: '+180',
         chat: 'private',
         idempotencyKey: '   ',
       }),
@@ -416,7 +416,7 @@ describe('«Новый проект» в процессе', () => {
     expect(sent).toEqual([projectCreatedReply('Альфа'), SUPERGROUP_REQUEST]);
     expect(await countProjects(handle.db)).toBe(1);
 
-    const repeat = await post(51, rootAccount, { id: rootAccount.id, type: 'private' }, `${NEW_PROJECT_HEADING}\nДругое\n\nUTC`);
+    const repeat = await post(51, rootAccount, { id: rootAccount.id, type: 'private' }, `${NEW_PROJECT_HEADING}\nДругое\n\n11`);
     expect(repeat).toBe(200);
     expect(sent).toEqual([projectCreatedReply('Альфа'), SUPERGROUP_REQUEST]);
     expect(await countProjects(handle.db)).toBe(1);

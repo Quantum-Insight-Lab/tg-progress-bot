@@ -1186,3 +1186,11 @@ atoms:
   R-964: { kind: view, scope: R-035 }
   R-965: { kind: view, scope: R-033 }
   R-966: { kind: view, scope: R-040 }
+
+  # Время человека вместо имени таймзоны
+  R-967: { kind: view, scope: R-036 }
+  R-968: { kind: rule, scope: R-036 }
+  R-969: { kind: rule, scope: R-037 }
+  R-970: { kind: view, scope: R-033 }
+  R-971: { kind: view, scope: R-439 }
+  R-972: { kind: tech, scope: R-036 }

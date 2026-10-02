@@ -183,14 +183,13 @@ describe('вопрос времени и таймзоны', () => {
     expect(follow).toContain(SCHEDULE_ASK);
     expect(follow).toContain(SCHEDULE_OFF);
     expect(parseScheduleMessage(`${SCHEDULE_HEADING}\nАльфа`)).toEqual({ kind: 'show', projectName: 'Альфа' });
-    expect(parseScheduleMessage(`${SCHEDULE_HEADING}\nАльфа\n09:00\nPacific/Auckland`)).toEqual({
+    expect(parseScheduleMessage(`${SCHEDULE_HEADING}\nАльфа\n09:00`)).toEqual({
       kind: 'set',
       projectName: 'Альфа',
       dailyTime: '09:00',
-      timezone: 'Pacific/Auckland',
     });
     expect(parseScheduleMessage(`${SCHEDULE_HEADING}\nАльфа\n`)).toEqual({ kind: 'clear', projectName: 'Альфа' });
-    expect(parseScheduleMessage(`${SCHEDULE_HEADING}\nАльфа\n09:00`)).toEqual({ kind: 'need-timezone' });
+    expect(parseScheduleMessage(`${SCHEDULE_HEADING}\nАльфа\n09:00\nPacific/Auckland`)).toBeNull();
     const off = renderSchedule({ projectName: 'Альфа', bound: true, dailyTime: null, timezone: 'Europe/Moscow', mailing: false });
     expect(off).toContain(SCHEDULE_OFF);
     expect(off).toContain(SCHEDULE_ASK);
@@ -227,15 +226,15 @@ describe('INV-24 час отчёта считается по таймзоне г
     const saved = await replyToScheduleMessage(
       'private',
       rootAccount,
-      { kind: 'set', projectName: 'Альфа', dailyTime: '09:00', timezone: 'Pacific/Auckland' },
+      { kind: 'set', projectName: 'Альфа', dailyTime: '09:00' },
       'set-hour',
       actions,
     );
-    expect(saved).toBe(scheduleSavedReply('09:00', 'Pacific/Auckland', 'Альфа'));
+    expect(saved).toBe(scheduleSavedReply('09:00', 'Europe/Moscow', 'Альфа'));
     const after = await stored(fixture.db);
     expect(after.chats).toBe(1);
     expect(after.dailyCron).toBe('09:00');
-    expect(after.chatTimezone).toBe('Pacific/Auckland');
+    expect(after.chatTimezone).toBe('Europe/Moscow');
     expect(after.projects).toEqual([
       { name: 'Альфа', timezone: 'Europe/Moscow', chatId: before.projects[0]?.chatId },
       { name: 'Бета', timezone: 'Asia/Yekaterinburg', chatId: before.projects[0]?.chatId },
@@ -245,13 +244,13 @@ describe('INV-24 час отчёта считается по таймзоне г
     expect(reportSchedule({ id: chatId, timezone: after.chatTimezone, dailyCron: after.dailyCron })).toEqual({
       chatId,
       dailyTime: '09:00',
-      timezone: 'Pacific/Auckland',
+      timezone: 'Europe/Moscow',
     });
     expect(await scheduleEvents(fixture.db, EVENT_TYPES.CHAT_SCHEDULE_SET)).toEqual([
       {
         idempotencyKey: 'set-hour',
         actorRole: SCHEDULE_ACTOR_ROOT,
-        payload: { chat_id: chatId, daily_time: '09:00', timezone: 'Pacific/Auckland' },
+        payload: { chat_id: chatId, daily_time: '09:00', timezone: 'Europe/Moscow' },
       },
     ]);
   });
@@ -294,24 +293,23 @@ describe('INV-27 рассылка живёт на группе и включен
       telegramUserId: String(veraAccount.id),
       projectName: 'Альфа',
       dailyTime: ' 18:30 ',
-      timezone: ' Europe/Samara ',
       chat: 'private',
       idempotencyKey: 'lead-set',
     });
     const on = await stored(fixture.db);
     expect(on.chats).toBe(1);
     expect(on.dailyCron).toBe('18:30');
-    expect(on.chatTimezone).toBe('Europe/Samara');
+    expect(on.chatTimezone).toBe('Europe/Moscow');
     expect(on.projects.map((project) => project.chatId)).toEqual([on.projects[0]?.chatId, on.projects[0]?.chatId]);
     const shown = await replyToScheduleMessage('private', rootAccount, { kind: 'show', projectName: 'Бета' }, 'show-on', actions);
     expect(shown).toContain(SCHEDULE_ON);
     expect(shown).toContain('Время отчёта группы: 18:30');
-    expect(shown).toContain('Таймзона группы: Europe/Samara');
+    expect(shown).toContain('Таймзона группы: Europe/Moscow');
 
     const member = await replyToScheduleMessage(
       'private',
       borisAccount,
-      { kind: 'set', projectName: 'Альфа', dailyTime: '10:00', timezone: 'UTC' },
+      { kind: 'set', projectName: 'Альфа', dailyTime: '10:00' },
       'member-set',
       actions,
     );
@@ -319,7 +317,7 @@ describe('INV-27 рассылка живёт на группе и включен
     const leadChange = await replyToScheduleMessage(
       'private',
       veraAccount,
-      { kind: 'set', projectName: 'Альфа', dailyTime: '11:00', timezone: 'UTC' },
+      { kind: 'set', projectName: 'Альфа', dailyTime: '11:00' },
       'lead-change',
       actions,
     );
@@ -331,19 +329,16 @@ describe('INV-27 рассылка живёт на группе и включен
     const outside = await replyToScheduleMessage(
       'supergroup',
       rootAccount,
-      { kind: 'set', projectName: 'Альфа', dailyTime: '12:00', timezone: 'UTC' },
+      { kind: 'set', projectName: 'Альфа', dailyTime: '12:00' },
       'group',
       actions,
     );
     expect(outside).toBeNull();
-    const missingZone = await replyToScheduleMessage('private', rootAccount, { kind: 'need-timezone' }, 'zone', actions);
-    expect(missingZone).toBe(SCHEDULE_NEED_BOTH);
-
     const cleared = await replyToScheduleMessage('private', rootAccount, { kind: 'clear', projectName: 'Бета' }, 'clear-root', actions);
     expect(cleared).toBe(SCHEDULE_CLEARED);
     const off = await stored(fixture.db);
     expect(off.dailyCron).toBeNull();
-    expect(off.chatTimezone).toBe('Europe/Samara');
+    expect(off.chatTimezone).toBe('Europe/Moscow');
     expect(off.chats).toBe(1);
     expect(off.projects).toEqual([
       { name: 'Альфа', timezone: 'Europe/Moscow', chatId: on.projects[0]?.chatId },
@@ -379,7 +374,7 @@ describe('INV-22 повтор расписания не применяется �
     const first = await replyToScheduleMessage(
       'private',
       rootAccount,
-      { kind: 'set', projectName: 'Альфа', dailyTime: '09:00', timezone: 'Europe/Moscow' },
+      { kind: 'set', projectName: 'Альфа', dailyTime: '09:00' },
       'same-key',
       actions,
     );
@@ -387,7 +382,7 @@ describe('INV-22 повтор расписания не применяется �
     const second = await replyToScheduleMessage(
       'private',
       rootAccount,
-      { kind: 'set', projectName: 'Альфа', dailyTime: '22:00', timezone: 'UTC' },
+      { kind: 'set', projectName: 'Альфа', dailyTime: '22:00' },
       'same-key',
       actions,
     );
@@ -401,7 +396,6 @@ describe('INV-22 повтор расписания не применяется �
         telegramUserId: String(rootAccount.id),
         projectName: 'Альфа',
         dailyTime: '09:00',
-        timezone: 'Europe/Moscow',
         chat: 'private',
         idempotencyKey: '   ',
       }),
@@ -417,7 +411,6 @@ describe('INV-22 повтор расписания не применяется �
       telegramUserId: String(rootAccount.id),
       projectName: 'Альфа',
       dailyTime: '09:00',
-      timezone: 'Europe/Moscow',
       chat: 'private',
       idempotencyKey: 'set-before-clear',
     });
@@ -433,7 +426,6 @@ describe('INV-22 повтор расписания не применяется �
       telegramUserId: String(rootAccount.id),
       projectName: 'Альфа',
       dailyTime: '11:00',
-      timezone: 'Asia/Yekaterinburg',
       chat: 'private',
       idempotencyKey: 'set-after-clear',
     });
@@ -447,7 +439,7 @@ describe('INV-22 повтор расписания не применяется �
     ).rejects.toMatchObject({ code: DOMAIN_ERROR.SCHEDULE_DUPLICATE });
     const row = await stored(fixture.db);
     expect(row.dailyCron).toBe('11:00');
-    expect(row.chatTimezone).toBe('Asia/Yekaterinburg');
+    expect(row.chatTimezone).toBe('Europe/Moscow');
     expect(await scheduleEvents(fixture.db, EVENT_TYPES.CHAT_SCHEDULE_CLEARED)).toHaveLength(1);
   });
 });

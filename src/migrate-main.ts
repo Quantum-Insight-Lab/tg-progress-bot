@@ -1,8 +1,13 @@
 import { applyMigrations } from './infrastructure/apply-migrations.ts';
 import { withMigrationSql } from './infrastructure/db.ts';
+import { convertStoredZoneNames } from './infrastructure/zone-names.ts';
 
 const connectionString = process.env.DATABASE_URL ?? '';
-const applied = await withMigrationSql(connectionString, (sql) => applyMigrations(sql));
+const applied = await withMigrationSql(connectionString, async (sql) => {
+  const names = await applyMigrations(sql);
+  await convertStoredZoneNames(sql, new Date());
+  return names;
+});
 
 if (applied.length === 0) {
   console.log('миграции уже применены');

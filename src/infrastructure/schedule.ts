@@ -129,7 +129,6 @@ export function createChatSchedule(db: Kysely<Database>, logger: Logger, clock: 
           chat: input.chat,
           projectName: input.projectName,
           dailyTime: input.dailyTime,
-          timezone: input.timezone,
           idempotencyKey: input.idempotencyKey,
         });
       });
