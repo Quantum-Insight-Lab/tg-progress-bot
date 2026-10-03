@@ -341,7 +341,7 @@ describe('перенос дня на новый канвас', () => {
     });
     expect(planned).toContain('высокий');
     expect(planned.includes(TASK_REVIEW_MARK)).toBe(false);
-    expect(planned.includes('○')).toBe(false);
+    expect(planned.includes('◻️')).toBe(false);
     const event = (await carryEvents(handle.db)).find((row) => row.payload.to_canvas_id === moscowTodayId);
     expect(event?.key).toBe(carriedCanvasKey(moscowId, anyaId, '2026-09-29'));
     expect(event?.payload).toEqual({
