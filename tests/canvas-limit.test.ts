@@ -105,7 +105,7 @@ describe('лимит rich message', () => {
       canvasDate: '2026-09-28',
       sections: {
         done: [text('срез'.repeat(RICH_MESSAGE_MAX_CHARS))],
-        tasks: [text('Задачи'), text('○ 1 — сигнал')],
+        tasks: [text('Задачи'), text('◻️ 1 — сигнал')],
         blockers: [text('блокер')],
         dynamics: [text('27.08 — 24%')],
       },
@@ -114,7 +114,7 @@ describe('лимит rich message', () => {
     if (prepared.status !== 'ready') return;
     expect(prepared.shrunk).toBe(true);
     const raw = JSON.stringify(prepared.message);
-    expect(raw).toContain('○ 1 — сигнал');
+    expect(raw).toContain('◻️ 1 — сигнал');
     expect(raw).toContain('Задачи');
     expect(raw).not.toContain('срез');
   });
