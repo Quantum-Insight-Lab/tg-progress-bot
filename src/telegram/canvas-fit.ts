@@ -48,7 +48,7 @@ export function prepareCanvasMessage(input: {
 }): PreparedCanvas {
   const rows: { paragraph: CanvasParagraph; kind: CanvasFitKind }[] = [
     {
-      paragraph: { pieces: [{ kind: 'text', text: canvasHeaderLine(input.projectName, input.canvasDate) }] },
+      paragraph: { pieces: [{ kind: 'bold', text: canvasHeaderLine(input.projectName, input.canvasDate) }] },
       kind: CANVAS_FIT_KEEP,
     },
   ];
@@ -56,7 +56,8 @@ export function prepareCanvasMessage(input: {
     if (id === 'header') continue;
     const block = input.sections?.[id];
     if (block === undefined || block.length === 0) continue;
-    for (const paragraph of block) rows.push({ paragraph, kind: SECTION_KIND[id] });
+    const fold = id === 'person' || id === 'inProgress' || id === 'next' || id === 'done';
+    for (const paragraph of block) rows.push({ paragraph: fold ? { ...paragraph, fold: true } : paragraph, kind: SECTION_KIND[id] });
   }
   const fit = fitCanvas(
     rows.map((row) => ({

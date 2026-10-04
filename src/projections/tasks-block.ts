@@ -1,4 +1,4 @@
-import type { CanvasParagraph, CanvasPiece } from './canvas-message.ts';
+import { canvasHeading, type CanvasParagraph, type CanvasPiece } from './canvas-message.ts';
 
 /** Заголовок блока. Пустой список абзац не занимает. */
 export const TASKS_BLOCK_HEADING = 'Задачи';
@@ -128,7 +128,7 @@ export function taskParagraphPieces(task: TaskFirstLine): CanvasPiece[] {
  */
 export function tasksBlockParagraphs(tasks: readonly TaskFirstLine[]): CanvasParagraph[] {
   if (tasks.length === 0) return [];
-  const paragraphs: CanvasParagraph[] = [{ pieces: [{ kind: 'text', text: TASKS_BLOCK_HEADING }] }];
+  const paragraphs: CanvasParagraph[] = [canvasHeading(TASKS_BLOCK_HEADING)];
   for (const task of tasks) {
     paragraphs.push({ pieces: taskParagraphPieces(task) });
   }

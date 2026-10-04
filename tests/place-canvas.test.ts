@@ -138,6 +138,7 @@ function openTask(title: string): CanvasTaskLine {
 function visibleCanvas(text: CanvasRichText): string {
   if (typeof text === 'string') return text;
   if (Array.isArray(text)) return text.map(visibleCanvas).join('');
+  if (text.type === 'bold') return text.text;
   return text.button.text;
 }
 
@@ -893,7 +894,7 @@ describe('канвас выставляется в топик', () => {
       projectName: 'Альфа',
       canvasDate: '2026-09-28',
       sections: { tasks: tasksBlockParagraphs(gate.sent[0]?.tasks ?? []) },
-    }).blocks.map((block) => block.text);
+    }).blocks.map((block) => visibleCanvas(block.text));
     expect(lines[1]).toBe('Задачи');
     expect(lines.join('\n')).toContain('Своя');
     expect(lines.join('\n')).not.toContain('Чужая');

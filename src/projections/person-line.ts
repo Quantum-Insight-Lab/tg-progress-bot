@@ -27,16 +27,17 @@ export interface PersonLinePlace {
  */
 export function personLineParagraphs(line: PersonCanvasLine): CanvasParagraph[] {
   if (line.kind === 'unmatched') {
-    return [{ pieces: [{ kind: 'text', text: PERSON_LINE_UNMATCHED }] }];
+    return [{ pieces: [{ kind: 'bold', text: PERSON_LINE_UNMATCHED }] }];
   }
   const name = line.name.trim();
   if (name.length === 0) throw new Error('у строки человека есть имя');
   return [
     {
       pieces: [
+        { kind: 'bold', text: `${name} по issues:` },
         {
           kind: 'text',
-          text: `${name} по issues: сделал ${String(line.done)} · сейчас на нём ${String(line.now)} · дальше в репозитории ${String(line.next)}`,
+          text: ` сделал ${String(line.done)} · сейчас на нём ${String(line.now)} · дальше в репозитории ${String(line.next)}`,
         },
       ],
     },

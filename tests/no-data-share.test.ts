@@ -49,6 +49,7 @@ const taskLine = {
 function visible(text: CanvasRichText): string {
   if (typeof text === 'string') return text;
   if (Array.isArray(text)) return text.map(visible).join('');
+  if (text.type === 'bold') return text.text;
   return text.button.text;
 }
 
@@ -82,7 +83,7 @@ describe('нет данных вместо процента', () => {
     expect(projectShareRatio(backlogShare([droppedIssue]))).toBeNull();
     expect(projectShareRatio(backlogShare([openIssue]))).toBe(0);
     expect(projectShareRatio(backlogShare([completedIssue, openIssue]))).toBe(1 / 2);
-    expect(noDataShareParagraphs(null)).toEqual([{ pieces: [{ kind: 'text', text: NO_DATA_SHARE }] }]);
+    expect(noDataShareParagraphs(null)).toEqual([{ pieces: [{ kind: 'text', text: `░░░░░░░░░░ ${NO_DATA_SHARE}` }] }]);
     expect(noDataShareParagraphs(0)).toEqual([]);
   });
 
@@ -127,25 +128,25 @@ describe('нет данных вместо процента', () => {
   it('R-099 R-101 придуманного процента нет', () => {
     const lines = painted(null);
     expect(lines.join('\n')).not.toMatch(/%|\b0%/);
-    expect(lines[1]).toBe(NO_DATA_SHARE);
+    expect(lines[1]).toBe(`░░░░░░░░░░ ${NO_DATA_SHARE}`);
   });
 
   it('R-100 реальное состояние неизвестно — «Нет данных»', () => {
-    expect(painted(projectShareRatio(null))[1]).toBe('Нет данных');
-    expect(painted(projectShareRatio(backlogShare([droppedIssue])))[1]).toBe('Нет данных');
+    expect(painted(projectShareRatio(null))[1]).toBe('░░░░░░░░░░ Нет данных');
+    expect(painted(projectShareRatio(backlogShare([droppedIssue])))[1]).toBe('░░░░░░░░░░ Нет данных');
   });
 
   it('R-177 задачи без репозитория остаются на канвасе', () => {
     const lines = painted(null);
     expect(lines).toContain('Задачи');
     expect(lines.some((line) => line.includes('Классификация сигнала'))).toBe(true);
-    expect(lines[1]).toBe(NO_DATA_SHARE);
+    expect(lines[1]).toBe(`░░░░░░░░░░ ${NO_DATA_SHARE}`);
   });
 
   it('R-178 канвас без репозитория печатается', () => {
     const lines = painted(null);
     expect(lines[0]).toBe('ПРОЕКТ: Альфа · 28.09');
-    expect(lines[1]).toBe(NO_DATA_SHARE);
+    expect(lines[1]).toBe(`░░░░░░░░░░ ${NO_DATA_SHARE}`);
   });
 
   it('R-179 блокеры по тишине процента не создают', () => {
@@ -167,11 +168,11 @@ describe('нет данных вместо процента', () => {
       canvasDate: '2026-09-28',
       sections: { backlog: noDataShareParagraphs(projectShareRatio(null)) },
     });
-    expect(linesOf(message)).toEqual(['ПРОЕКТ: Альфа · 28.09', 'Нет данных']);
+    expect(linesOf(message)).toEqual(['ПРОЕКТ: Альфа · 28.09', '░░░░░░░░░░ Нет данных']);
   });
 
   it('R-181 печатается «Нет данных»', () => {
-    expect(painted(null)[1]).toBe('Нет данных');
+    expect(painted(null)[1]).toBe('░░░░░░░░░░ Нет данных');
   });
 
   it('R-453 R-455 пустой знаменатель — не 0%', () => {
@@ -179,7 +180,7 @@ describe('нет данных вместо процента', () => {
     expect(ratio).toBeNull();
     expect(ratio).not.toBe(0);
     const lines = painted(ratio);
-    expect(lines[1]).toBe('Нет данных');
+    expect(lines[1]).toBe('░░░░░░░░░░ Нет данных');
     expect(lines.join('\n')).not.toContain('0%');
   });
 

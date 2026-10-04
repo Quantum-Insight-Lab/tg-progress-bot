@@ -101,6 +101,8 @@ const person = { name: 'Андрей', place: personBacklogPlace('andrey', REPOS
 function visible(text: CanvasRichText): string {
   if (typeof text === 'string') return text;
   if (Array.isArray(text)) return text.map(visible).join('');
+  if (text.type === 'bold') return text.text;
+  if (text.type === 'bold') return text.text;
   return text.button.text;
 }
 
@@ -192,9 +194,9 @@ describe('M-1 M-2 критерий успеха', () => {
     const tasksAt = text.indexOf(TASKS_BLOCK_HEADING);
     const blockersAt = text.indexOf(BLOCKERS_BLOCK_HEADING);
     expect(shareAt).toBeGreaterThan(0);
-    expect(personAt).toBeGreaterThan(shareAt);
-    expect(tasksAt).toBeGreaterThan(personAt);
+    expect(tasksAt).toBeGreaterThan(shareAt);
     expect(blockersAt).toBeGreaterThan(tasksAt);
+    expect(personAt).toBeGreaterThan(blockersAt);
     expect(calls).toHaveLength(1);
   });
 
@@ -206,7 +208,7 @@ describe('M-1 M-2 критерий успеха', () => {
     expect(total).toBe(SHARE_TOTAL);
     const percent = Math.round((share.completed * 100) / total);
     const lines = await topicLines();
-    expect(lines).toContain(`Сделано по проекту: ${String(percent)}% · осталось ${String(share.remaining)} из ${String(total)}`);
+    expect(lines.join('\n')).toContain(`Сделано по проекту: ${String(percent)}% · осталось ${String(share.remaining)} из ${String(total)}`);
   });
 
   it('R-954 сколько issues осталось', async () => {
@@ -241,6 +243,10 @@ describe('M-1 M-2 критерий успеха', () => {
   it('R-957 что блокирует работу', async () => {
     const lines = await topicLines();
     const blockersAt = lines.indexOf(BLOCKERS_BLOCK_HEADING);
-    expect(lines.slice(blockersAt + 1)).toEqual([`7 — ${BLOCKER_REASON}`, BLOCKER_DEFAULT_BRANCH_CI, 'PR #12 без движения']);
+    expect(lines.slice(blockersAt + 1, blockersAt + 4)).toEqual([
+      `7 — ${BLOCKER_REASON}`,
+      BLOCKER_DEFAULT_BRANCH_CI,
+      'PR #12 без движения',
+    ]);
   });
 });
