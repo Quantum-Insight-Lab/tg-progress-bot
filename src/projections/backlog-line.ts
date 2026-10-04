@@ -10,11 +10,10 @@ const PERCENT_SCALE = 100;
 const SHARE_CELL_FILLED = '█';
 const SHARE_CELL_EMPTY = '░';
 
-/** Полоска доли: заполненные клетки по проценту, остальные пустые. */
+/** Полоска доли. Клетка закрашена, только если процент покрывает её целиком. */
 export function shareBar(percent: number | null): string {
-  const filled = percent === null ? 0 : Math.round((percent * CANVAS_SHARE_CELLS) / PERCENT_SCALE);
-  const cells = Math.min(CANVAS_SHARE_CELLS, Math.max(0, filled));
-  return SHARE_CELL_FILLED.repeat(cells) + SHARE_CELL_EMPTY.repeat(CANVAS_SHARE_CELLS - cells);
+  const filled = percent === null || percent <= 0 ? 0 : percent >= PERCENT_SCALE ? CANVAS_SHARE_CELLS : Math.floor((percent * CANVAS_SHARE_CELLS) / PERCENT_SCALE);
+  return SHARE_CELL_FILLED.repeat(filled) + SHARE_CELL_EMPTY.repeat(CANVAS_SHARE_CELLS - filled);
 }
 
 /** Доля, которую канвас печатает. Поля те же, что у расчёта бэклога. */
@@ -34,7 +33,7 @@ export function noDataShareParagraphs(ratio: number | null): CanvasParagraph[] {
 }
 
 /**
- * «Сделано по проекту: N% · осталось X из Y».
+ * Полоска, затем «N% · осталось X из Y». Слов «Сделано по проекту» нет: их место занимает полоска.
  * Остаток стоит в той же строке, что и процент. Пустая доля сюда не печатается.
  * «из Y» — открытые и completed: `not_planned` в это число не входит.
  */
@@ -47,7 +46,7 @@ export function projectShareParagraphs(share: CanvasBacklogShare | null): Canvas
       pieces: [
         {
           kind: 'text',
-          text: `${shareBar(percent)} Сделано по проекту: ${String(percent)}% · осталось ${String(share.remaining)} из ${String(total)}`,
+          text: `${shareBar(percent)} ${String(percent)}% · осталось ${String(share.remaining)} из ${String(total)}`,
         },
       ],
     },

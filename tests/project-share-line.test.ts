@@ -98,13 +98,17 @@ describe('строка доли и общий процент', () => {
   it('R-975 доля — полоска из десяти клеток', () => {
     const lines = painted(backlogShare(mockIssues));
     expect(lines[1]?.startsWith('████░░░░░░ ')).toBe(true);
-    expect(lines[1]).toContain('Сделано по проекту: 42%');
+    expect(lines[1]).toContain('42%');
+    expect(lines[1]).not.toContain('Сделано по проекту');
+    const almost = painted({ completed: 98, remaining: 2, ratio: 98 / 100 });
+    expect(almost[1]?.startsWith('█████████░ ')).toBe(true);
+    expect(almost[1]).toContain('98%');
   });
 
   it('R-109 «Сделано по проекту: 42%»', () => {
     const lines = painted(backlogShare(mockIssues));
-    expect(lines[1]).toBe('████░░░░░░ Сделано по проекту: 42% · осталось 18 из 31');
-    expect(lines[1]).toContain('Сделано по проекту: 42%');
+    expect(lines[1]).toBe('████░░░░░░ 42% · осталось 18 из 31');
+    expect(lines[1]).toContain('42%');
   });
 
   it('R-110 «осталось 18 из 31»', () => {
@@ -132,11 +136,11 @@ describe('строка доли и общий процент', () => {
     const paragraphs = projectShareParagraphs(backlogShare(mockIssues));
     expect(paragraphs).toHaveLength(1);
     const text = paragraphs[0]?.pieces[0];
-    expect(text).toEqual({ kind: 'text', text: '████░░░░░░ Сделано по проекту: 42% · осталось 18 из 31' });
+    expect(text).toEqual({ kind: 'text', text: '████░░░░░░ 42% · осталось 18 из 31' });
     const full = projectShareParagraphs(backlogShare(fill(repoA, 'completed', 13, 1)));
     const fullText = full[0]?.pieces[0];
     expect(fullText?.kind).toBe('text');
-    if (fullText?.kind === 'text') expect(fullText.text).toBe('██████████ Сделано по проекту: 100% · осталось 0 из 13');
+    if (fullText?.kind === 'text') expect(fullText.text).toBe('██████████ 100% · осталось 0 из 13');
   });
 
   it('INV-01 делёж issues одного репозитория по проектам в формулу не входит', () => {
@@ -182,7 +186,7 @@ describe('строка доли и общий процент', () => {
   it('INV-01 известный ноль печатает процент и остаток', () => {
     const share = backlogShare([open(repoA, 1), open(repoA, 2)]);
     const lines = painted(share);
-    expect(lines[1]).toBe('░░░░░░░░░░ Сделано по проекту: 0% · осталось 2 из 2');
+    expect(lines[1]).toBe('░░░░░░░░░░ 0% · осталось 2 из 2');
     expect(lines.join('\n')).not.toContain(NO_DATA_SHARE);
     expect(backlogShareParagraphs(null).map((paragraph) => paragraph.pieces[0])).toEqual([
       { kind: 'text', text: `░░░░░░░░░░ ${NO_DATA_SHARE}` },
