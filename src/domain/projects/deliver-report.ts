@@ -143,6 +143,48 @@ export interface ReportRepositoryFacts {
   mergedPullRequests: number;
 }
 
+/** Доля на одну границу суток. Пустой `ratio` — числа нет, это не ноль. */
+export interface ReportShareFact {
+  completed: number;
+  remaining: number;
+  ratio: number | null;
+}
+
+/** Остаток на конец суток. */
+export interface ReportRemainderFact {
+  remaining: number;
+  total: number;
+}
+
+/** Issue в строке «Закрыто» или «Открыто новых». */
+export interface ReportIssueFact {
+  number: number;
+  title: string;
+}
+
+/** Бэклог проекта за сутки. Пустая доля строку «Бэклог» не занимает. */
+export interface ReportBacklogFacts {
+  shareAtStart: ReportShareFact;
+  shareAtEnd: ReportShareFact;
+  remainderAtEnd: ReportRemainderFact | null;
+  closed: readonly ReportIssueFact[];
+  openedNew: readonly ReportIssueFact[];
+}
+
+/** Доли нет: знаменатель пуст. */
+export const EMPTY_REPORT_SHARE: ReportShareFact = { completed: 0, remaining: 0, ratio: null };
+
+/** Пустой бэклог: строки «Бэклог» и «Все проекты» из него не печатаются. */
+export function emptyReportBacklog(): ReportBacklogFacts {
+  return {
+    shareAtStart: EMPTY_REPORT_SHARE,
+    shareAtEnd: EMPTY_REPORT_SHARE,
+    remainderAtEnd: null,
+    closed: [],
+    openedNew: [],
+  };
+}
+
 /** Проект внутри уже выбранного куска отчёта. */
 export interface ReportProjectFacts {
   id: string;
@@ -150,6 +192,7 @@ export interface ReportProjectFacts {
   chatId: string;
   memberIds: readonly string[];
   tasks: ReportTaskFacts;
+  backlog: ReportBacklogFacts;
   now: readonly ReportNowFact[];
   next: readonly ReportNextFact[];
   reasons: readonly { text: string }[];
@@ -163,6 +206,9 @@ export interface ReportDocument {
   date: string;
   audience: 'dm' | 'team';
   memberId: string | null;
+  shareAtStart: ReportShareFact;
+  shareAtEnd: ReportShareFact;
+  remainderAtEnd: ReportRemainderFact | null;
   projects: readonly ReportProjectFacts[];
 }
 
