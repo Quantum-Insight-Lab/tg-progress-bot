@@ -590,7 +590,7 @@ describe('бот ставит галочку по callback', () => {
     );
     expect(taskStatusCode).toBe(200);
     const posted = calls.find((call) => call.method === 'sendRichMessage');
-    expect(JSON.stringify(posted?.payload)).toContain('○');
+    expect(JSON.stringify(posted?.payload)).toContain('◻️');
     expect(JSON.stringify(posted?.payload)).toContain('task:mark:1');
     expect(JSON.stringify(posted?.payload)).not.toContain('на подтверждении');
 
@@ -605,7 +605,7 @@ describe('бот ставит галочку по callback', () => {
     expect((await tasksOf(fixture.db)).map((task) => task.status)).toEqual([TASK_STATUS_REVIEW]);
     const edited = calls.filter((call) => call.method === 'editMessageText');
     expect(edited).toHaveLength(1);
-    expect(JSON.stringify(edited[0]?.payload)).toContain('✓');
+    expect(JSON.stringify(edited[0]?.payload)).toContain('✅');
     expect(JSON.stringify(edited[0]?.payload)).toContain('на подтверждении');
     expect(JSON.stringify(edited[0]?.payload)).toContain('task:mark:1');
     expect(calls.some((call) => call.method === 'answerCallbackQuery')).toBe(true);
@@ -632,7 +632,7 @@ describe('бот ставит галочку по callback', () => {
     expect((await tasksOf(fixture.db)).map((task) => task.status)).toEqual([TASK_STATUS_IN_PROGRESS]);
     const redrawn = calls.filter((call) => call.method === 'editMessageText');
     expect(redrawn).toHaveLength(2);
-    expect(JSON.stringify(redrawn[1]?.payload)).toContain('○');
+    expect(JSON.stringify(redrawn[1]?.payload)).toContain('◻️');
     expect(JSON.stringify(redrawn[1]?.payload)).not.toContain('на подтверждении');
     const events = await markEvents(fixture.db);
     expect(events.map((event) => event.key)).toEqual(['cb-bot-1', 'cb-bot-2']);

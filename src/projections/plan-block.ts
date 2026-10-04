@@ -17,7 +17,7 @@ export const TASK_RESUME_LABEL = 'в работу';
 
 /**
  * Первая строка абзаца плана: номер, название и день.
- * Кружка и галочки нет — у `PLANNED` кнопка отметки не рисуется.
+ * ◻️ и ✅ нет — у `PLANNED` кнопка отметки не рисуется.
  */
 export function planFirstLine(task: TaskFirstLine): string {
   return `${String(task.number)} — ${task.title} — ${taskDayMark(task.day)}`;

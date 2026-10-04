@@ -692,7 +692,7 @@ describe('бот принимает план и приоритет по callback
     expect(plannedPayload).toContain('high');
     expect(plannedPayload).not.toContain('task:mark:1');
     expect(plannedPayload).not.toContain('task:plan:1');
-    expect(plannedPayload).not.toContain('○');
+    expect(plannedPayload).not.toContain('◻️');
     expect(calls.filter((call) => call.method === 'sendRichMessage')).toHaveLength(1);
 
     const foreign = await httpStatus(

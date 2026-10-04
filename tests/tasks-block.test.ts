@@ -98,19 +98,19 @@ describe('блок «Задачи»: первая строка', () => {
     expect(linesOf(empty)).toEqual(['ПРОЕКТ: Общественный сенсор · 17.09']);
   });
 
-  it('R-123 «○»', () => {
+  it('R-123 «◻️»', () => {
     expect(firstRow(lines[2]).startsWith(`${TASK_OPEN_MARK} `)).toBe(true);
-    expect(firstRow(lines[2]).startsWith('○ ')).toBe(true);
+    expect(firstRow(lines[2]).startsWith('◻️ ')).toBe(true);
   });
 
   it('R-154 кружок служит кнопкой', () => {
     const open = block[1]?.pieces[0];
     const review = block[2]?.pieces[0];
-    expect(open).toEqual({ kind: 'action', label: '○', callbackData: 'task:mark:7' });
-    expect(review).toEqual({ kind: 'action', label: '✓', callbackData: 'task:mark:9' });
+    expect(open).toEqual({ kind: 'action', label: '◻️', callbackData: 'task:mark:7' });
+    expect(review).toEqual({ kind: 'action', label: '✅', callbackData: 'task:mark:9' });
     expect(open).toMatchObject({ callbackData: taskCanvasActionData(TASK_MARK_ACTION, openLine.number) });
-    expect(firstRow(lines[2])).toBe('○ 7 — Классификация сигнала — 3-й день');
-    expect(firstRow(lines[3])).toBe('✓ 9 — Черновик карточки — на подтверждении');
+    expect(firstRow(lines[2])).toBe('◻️ 7 — Классификация сигнала — 3-й день');
+    expect(firstRow(lines[3])).toBe('✅ 9 — Черновик карточки — на подтверждении');
   });
 
   it('R-124 «7»', () => {
@@ -132,14 +132,14 @@ describe('блок «Задачи»: первая строка', () => {
     expect(taskCanvasDay(projectCalendarDate(created, 'Pacific/Honolulu'), '2026-09-17')).toBe(2);
   });
 
-  it('R-130 «✓ 9 — Черновик карточки»', () => {
+  it('R-130 «✅ 9 — Черновик карточки»', () => {
     expect(firstRow(lines[3]).startsWith(`${TASK_REVIEW_MARK} 9 — Черновик карточки — `)).toBe(true);
-    expect(firstRow(lines[3]).startsWith('✓ 9 — Черновик карточки — ')).toBe(true);
+    expect(firstRow(lines[3]).startsWith('✅ 9 — Черновик карточки — ')).toBe(true);
   });
 
   it('R-131 «на подтверждении»', () => {
     expect(firstRow(lines[3]).endsWith(` — ${TASK_REVIEW_PLACE}`)).toBe(true);
-    expect(firstRow(lines[3])).toBe('✓ 9 — Черновик карточки — на подтверждении');
+    expect(firstRow(lines[3])).toBe('✅ 9 — Черновик карточки — на подтверждении');
     expect(firstRow(lines[3])).not.toContain('день');
   });
 
@@ -147,8 +147,8 @@ describe('блок «Задачи»: первая строка', () => {
     expect(lines.map(firstRow)).toEqual([
       'ПРОЕКТ: Общественный сенсор · 17.09',
       'Задачи',
-      '○ 7 — Классификация сигнала — 3-й день',
-      '✓ 9 — Черновик карточки — на подтверждении',
+      '◻️ 7 — Классификация сигнала — 3-й день',
+      '✅ 9 — Черновик карточки — на подтверждении',
     ]);
     expect(block[1]?.pieces[0]).toEqual({
       kind: 'action',
@@ -201,20 +201,20 @@ describe('блок «Задачи»: первая строка', () => {
       }),
     ).join('\n');
     expect(text).toContain(title);
-    expect(text).toContain('○ 7 — ');
+    expect(text).toContain('◻️ 7 — ');
     expect(text).not.toContain('\n#12');
-    expect(text.split('\n').filter((row) => row.startsWith('○') || row.startsWith('✓'))).toHaveLength(1);
+    expect(text.split('\n').filter((row) => row.startsWith('◻️') || row.startsWith('✅'))).toHaveLength(1);
   });
 
   it('INV-05 у IN_PROGRESS кружок, у REVIEW — галочка и «на подтверждении»', () => {
     const open = taskFirstLine(openLine);
     const review = taskFirstLine(reviewLine);
-    expect(open.startsWith('○')).toBe(true);
-    expect(open).not.toContain('✓');
+    expect(open.startsWith('◻️')).toBe(true);
+    expect(open).not.toContain('✅');
     expect(open).not.toContain('на подтверждении');
-    expect(review.startsWith('✓')).toBe(true);
+    expect(review.startsWith('✅')).toBe(true);
     expect(review).toContain('на подтверждении');
-    expect(review).not.toContain('○');
+    expect(review).not.toContain('◻️');
     expect(review).not.toContain('день');
   });
 
@@ -235,11 +235,11 @@ describe('блок «Задачи»: первая строка', () => {
     expect(once).toHaveLength(2);
     expect(once[1]?.pieces[0]).toEqual({
       kind: 'action',
-      label: '○',
+      label: '◻️',
       callbackData: 'task:mark:7',
     });
     expect(once[1]?.pieces[1]).toEqual({ kind: 'text', text: ' 7 — Классификация сигнала — 3-й день\n' });
-    expect(once.filter((paragraph) => paragraph.pieces.some((piece) => piece.kind === 'action' && piece.label === '○'))).toHaveLength(1);
+    expect(once.filter((paragraph) => paragraph.pieces.some((piece) => piece.kind === 'action' && piece.label === '◻️'))).toHaveLength(1);
   });
 });
 
@@ -308,8 +308,8 @@ function actionLabels(text: CanvasRichText): string[] {
   it('R-328 у задачи на подтверждении — ещё «вернуть»', () => {
     expect(actionLabels(reviewText)).toEqual(['normal', 'подтвердить', 'вернуть', 'отменить']);
     expect(actionLabels(openText)).toEqual(['high', 'в план', 'отменить']);
-    expect(labels(openText)[0]).toBe('○');
-    expect(labels(reviewText)[0]).toBe('✓');
+    expect(labels(openText)[0]).toBe('◻️');
+    expect(labels(reviewText)[0]).toBe('✅');
     expect(secondRow(visible(reviewText))).toBe('normal · подтвердить · вернуть · отменить');
     expect(secondRow(visible(openText))).not.toContain('вернуть');
   });
@@ -452,7 +452,7 @@ describe('блок «Задачи»: какие задачи в нём стоя�
       canvasDate: '2026-09-17',
       sections: { tasks: tasksBlockParagraphs(tasksStandingInBlock([reviewTask]).map(lineOf)) },
     });
-    expect(firstRow(linesOf(checked)[2])).toBe('✓ 9 — Черновик карточки — на подтверждении');
+    expect(firstRow(linesOf(checked)[2])).toBe('✅ 9 — Черновик карточки — на подтверждении');
     const returned = defineTask({ ...reviewTask, status: TASK_STATUS_IN_PROGRESS });
     const again = tasksStandingInBlock([returned]);
     expect(again).toEqual([returned]);
@@ -464,34 +464,34 @@ describe('блок «Задачи»: какие задачи в нём стоя�
     expect(linesOf(redrawn).map(firstRow)).toEqual([
       'ПРОЕКТ: Общественный сенсор · 17.09',
       'Задачи',
-      '○ 9 — Черновик карточки — 3-й день',
+      '◻️ 9 — Черновик карточки — 3-й день',
     ]);
     expect(linesOf(redrawn).join('\n')).not.toContain('на подтверждении');
-    expect(linesOf(redrawn).join('\n')).not.toContain('✓');
+    expect(linesOf(redrawn).join('\n')).not.toContain('✅');
   });
 
   it('R-488 его IN_PROGRESS', () => {
     expect(standing.map((task) => task.title)).toContain('Классификация сигнала');
-    expect(firstRow(membershipLines[2])).toBe('○ 7 — Классификация сигнала — 3-й день');
+    expect(firstRow(membershipLines[2])).toBe('◻️ 7 — Классификация сигнала — 3-й день');
     expect(membershipLines[1]).toBe('Задачи');
   });
 
   it('R-489 BLOCKED', () => {
     expect(standing.map((task) => task.status)).toContain(TASK_STATUS_BLOCKED);
-    expect(firstRow(membershipLines[3])).toBe('○ 8 — Ждёт ответ — 3-й день');
+    expect(firstRow(membershipLines[3])).toBe('◻️ 8 — Ждёт ответ — 3-й день');
     expect(secondRow(membershipLines[3])).toBe('normal · в план · отменить');
-    expect(paragraphButtons(3).map((button) => button.button.text)).toEqual(['○', 'normal', 'в план', 'отменить']);
+    expect(paragraphButtons(3).map((button) => button.button.text)).toEqual(['◻️', 'normal', 'в план', 'отменить']);
   });
 
   it('R-490 и REVIEW', () => {
     expect(standing.map((task) => task.status)).toContain(TASK_STATUS_REVIEW);
-    expect(firstRow(membershipLines[4])).toBe('✓ 9 — Черновик карточки — на подтверждении');
+    expect(firstRow(membershipLines[4])).toBe('✅ 9 — Черновик карточки — на подтверждении');
     expect(secondRow(membershipLines[4])).toBe('normal · подтвердить · вернуть · отменить');
   });
 
   it('R-492 действия — на следующей', () => {
     const openPieces = tasksBlockParagraphs(standing.map(lineOf))[1]?.pieces ?? [];
-    expect(openPieces[0]).toEqual({ kind: 'action', label: '○', callbackData: 'task:mark:7' });
+    expect(openPieces[0]).toEqual({ kind: 'action', label: '◻️', callbackData: 'task:mark:7' });
     expect(openPieces[1]).toEqual({ kind: 'text', text: ' 7 — Классификация сигнала — 3-й день\n' });
     expect(openPieces.slice(2).some((piece) => piece.kind === 'action' && piece.label === 'в план')).toBe(true);
     expect(openPieces.slice(2).some((piece) => piece.kind === 'action' && piece.label === 'отменить')).toBe(true);
@@ -513,9 +513,9 @@ describe('блок «Задачи»: какие задачи в нём стоя�
     expect(membershipLines.map(firstRow)).toEqual([
       'ПРОЕКТ: Общественный сенсор · 17.09',
       'Задачи',
-      '○ 7 — Классификация сигнала — 3-й день',
-      '○ 8 — Ждёт ответ — 3-й день',
-      '✓ 9 — Черновик карточки — на подтверждении',
+      '◻️ 7 — Классификация сигнала — 3-й день',
+      '◻️ 8 — Ждёт ответ — 3-й день',
+      '✅ 9 — Черновик карточки — на подтверждении',
     ]);
     expect(text).not.toContain('#7');
     expect(text).not.toContain('#8');
@@ -558,9 +558,9 @@ describe('блок «Задачи»: какие задачи в нём стоя�
         sections: { tasks: tasksBlockParagraphs(tasksStandingInBlock([titled]).map(lineOf)) },
       }),
     ).join('\n');
-    expect(blockText).toContain('○ 7 — Смотри https://github.com/org/repo/issues/12 и PR — 3-й день');
+    expect(blockText).toContain('◻️ 7 — Смотри https://github.com/org/repo/issues/12 и PR — 3-й день');
     expect(blockText).not.toContain('\n#12');
-    expect(blockText.split('\n').filter((row) => row.startsWith('○') || row.startsWith('✓'))).toHaveLength(1);
+    expect(blockText.split('\n').filter((row) => row.startsWith('◻️') || row.startsWith('✅'))).toHaveLength(1);
     expect(JSON.stringify(tasksBlockParagraphs([lineOf(titled)]))).not.toContain('issue_number');
     expect(JSON.stringify(tasksBlockParagraphs([lineOf(titled)]))).not.toContain('pull_request');
   });

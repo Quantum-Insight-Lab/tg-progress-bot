@@ -3,11 +3,11 @@ import type { CanvasParagraph, CanvasPiece } from './canvas-message.ts';
 /** Заголовок блока. Пустой список абзац не занимает. */
 export const TASKS_BLOCK_HEADING = 'Задачи';
 
-/** Кружок у задачи, которая ещё не на подтверждении. */
-export const TASK_OPEN_MARK = '○';
+/** Открытая задача: пустой квадрат. */
+export const TASK_OPEN_MARK = '◻️';
 
-/** Галочка у задачи на подтверждении. */
-export const TASK_REVIEW_MARK = '✓';
+/** Задача на подтверждении. */
+export const TASK_REVIEW_MARK = '✅';
 
 /** Вместо дня, пока руководитель не ответил. */
 export const TASK_REVIEW_PLACE = 'на подтверждении';
@@ -50,7 +50,7 @@ type TaskCanvasAction = keyof typeof TASK_CANVAS_ACTIONS;
 /** Слово текущего приоритета — кнопка на второй строке. */
 export const TASK_PRIORITY_ACTION = 'priority';
 
-/** Кружок или галочка на первой строке. Нажатие ставит или снимает галочку. */
+/** ◻️ или ✅ на первой строке. Нажатие ставит или снимает отметку. */
 export const TASK_MARK_ACTION = 'mark';
 
 /** «В работу»: возврат из плана. Кнопку рисует блок «План». */
@@ -107,7 +107,7 @@ export function taskSecondLinePieces(task: TaskFirstLine): CanvasPiece[] {
 }
 
 /**
- * Абзац задачи: кружок или галочка — кнопка первой строки, остальное — текст,
+ * Абзац задачи: ◻️ или ✅ — кнопка первой строки, остальное — текст,
  * затем кнопки второй. Отметка рисуется из статуса, не из native checkbox.
  */
 export function taskParagraphPieces(task: TaskFirstLine): CanvasPiece[] {

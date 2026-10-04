@@ -163,13 +163,13 @@ describe('блок «План»', () => {
     expect(firstRow(lines[2])).toBe('7 — Классификация сигнала — 3-й день');
     expect(firstRow(lines[2]).includes(TASK_OPEN_MARK)).toBe(false);
     expect(firstRow(lines[2]).includes(TASK_REVIEW_MARK)).toBe(false);
-    expect(firstRow(lines[2]).includes('○')).toBe(false);
-    expect(firstRow(lines[2]).includes('✓')).toBe(false);
+    expect(firstRow(lines[2]).includes('◻️')).toBe(false);
+    expect(firstRow(lines[2]).includes('✅')).toBe(false);
     const dumped = JSON.stringify(block);
     expect(dumped).not.toContain(`task:${TASK_MARK_ACTION}:`);
     expect(dumped).not.toContain('task:mark:');
-    expect(buttonsOf(canvas.blocks[2]?.text ?? '').map((button) => button.button.text)).not.toContain('○');
-    expect(buttonsOf(canvas.blocks[2]?.text ?? '').map((button) => button.button.text)).not.toContain('✓');
+    expect(buttonsOf(canvas.blocks[2]?.text ?? '').map((button) => button.button.text)).not.toContain('◻️');
+    expect(buttonsOf(canvas.blocks[2]?.text ?? '').map((button) => button.button.text)).not.toContain('✅');
   });
 
   it('INV-08 абзацы плана стоят в переданном порядке и второй сортировки нет', () => {

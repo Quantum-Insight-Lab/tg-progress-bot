@@ -633,9 +633,9 @@ describe('канвас выставляется в топик', () => {
       canvasDate: '2026-09-28',
       sections: { tasks: tasksBlockParagraphs(gate.sent[0]?.tasks ?? []) },
     }).blocks.map((block) => visibleCanvas(block.text)).join('\n');
-    expect(text).toContain('○ 4 — Классификация сигнала — 1-й день');
-    expect(text).toContain('○ 5 — Ждёт ответ — 1-й день');
-    expect(text).toContain('✓ 6 — Черновик карточки — на подтверждении');
+    expect(text).toContain('◻️ 4 — Классификация сигнала — 1-й день');
+    expect(text).toContain('◻️ 5 — Ждёт ответ — 1-й день');
+    expect(text).toContain('✅ 6 — Черновик карточки — на подтверждении');
     expect(text).not.toContain('На потом');
     expect(text).not.toContain('Уже подтверждена');
     expect(text).not.toContain('Снятая');
@@ -659,9 +659,9 @@ describe('канвас выставляется в топик', () => {
       canvasDate: '2026-09-28',
       sections: { tasks: tasksBlockParagraphs(gate.edited[0]?.home.tasks ?? []) },
     }).blocks.map((block) => visibleCanvas(block.text)).join('\n');
-    expect(redrawn).toContain('○ 6 — Черновик карточки — 1-й день');
+    expect(redrawn).toContain('◻️ 6 — Черновик карточки — 1-й день');
     expect(redrawn).not.toContain('на подтверждении');
-    expect(redrawn).not.toContain('✓');
+    expect(redrawn).not.toContain('✅');
   });
 
   it('INV-08 R-495 план канваса — PLANNED исполнителя по приоритету, затем по дате', async () => {
@@ -739,8 +739,8 @@ describe('канвас выставляется в топик', () => {
     expect(text).toContain('high · в работу · отменить');
     expect(text).not.toContain('Чужой план');
     expect(text).not.toContain('Уже подтверждена');
-    expect(text).not.toContain('○ 3 —');
-    expect(text).not.toContain('✓');
+    expect(text).not.toContain('◻️ 3 —');
+    expect(text).not.toContain('✅');
   });
 
   it('INV-24 смена таймзоны не переписывает выставленный канвас; новые сутки дают другое сообщение', async () => {
@@ -847,7 +847,7 @@ describe('канвас выставляется в топик', () => {
     expect(message.blocks.map((block) => visibleCanvas(block.text))).toEqual([
       'ПРОЕКТ: Альфа · 28.09',
       'Задачи',
-      '○ 1 — Классификация сигнала — 1-й день\nnormal · в план · отменить',
+      '◻️ 1 — Классификация сигнала — 1-й день\nnormal · в план · отменить',
     ]);
   });
 
