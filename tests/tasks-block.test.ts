@@ -61,13 +61,13 @@ function visible(text: CanvasRichText): string {
   if (typeof text === 'string') return text;
   if (Array.isArray(text)) return text.map(visible).join('');
   if (text.type === 'bold') return text.text;
-  if (text.type === 'bold') return text.text;
   return text.button.text;
 }
 
 function buttonsOf(text: CanvasRichText): CanvasTextButton[] {
   if (typeof text === 'string') return [];
   if (Array.isArray(text)) return text.flatMap(buttonsOf);
+  if (text.type === 'bold') return [];
   return [text];
 }
 

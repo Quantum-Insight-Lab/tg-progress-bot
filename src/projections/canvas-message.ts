@@ -95,7 +95,7 @@ function linkButton(label: string, callbackData: string): CanvasTextButton {
 }
 
 function paragraphText(pieces: readonly CanvasPiece[]): CanvasRichText {
-  const nodes: Array<string | CanvasTextButton> = [];
+  const nodes: Array<string | CanvasTextButton | CanvasBoldText> = [];
   let plain = '';
   let hasAction = false;
   const flush = (): void => {
