@@ -125,11 +125,12 @@ const backlog: CanvasMirrorIssue[] = [
 function visible(text: CanvasRichText): string {
   if (typeof text === 'string') return text;
   if (Array.isArray(text)) return text.map(visible).join('');
+  if (text.type === 'bold') return text.text;
   return text.button.text;
 }
 
 function linesOf(message: CanvasRichMessage): string[] {
-  return message.blocks.map((block) => visible(block.text));
+  return message.blocks.flatMap((block) => visible(block.text).split('\n'));
 }
 
 function painted(issues: readonly CanvasMirrorIssue[] = backlog): string[] {
@@ -154,9 +155,9 @@ function between(lines: readonly string[], heading: string, nextHeading: string 
 }
 
 const lines = painted();
-const done = between(lines, 'Сделано', 'В работе');
 const working = between(lines, 'В работе', 'Далее');
-const next = between(lines, 'Далее', null);
+const next = between(lines, 'Далее', 'Сделано');
+const done = between(lines, 'Сделано', null);
 
 describe('срез issues: assignees, связи, лимит', () => {
   it('R-151 У issue в «В работе» стоит имя assignee — пользователь бота по github_login', () => {

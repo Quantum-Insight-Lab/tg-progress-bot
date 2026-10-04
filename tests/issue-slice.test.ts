@@ -32,11 +32,12 @@ const next: SliceIssueLine[] = [
 function visible(text: CanvasRichText): string {
   if (typeof text === 'string') return text;
   if (Array.isArray(text)) return text.map(visible).join('');
+  if (text.type === 'bold') return text.text;
   return text.button.text;
 }
 
 function linesOf(message: CanvasRichMessage): string[] {
-  return message.blocks.map((block) => visible(block.text));
+  return message.blocks.flatMap((block) => visible(block.text).split('\n'));
 }
 
 function painted(): string[] {
@@ -60,7 +61,7 @@ describe('срез issues на канвасе', () => {
     expect(lines).toContain(SLICE_DONE_HEADING);
     expect(lines).toContain('Сделано');
     expect(lines.indexOf('Сделано')).toBeGreaterThan(0);
-    expect(lines.indexOf('Сделано')).toBeLessThan(lines.indexOf('В работе'));
+    expect(lines.indexOf('Сделано')).toBeGreaterThan(lines.indexOf('В работе'));
     expect(doneSliceParagraphs([])).toEqual([]);
     const empty = renderCanvas({
       projectName: 'Общественный сенсор',
@@ -77,7 +78,7 @@ describe('срез issues на канвасе', () => {
   it('R-117 «В работе»', () => {
     expect(lines).toContain(SLICE_IN_PROGRESS_HEADING);
     expect(lines).toContain('В работе');
-    expect(lines.indexOf('В работе')).toBeGreaterThan(lines.indexOf('Сделано'));
+    expect(lines.indexOf('В работе')).toBeLessThan(lines.indexOf('Сделано'));
     expect(lines.indexOf('В работе')).toBeLessThan(lines.indexOf('Далее'));
     expect(inProgressSliceParagraphs([])).toEqual([]);
   });

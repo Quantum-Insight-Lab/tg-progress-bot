@@ -74,6 +74,7 @@ const githubLine = 'GitHub org/sensor: CI зелёный · открытых PR 
 function visible(text: CanvasRichText): string {
   if (typeof text === 'string') return text;
   if (Array.isArray(text)) return text.map(visible).join('');
+  if (text.type === 'bold') return text.text;
   return text.button.text;
 }
 
@@ -219,7 +220,7 @@ describe('строка GitHub на канвасе', () => {
 
   it('R-182 строка GitHub показывает «репозиторий не подключён»', () => {
     expect(githubSectionParagraphs(null)).toEqual([
-      { pieces: [{ kind: 'text', text: GITHUB_LINE_DISCONNECTED }] },
+      { pieces: [{ kind: 'bold', text: GITHUB_LINE_DISCONNECTED }] },
     ]);
     expect(painted(null)).toEqual(['ПРОЕКТ: Общественный сенсор · 17.09', GITHUB_LINE_DISCONNECTED]);
     expect(painted(null).join('\n')).not.toContain('CI ');

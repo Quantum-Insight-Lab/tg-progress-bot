@@ -85,7 +85,9 @@ export function githubLineText(line: GithubLineView): string {
 
 /** Один абзац канваса. Пустой репозиторий сюда не передаётся. */
 export function githubLineParagraphs(line: GithubLineView): CanvasParagraph[] {
-  return [{ pieces: [{ kind: 'text', text: githubLineText(line) }] }];
+  const text = githubLineText(line);
+  const mark = 'GitHub';
+  return [{ pieces: [{ kind: 'bold', text: mark }, { kind: 'text', text: text.slice(mark.length) }] }];
 }
 
 /**
@@ -94,6 +96,6 @@ export function githubLineParagraphs(line: GithubLineView): CanvasParagraph[] {
  * Второго экрана со списками нет.
  */
 export function githubSectionParagraphs(line: GithubLineView | null): CanvasParagraph[] {
-  if (line === null) return [{ pieces: [{ kind: 'text', text: GITHUB_LINE_DISCONNECTED }] }];
+  if (line === null) return [{ pieces: [{ kind: 'bold', text: GITHUB_LINE_DISCONNECTED }] }];
   return githubLineParagraphs(line);
 }

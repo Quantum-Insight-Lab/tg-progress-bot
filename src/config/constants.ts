@@ -34,3 +34,5 @@ export const HOURS_PER_DAY = 24;
 export const UTC_OFFSET_WEST_HOURS = 12;
 /** C-17, самый восточный сдвиг, часы к востоку от UTC. */
 export const UTC_OFFSET_EAST_HOURS = 14;
+/** C-18, клеток в полоске доли на канвасе. */
+export const CANVAS_SHARE_CELLS = 10;

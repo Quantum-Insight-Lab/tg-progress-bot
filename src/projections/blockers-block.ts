@@ -1,4 +1,4 @@
-import type { CanvasParagraph } from './canvas-message.ts';
+import { canvasHeading, type CanvasParagraph } from './canvas-message.ts';
 
 /**
  * P-8. Блок «Блокеры» на канвасе.
@@ -65,7 +65,7 @@ export function blockersBlockParagraphs(block: BlockersBlock): CanvasParagraph[]
   if (block.defaultBranchCiRed) lines.push(BLOCKER_DEFAULT_BRANCH_CI);
   for (const pullRequest of block.pullRequests) lines.push(blockerPullRequestText(pullRequest));
   if (lines.length === 0) return [];
-  const paragraphs: CanvasParagraph[] = [{ pieces: [{ kind: 'text', text: BLOCKERS_BLOCK_HEADING }] }];
+  const paragraphs: CanvasParagraph[] = [canvasHeading(BLOCKERS_BLOCK_HEADING)];
   for (const text of lines) paragraphs.push({ pieces: [{ kind: 'text', text }] });
   return paragraphs;
 }

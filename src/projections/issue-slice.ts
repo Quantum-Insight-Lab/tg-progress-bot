@@ -1,5 +1,5 @@
 import { CANVAS_SLICE_SIZE } from '../config/constants.ts';
-import type { CanvasParagraph } from './canvas-message.ts';
+import { canvasHeading, type CanvasParagraph } from './canvas-message.ts';
 
 /**
  * P-5. Срез issues на канвасе: «Сделано», «В работе», «Далее».
@@ -93,7 +93,7 @@ function withPunctuation(lines: readonly string[]): string[] {
 
 function section(heading: string, lines: readonly string[]): CanvasParagraph[] {
   if (lines.length === 0) return [];
-  const paragraphs: CanvasParagraph[] = [{ pieces: [{ kind: 'text', text: heading }] }];
+  const paragraphs: CanvasParagraph[] = [canvasHeading(heading)];
   for (const line of withPunctuation(lines)) {
     paragraphs.push({ pieces: [{ kind: 'text', text: line }] });
   }

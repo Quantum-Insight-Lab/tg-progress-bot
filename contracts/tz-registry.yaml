@@ -1198,3 +1198,9 @@ atoms:
   # Кнопка выключения рассылки
   R-973: { kind: view, scope: R-033 }
   R-974: { kind: rule, scope: R-033 }
+
+  # Канвас: задачи сверху, GitHub в раскрывающемся блоке
+  R-975: { kind: view, scope: R-016 }
+  R-976: { kind: view, scope: R-001 }
+  R-977: { kind: view, scope: R-001 }
+  R-978: { kind: view, scope: R-001 }

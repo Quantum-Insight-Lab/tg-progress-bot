@@ -28,7 +28,7 @@ const taskParagraph = renderCanvasMessage([
 ]);
 
 function isButton(part: CanvasRichText): part is CanvasTextButton {
-  return typeof part !== 'string' && !Array.isArray(part);
+  return typeof part !== 'string' && !Array.isArray(part) && part.type === 'button';
 }
 
 function buttonsOf(message: CanvasRichMessage): CanvasTextButton[] {
@@ -39,6 +39,7 @@ function buttonsOf(message: CanvasRichMessage): CanvasTextButton[] {
       for (const part of text) walk(part);
       return;
     }
+    if (text.type === 'bold') return;
     found.push(text);
   };
   for (const block of message.blocks) walk(block.text);
@@ -183,11 +184,15 @@ function paragraph(text: string): CanvasParagraph {
   return { pieces: [{ kind: 'text', text }] };
 }
 
+function visibleLine(text: CanvasRichText): string {
+  if (typeof text === 'string') return text;
+  if (Array.isArray(text)) return text.map(visibleLine).join('');
+  if (text.type === 'bold') return text.text;
+  return text.button.text;
+}
+
 function linesOf(message: CanvasRichMessage): string[] {
-  return message.blocks.map((block) => {
-    if (typeof block.text !== 'string') throw new Error('абзац состава — текст');
-    return block.text;
-  });
+  return message.blocks.flatMap((block) => visibleLine(block.text).split('\n'));
 }
 
 const header = 'ПРОЕКТ: Общественный сенсор · 17.09';
@@ -234,14 +239,15 @@ describe('P-1 P-2 состав канваса и шапка', () => {
     const now = composedLines.indexOf('прямо сейчас: в работе');
     expect(share).toBeGreaterThan(0);
     expect(slice).toBeGreaterThan(share);
-    expect(now).toBeGreaterThan(slice);
+    expect(now).toBeGreaterThan(share);
+    expect(slice).toBeGreaterThan(now);
   });
 
   it('R-088 что делается прямо сейчас', () => {
     const issues = composedLines.indexOf('прямо сейчас: в работе');
     const tasks = composedLines.indexOf('прямо сейчас: задачи');
-    expect(issues).toBeGreaterThan(composedLines.indexOf('уже сделано: срез'));
-    expect(tasks).toBeGreaterThan(issues);
+    expect(tasks).toBeGreaterThan(composedLines.indexOf('уже сделано: доля'));
+    expect(issues).toBeGreaterThan(tasks);
     expect(tasks).toBeLessThan(composedLines.indexOf('мешает'));
   });
 
@@ -255,7 +261,7 @@ describe('P-1 P-2 состав канваса и шапка', () => {
     const ahead = composedLines.indexOf('следующий шаг: далее');
     const plan = composedLines.indexOf('следующий шаг: план');
     expect(ahead).toBeGreaterThan(composedLines.indexOf('прямо сейчас: в работе'));
-    expect(plan).toBeGreaterThan(ahead);
+    expect(plan).toBeLessThan(ahead);
     expect(plan).toBeLessThan(composedLines.indexOf('мешает'));
   });
 
@@ -263,13 +269,13 @@ describe('P-1 P-2 состав канваса и шапка', () => {
     expect(CANVAS_SECTION_ORDER).toEqual([
       'header',
       'backlog',
-      'person',
-      'done',
-      'inProgress',
-      'next',
       'tasks',
       'plan',
       'blockers',
+      'person',
+      'inProgress',
+      'next',
+      'done',
       'github',
       'divergence',
       'dynamics',
@@ -277,13 +283,13 @@ describe('P-1 P-2 состав канваса и шапка', () => {
     expect(composedLines).toEqual([
       header,
       'уже сделано: доля',
-      'человек',
-      'уже сделано: срез',
-      'прямо сейчас: в работе',
-      'следующий шаг: далее',
       'прямо сейчас: задачи',
       'следующий шаг: план',
       'мешает',
+      'человек',
+      'прямо сейчас: в работе',
+      'следующий шаг: далее',
+      'уже сделано: срез',
       'github',
       'расхождение',
       'динамика',
@@ -298,5 +304,26 @@ describe('P-1 P-2 состав канваса и шапка', () => {
       },
     });
     expect(linesOf(gap)).toEqual([header, 'уже сделано: срез', 'github']);
+  });
+
+  it('R-976 срез issues в раскрывающемся блоке, строка GitHub снаружи', () => {
+    const fold = composed.blocks.find((block) => block.type === 'expandable_blockquote');
+    expect(fold?.type).toBe('expandable_blockquote');
+    if (fold?.type !== 'expandable_blockquote') throw new Error('нет раскрывающегося блока');
+    const inside = visibleLine(fold.text);
+    expect(inside).toContain('человек');
+    expect(inside).toContain('уже сделано: срез');
+    expect(inside).not.toContain('github');
+    expect(inside).not.toContain('расхождение');
+    expect(inside).not.toContain('динамика');
+    const github = composed.blocks.find((block) => block.type === 'paragraph' && visibleLine(block.text) === 'github');
+    expect(github).toBeDefined();
+    const foldAt = composed.blocks.indexOf(fold);
+    const githubAt = github === undefined ? -1 : composed.blocks.indexOf(github);
+    expect(githubAt).toBeGreaterThan(foldAt);
+  });
+
+  it('R-977 заголовок шапки жирный', () => {
+    expect(composed.blocks[0]?.text).toEqual({ type: 'bold', text: header });
   });
 });

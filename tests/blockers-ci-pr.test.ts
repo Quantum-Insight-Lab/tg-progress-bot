@@ -83,6 +83,7 @@ const mirrorPullRequests = [borisRed, borisGreen, veraRed, stranger];
 function visible(text: CanvasRichText): string {
   if (typeof text === 'string') return text;
   if (Array.isArray(text)) return text.map(visible).join('');
+  if (text.type === 'bold') return text.text;
   return text.button.text;
 }
 
