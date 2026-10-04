@@ -176,7 +176,7 @@ describe('M-1 M-2 критерий успеха', () => {
     expect(calls.map((call) => call.method)).toEqual(['sendRichMessage']);
     expect(fieldsOf(calls[0]?.payload).message_thread_id).toBe(TOPIC_ID);
     expect(lines[0]).toBe(`ПРОЕКТ: ${PROJECT} · 17.09`);
-    expect(lines.join('\n')).toContain('Сделано по проекту:');
+    expect(lines.join('\n')).toContain('42% · осталось');
     expect(lines.join('\n')).toContain('Андрей по issues:');
     expect(lines).toContain(TASKS_BLOCK_HEADING);
     expect(lines.join('\n')).toContain(TODAY_TITLE);
@@ -188,7 +188,7 @@ describe('M-1 M-2 критерий успеха', () => {
   it('R-952 одно сообщение топика отвечает на пять вопросов сразу', async () => {
     const lines = await topicLines();
     const text = lines.join('\n');
-    const shareAt = text.indexOf('Сделано по проекту:');
+    const shareAt = text.indexOf('42% · осталось');
     const personAt = text.indexOf('Андрей по issues:');
     const tasksAt = text.indexOf(TASKS_BLOCK_HEADING);
     const blockersAt = text.indexOf(BLOCKERS_BLOCK_HEADING);
@@ -207,7 +207,7 @@ describe('M-1 M-2 критерий успеха', () => {
     expect(total).toBe(SHARE_TOTAL);
     const percent = Math.round((share.completed * 100) / total);
     const lines = await topicLines();
-    expect(lines.join('\n')).toContain(`Сделано по проекту: ${String(percent)}% · осталось ${String(share.remaining)} из ${String(total)}`);
+    expect(lines.join('\n')).toContain(`${String(percent)}% · осталось ${String(share.remaining)} из ${String(total)}`);
   });
 
   it('R-954 сколько issues осталось', async () => {
