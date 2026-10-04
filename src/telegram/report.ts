@@ -2,7 +2,6 @@ import type { Bot } from 'grammy';
 import type { ReportCommands, ReportDocument, ReportMessage } from '../domain/projects/deliver-report.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { dailyReport, type DailyReportView } from '../projections/daily-report.ts';
-import type { ReportBacklogShare } from '../projections/report-backlog-block.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
 
 /** Группа ещё не привязана — командного отчёта нет. */
@@ -11,27 +10,25 @@ export const REPORT_UNBOUND = 'Пока супергруппа не привяз
 /** Чужой группе отчёт не отдаём. */
 export const REPORT_ACCESS = 'Нет доступа.';
 
-const NO_SHARE: ReportBacklogShare = { completed: 0, remaining: 0, ratio: null };
-
 function viewOf(document: ReportDocument): DailyReportView {
   return {
     chatId: document.chatId,
     date: document.date,
     audience: document.audience,
     memberId: document.memberId,
-    shareAtStart: NO_SHARE,
-    shareAtEnd: NO_SHARE,
-    remainderAtEnd: null,
+    shareAtStart: document.shareAtStart,
+    shareAtEnd: document.shareAtEnd,
+    remainderAtEnd: document.remainderAtEnd,
     projects: document.projects.map((project) => ({
       chatId: project.chatId,
       memberIds: project.memberIds,
       backlog: {
         projectName: project.name,
-        shareAtStart: NO_SHARE,
-        shareAtEnd: NO_SHARE,
-        remainderAtEnd: null,
-        closed: [],
-        openedNew: [],
+        shareAtStart: project.backlog.shareAtStart,
+        shareAtEnd: project.backlog.shareAtEnd,
+        remainderAtEnd: project.backlog.remainderAtEnd,
+        closed: project.backlog.closed,
+        openedNew: project.backlog.openedNew,
         confirmedOn: [],
       },
       tasks: project.tasks,

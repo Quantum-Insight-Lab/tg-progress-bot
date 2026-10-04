@@ -12,6 +12,10 @@ import {
   readBlockersMigration,
   readChatsMigration,
   readEventsMigration,
+  readCiMirrorMigration,
+  readCommitsMigration,
+  readIssuesMigration,
+  readPullRequestsMigration,
   readMemberTopicMigration,
   readProjectMembersMigration,
   readProjectRepositoryMigration,
@@ -67,6 +71,10 @@ async function openDb(): Promise<{ db: Kysely<Database>; close: () => Promise<vo
   await pglite.exec(readMemberTopicMigration());
   await pglite.exec(readTasksMigration());
   await pglite.exec(readBlockersMigration());
+  await pglite.exec(readIssuesMigration());
+  await pglite.exec(readPullRequestsMigration());
+  await pglite.exec(readCiMirrorMigration());
+  await pglite.exec(readCommitsMigration());
   const db = new Kysely<Database>({
     dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
   });
@@ -426,5 +434,37 @@ describe('INV-25 строки отчёта считаются из фактов'
         ],
       }),
     );
+  });
+});
+
+describe('R-665 строка «Все проекты» берётся из issues репозитория', () => {
+  const opened: Fixture[] = [];
+
+  afterEach(async () => {
+    await Promise.all(opened.splice(0).map((item) => item.close()));
+  });
+
+  it('R-665 доля на начало и конец суток печатает «Все проекты», пустая заглушка её не съедает', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    now = new Date('2026-09-28T07:33:00.000Z');
+    await sql`
+      INSERT INTO repositories (id, owner, name) VALUES ('42', 'lab', 'bot')
+    `.execute(fixture.db);
+    await sql`
+      UPDATE projects SET repository_id = '42' WHERE id = ${fixture.alphaId}::uuid
+    `.execute(fixture.db);
+    await sql`
+      INSERT INTO issues (id, repository_id, issue_number, title, state, state_reason, updated_at, closed_at)
+      VALUES
+        ('00000000-0000-4000-8000-0000000000d1'::uuid, '42', 1, 'Старое', 'closed', 'completed', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'),
+        ('00000000-0000-4000-8000-0000000000d2'::uuid, '42', 2, 'Открытое', 'open', NULL, '2026-09-20T00:00:00.000Z', NULL),
+        ('00000000-0000-4000-8000-0000000000d3'::uuid, '42', 3, 'Закрыто сегодня', 'closed', 'completed', '2026-09-28T01:00:00.000Z', '2026-09-28T01:00:00.000Z')
+    `.execute(fixture.db);
+    const actions = createReportCommands(fixture.db, silentLogger, clock, renderReportDocuments);
+    const report = await replyToReportCommand({ type: 'private', id: String(rootAccount.id) }, rootAccount, 'share-line', actions);
+    expect(report?.text).toContain('Все проекты: 33% → 67% · осталось 1 из 3');
+    expect(report?.text).toContain('Бэклог: 33% → 67% · осталось 1 из 3');
+    expect(report?.text).toContain('Закрыто: #3 Закрыто сегодня');
   });
 });

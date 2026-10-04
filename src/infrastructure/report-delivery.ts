@@ -1,5 +1,7 @@
 import { sql, type Kysely } from 'kysely';
 import {
+  EMPTY_REPORT_SHARE,
+  emptyReportBacklog,
   groupReportCommand,
   privateReportCommand,
   publishReportSent,
@@ -10,11 +12,14 @@ import {
   REPORT_TRIGGER_SCHEDULE,
   scheduledReport,
   type ReportActor,
+  type ReportBacklogFacts,
   type ReportDocument,
   type ReportGroup,
   type ReportProjectFacts,
   type ReportProjectRef,
+  type ReportRemainderFact,
   type ReportRepositoryFacts,
+  type ReportShareFact,
   type ReportCommands,
   type ReportMessage,
   type ReportRenderer,
@@ -22,6 +27,8 @@ import {
   type ReportSender,
 } from '../domain/projects/deliver-report.ts';
 import { LEAD_ROLE, MEMBER_ROLE } from '../domain/projects/member.ts';
+import { BACKLOG_ISSUE_COMPLETED, BACKLOG_ISSUE_CLOSED, BACKLOG_ISSUE_OPEN } from '../domain/progress/backlog-share.ts';
+import { PERIOD_FACT_ISSUE, periodBacklog, type PeriodBacklog, type PeriodFact } from '../domain/progress/period-backlog.ts';
 import { periodTaskCounters, PERIOD_TASK_COUNTER_TASK, type PeriodTaskCounterTask } from '../domain/progress/period-tasks.ts';
 import { reportCurrent, REPORT_CURRENT_TASK } from '../domain/progress/report-current.ts';
 import { projectCalendarDate, projectDaysBetween } from '../domain/shared/project-time.ts';
@@ -387,22 +394,144 @@ function counterOf(task: TaskRow, events: readonly TaskEvent[], periodStart: Dat
   };
 }
 
+interface IssueMirrorRow {
+  id: string;
+  repository_id: string;
+  issue_number: number | string;
+  title: string;
+  state: string;
+  state_reason: string | null;
+  closed_at: Date | string | null;
+}
+
+function shareOf(completed: number, remaining: number): ReportShareFact {
+  const total = completed + remaining;
+  if (total < 1) return EMPTY_REPORT_SHARE;
+  return { completed, remaining, ratio: completed / total };
+}
+
+function combineBacklogs(parts: readonly PeriodBacklog[]): {
+  shareAtStart: ReportShareFact;
+  shareAtEnd: ReportShareFact;
+  remainderAtEnd: ReportRemainderFact | null;
+} {
+  let startCompleted = 0;
+  let startRemaining = 0;
+  let endCompleted = 0;
+  let endRemaining = 0;
+  for (const part of parts) {
+    startCompleted += part.shareAtStart.completed;
+    startRemaining += part.shareAtStart.remaining;
+    endCompleted += part.shareAtEnd.completed;
+    endRemaining += part.shareAtEnd.remaining;
+  }
+  const shareAtEnd = shareOf(endCompleted, endRemaining);
+  return {
+    shareAtStart: shareOf(startCompleted, startRemaining),
+    shareAtEnd,
+    remainderAtEnd: shareAtEnd.ratio === null ? null : { remaining: endRemaining, total: endCompleted + endRemaining },
+  };
+}
+
+function backlogFacts(period: PeriodBacklog): ReportBacklogFacts {
+  return {
+    shareAtStart: {
+      completed: period.shareAtStart.completed,
+      remaining: period.shareAtStart.remaining,
+      ratio: period.shareAtStart.ratio,
+    },
+    shareAtEnd: {
+      completed: period.shareAtEnd.completed,
+      remaining: period.shareAtEnd.remaining,
+      ratio: period.shareAtEnd.ratio,
+    },
+    remainderAtEnd: period.remainderAtEnd,
+    closed: period.closed.map((issue) => ({ number: issue.number, title: issue.title })),
+    openedNew: period.openedNew.map((issue) => ({ number: issue.number, title: issue.title })),
+  };
+}
+
+/** На начало суток issue, закрытый как сделанный внутри окна, был открыт. */
+function issueAtStart(row: IssueMirrorRow, periodStart: Date, periodEnd: Date): { state: string; stateReason: string | null } {
+  const end = { state: row.state, stateReason: row.state_reason };
+  if (row.state !== BACKLOG_ISSUE_CLOSED || row.state_reason !== BACKLOG_ISSUE_COMPLETED || row.closed_at === null) return end;
+  const closed = instantOf(row.closed_at);
+  if (closed >= periodStart && closed <= periodEnd) return { state: BACKLOG_ISSUE_OPEN, stateReason: null };
+  return end;
+}
+
+async function issuesTableReady(db: Kysely<Database>): Promise<boolean> {
+  const found = await sql<{ column_name: string }>`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'issues' AND column_name = 'issue_number'
+  `.execute(db);
+  return found.rows.length > 0;
+}
+
+async function backlogsByRepository(
+  db: Kysely<Database>,
+  repositoryIds: readonly string[],
+  periodStart: Date,
+  periodEnd: Date,
+): Promise<Map<string, PeriodBacklog>> {
+  const found = new Map<string, PeriodBacklog>();
+  if (repositoryIds.length === 0 || !(await issuesTableReady(db))) return found;
+  const rows = await db
+    .selectFrom('issues')
+    .select(['id', 'repository_id', 'issue_number', 'title', 'state', 'state_reason', 'closed_at'])
+    .where('repository_id', 'in', [...repositoryIds])
+    .execute();
+  const grouped = new Map<string, IssueMirrorRow[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.repository_id) ?? [];
+    list.push(row);
+    grouped.set(row.repository_id, list);
+  }
+  for (const repositoryId of repositoryIds) {
+    const facts: PeriodFact[] = (grouped.get(repositoryId) ?? []).map((row) => ({
+      kind: PERIOD_FACT_ISSUE,
+      key: row.id,
+      number: whole(row.issue_number),
+      title: row.title,
+      atStart: issueAtStart(row, periodStart, periodEnd),
+      atEnd: { state: row.state, stateReason: row.state_reason },
+    }));
+    found.set(repositoryId, periodBacklog(facts));
+  }
+  return found;
+}
+
 async function documentsOf(db: Kysely<Database>, sections: readonly ReportSection[], now: Date): Promise<ReportDocument[]> {
   const documents: ReportDocument[] = [];
   for (const section of sections) {
+    const loaded = await projectFacts(db, section, now);
     documents.push({
       chatId: section.chatId,
       date: section.date,
       audience: section.audience,
       memberId: section.memberId,
-      projects: await projectFacts(db, section, now),
+      shareAtStart: loaded.shareAtStart,
+      shareAtEnd: loaded.shareAtEnd,
+      remainderAtEnd: loaded.remainderAtEnd,
+      projects: loaded.projects,
     });
   }
   return documents;
 }
 
-async function projectFacts(db: Kysely<Database>, section: ReportSection, now: Date): Promise<ReportProjectFacts[]> {
-  if (section.projectIds.length === 0) return [];
+async function projectFacts(
+  db: Kysely<Database>,
+  section: ReportSection,
+  now: Date,
+): Promise<{
+  projects: ReportProjectFacts[];
+  shareAtStart: ReportShareFact;
+  shareAtEnd: ReportShareFact;
+  remainderAtEnd: ReportRemainderFact | null;
+}> {
+  if (section.projectIds.length === 0) {
+    return { projects: [], shareAtStart: EMPTY_REPORT_SHARE, shareAtEnd: EMPTY_REPORT_SHARE, remainderAtEnd: null };
+  }
   const rows = await sql<ProjectRow>`
     SELECT id::text AS id, name, timezone, chat_id::text AS chat_id, repository_id
     FROM projects
@@ -416,11 +545,13 @@ async function projectFacts(db: Kysely<Database>, section: ReportSection, now: D
   const names = await namesOf(db, [...new Set(tasks.map((task) => task.assignee_id))]);
   const repositoryIds = [...new Set(rows.rows.map((row) => row.repository_id).filter((id): id is string => id !== null))];
   const repositories = await repositoriesOf(db, repositoryIds, section.periodStart, section.periodEnd);
-  const zones = new Map(rows.rows.map((row) => [row.id, row.timezone]));
-  const divergence = await divergenceOn(db, section.projectIds, now, zones);
   const periodStart = new Date(section.periodStart);
   const periodEnd = new Date(section.periodEnd);
-  return refs.map((ref) => {
+  const backlogs = await backlogsByRepository(db, repositoryIds, periodStart, periodEnd);
+  const overall = combineBacklogs([...backlogs.values()]);
+  const zones = new Map(rows.rows.map((row) => [row.id, row.timezone]));
+  const divergence = await divergenceOn(db, section.projectIds, now, zones);
+  const projects = refs.map((ref) => {
     const row = rows.rows.find((item) => item.id === ref.id);
     const timezone = row?.timezone ?? 'UTC';
     const ownTasks = tasks.filter((task) => task.project_id === ref.id);
@@ -450,6 +581,7 @@ async function projectFacts(db: Kysely<Database>, section: ReportSection, now: D
           ? [...ref.memberIds, section.memberId]
           : ref.memberIds,
       tasks: counters,
+      backlog: repositoryId === null ? emptyReportBacklog() : backlogFacts(backlogs.get(repositoryId) ?? periodBacklog([])),
       now: current.now.map((task) => ({
         number: task.number,
         title: task.title,
@@ -467,6 +599,12 @@ async function projectFacts(db: Kysely<Database>, section: ReportSection, now: D
       repository: repositoryId === null ? null : (repositories.get(repositoryId) ?? null),
     };
   });
+  return {
+    projects,
+    shareAtStart: overall.shareAtStart,
+    shareAtEnd: overall.shareAtEnd,
+    remainderAtEnd: overall.remainderAtEnd,
+  };
 }
 
 async function commitReport(
