@@ -105,6 +105,13 @@ describe('строка доли и общий процент', () => {
     expect(almost[1]).toContain('98%');
   });
 
+  it('R-989 клетка закрашена, только если процент покрывает её целиком', () => {
+    expect(painted({ completed: 9, remaining: 91, ratio: 0.09 })[1]?.startsWith('░░░░░░░░░░ ')).toBe(true);
+    expect(painted({ completed: 10, remaining: 90, ratio: 0.1 })[1]?.startsWith('█░░░░░░░░░ ')).toBe(true);
+    expect(painted({ completed: 98, remaining: 2, ratio: 0.98 })[1]?.startsWith('█████████░ ')).toBe(true);
+    expect(painted({ completed: 100, remaining: 0, ratio: 1 })[1]?.startsWith('██████████ ')).toBe(true);
+  });
+
   it('R-109 «Сделано по проекту: 42%»', () => {
     const lines = painted(backlogShare(mockIssues));
     expect(lines[1]).toBe('████░░░░░░ 42% · осталось 18 из 31');

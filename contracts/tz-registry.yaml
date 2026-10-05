@@ -1214,3 +1214,15 @@ atoms:
   R-986: { kind: rule, scope: R-027 }
   R-987: { kind: act, scope: R-027 }
   R-988: { kind: rule, scope: R-027 }
+  R-989: { kind: view, scope: R-016 }
+  R-990: { kind: view, scope: R-001 }
+  R-991: { kind: view, scope: R-001 }
+  R-992: { kind: view, scope: R-001 }
+  R-993: { kind: view, scope: R-001 }
+  R-994: { kind: view, scope: R-001 }
+  R-995: { kind: view, scope: R-015 }
+  R-996: { kind: view, scope: R-015 }
+  R-997: { kind: view, scope: R-021 }
+  R-998: { kind: rule, scope: R-036 }
+  R-999: { kind: rule, scope: R-033 }
+  R-1000: { kind: rule, scope: R-033 }

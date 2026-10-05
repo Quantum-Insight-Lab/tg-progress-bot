@@ -400,6 +400,44 @@ describe('INV-27 рассылка живёт на группе и включен
     expect(again?.text).toBe(SCHEDULE_OFF);
     expect(await scheduleEvents(fixture.db, EVENT_TYPES.CHAT_SCHEDULE_CLEARED)).toHaveLength(1);
   });
+
+  it('R-999 при выключении рассылки таймзона остаётся', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    const actions = createChatSchedule(fixture.db, silentLogger, clock);
+    const before = await stored(fixture.db);
+    await actions.set({
+      telegramUserId: String(rootAccount.id),
+      projectName: 'Альфа',
+      dailyTime: '19:00',
+      chat: 'private',
+      idempotencyKey: 'set-keep-zone',
+    });
+    const cleared = await replyToClearSchedule('private', rootAccount, fixture.alphaId, 'clear-keep-zone', actions);
+    expect(cleared?.text).toBe(SCHEDULE_CLEARED);
+    const after = await stored(fixture.db);
+    expect(after.dailyCron).toBeNull();
+    expect(after.chatTimezone).toBe(before.chatTimezone);
+  });
+
+  it('R-1000 рассылку выключает корень', async () => {
+    const fixture = await seed(true);
+    opened.push(fixture);
+    const actions = createChatSchedule(fixture.db, silentLogger, clock);
+    await actions.set({
+      telegramUserId: String(rootAccount.id),
+      projectName: 'Альфа',
+      dailyTime: '19:00',
+      chat: 'private',
+      idempotencyKey: 'set-root-only',
+    });
+    const denied = await replyToClearSchedule('private', veraAccount, fixture.alphaId, 'clear-lead', actions);
+    expect(denied?.text).toBe(SCHEDULE_CLEAR_ROOT);
+    expect((await stored(fixture.db)).dailyCron).toBe('19:00');
+    const cleared = await replyToClearSchedule('private', rootAccount, fixture.alphaId, 'clear-root-only', actions);
+    expect(cleared?.text).toBe(SCHEDULE_CLEARED);
+    expect((await stored(fixture.db)).dailyCron).toBeNull();
+  });
 });
 
 describe('INV-22 повтор расписания не применяется второй раз', () => {
