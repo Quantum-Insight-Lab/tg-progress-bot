@@ -1226,3 +1226,5 @@ atoms:
   R-998: { kind: rule, scope: R-036 }
   R-999: { kind: rule, scope: R-033 }
   R-1000: { kind: rule, scope: R-033 }
+  R-1001: { kind: view, scope: R-022 }
+  R-1002: { kind: view, scope: R-022 }
