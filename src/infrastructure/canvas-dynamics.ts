@@ -46,7 +46,7 @@ export async function loadCanvasDynamics(
   db: Kysely<Database>,
   projectId: string,
   canvasDate: string,
-): Promise<RecordedSnapshot[]> {
+): Promise<readonly RecordedSnapshot[]> {
   if (!(await tablePresent(db, 'progress_snapshots'))) return [];
   const points = dynamicsAt(await loadProgressDynamics(db, projectId), dynamicsSampleDates(canvasDate));
   const repositoryId = await repositoryOf(db, projectId);

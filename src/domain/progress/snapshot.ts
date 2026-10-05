@@ -159,7 +159,7 @@ export function dynamicsSampleDates(anchor: string): string[] {
 export function canvasDynamicsPoints(
   repositoryId: string | null,
   points: readonly RecordedSnapshot[],
-): RecordedSnapshot[] {
+): readonly RecordedSnapshot[] {
   if (repositoryId === null || repositoryId.trim().length === 0) return [];
   return points;
 }
