@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   PERSON_PLACE_READ,
+  PERSON_PLACE_ABSENT,
   PERSON_PLACE_SLICE,
   PERSON_PLACE_UNMATCHED,
   personBacklogPlace,
@@ -76,7 +77,8 @@ describe('место человека в бэклоге', () => {
   it('INV-14 без логина среза нет, задачи при этом переходят как обычно', () => {
     expect(personBacklogPlace(null, repositoryId, backlog)).toEqual({ kind: PERSON_PLACE_UNMATCHED });
     expect(personBacklogPlace('   ', repositoryId, backlog)).toEqual({ kind: PERSON_PLACE_UNMATCHED });
-    expect(personBacklogPlace('ann', null, [])).toEqual({ kind: PERSON_PLACE_SLICE, done: [], now: [], next: [] });
+    expect(personBacklogPlace('ann', null, [])).toEqual({ kind: PERSON_PLACE_ABSENT });
+    expect(personBacklogPlace(null, null, [])).toEqual({ kind: PERSON_PLACE_ABSENT });
     const move = transitionTask(TASK_STATUS_IN_PROGRESS, TASK_TRANSITION_CHECK);
     expect(move.from).toBe(TASK_STATUS_IN_PROGRESS);
     expect(move.to).toBe('REVIEW');

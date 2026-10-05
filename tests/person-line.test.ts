@@ -1,7 +1,13 @@
 import { PGlite } from '@electric-sql/pglite';
 import { Kysely, PGliteDialect, sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
-import { PERSON_PLACE_SLICE, PERSON_PLACE_UNMATCHED, personBacklogPlace, type PersonBacklogIssue } from '../src/domain/progress/person-place.ts';
+import {
+  PERSON_PLACE_ABSENT,
+  PERSON_PLACE_SLICE,
+  PERSON_PLACE_UNMATCHED,
+  personBacklogPlace,
+  type PersonBacklogIssue,
+} from '../src/domain/progress/person-place.ts';
 import type { Database } from '../src/infrastructure/database.ts';
 import { assumeJournalRole } from '../src/infrastructure/db.ts';
 import {
@@ -19,8 +25,9 @@ import {
   personLineFromPlace,
   personLineParagraphs,
 } from '../src/projections/person-line.ts';
+import { GITHUB_LINE_DISCONNECTED, githubSectionParagraphs } from '../src/projections/github-line.ts';
 import { prepareCanvasMessage } from '../src/telegram/canvas-fit.ts';
-import type { CanvasRichText } from '../src/projections/canvas-message.ts';
+import type { CanvasRichMessage, CanvasRichText } from '../src/projections/canvas-message.ts';
 
 const repositoryId = '11';
 const stranger = 'stranger';
@@ -70,6 +77,10 @@ function visible(text: CanvasRichText): string {
   return text.button.text;
 }
 
+function linesOf(message: CanvasRichMessage): string[] {
+  return message.blocks.map((block) => visible(block.text));
+}
+
 function painted(person: { name: string; place: ReturnType<typeof personBacklogPlace> }): string[] {
   const prepared = prepareCanvasMessage({
     projectName: 'Общественный сенсор',
@@ -77,7 +88,7 @@ function painted(person: { name: string; place: ReturnType<typeof personBacklogP
     sections: { person: personLineParagraphs(personLineFromPlace(person)) },
   });
   if (prepared.status !== 'ready') throw new Error('канвас не собрался');
-  return prepared.message.blocks.map((block) => visible(block.text));
+  return linesOf(prepared.message);
 }
 
 const personLine = 'Андрей по issues: сделал 4 · сейчас на нём 2 · дальше в репозитории 16';
@@ -131,10 +142,43 @@ describe('строка человека на канвасе', () => {
     );
     const empty = painted({
       name: 'Андрей',
-      place: personBacklogPlace('andrey', null, []),
+      place: personBacklogPlace('andrey', repositoryId, []),
     });
     expect(empty[1]).toBe('Андрей по issues: сделал 0 · сейчас на нём 0 · дальше в репозитории 0');
     expect(empty[1]).not.toBe(PERSON_LINE_UNMATCHED);
+  });
+
+  it('R-979 без репозитория строка человека не печатается', async () => {
+    const handle = await openDb();
+    opened.push(handle);
+    await seed(handle.db);
+
+    const withLogin = await loadCanvasPerson(handle.db, bareProjectId, andreyId);
+    expect(withLogin.place).toEqual({ kind: PERSON_PLACE_ABSENT });
+    await sql`UPDATE users SET github_login = NULL WHERE id = ${andreyId}::uuid`.execute(handle.db);
+    const withoutLogin = await loadCanvasPerson(handle.db, bareProjectId, andreyId);
+    expect(withoutLogin.place).toEqual({ kind: PERSON_PLACE_ABSENT });
+
+    for (const person of [withLogin, withoutLogin]) {
+      const prepared = prepareCanvasMessage({
+        projectName: 'Пустой',
+        canvasDate: '2026-09-17',
+        sections: {
+          person: personLineParagraphs(personLineFromPlace(person)),
+          github: githubSectionParagraphs(null),
+        },
+      });
+      if (prepared.status !== 'ready') throw new Error('канвас не собрался');
+      expect(prepared.message.blocks.some((block) => block.type === 'expandable_blockquote')).toBe(false);
+      const text = linesOf(prepared.message).join('\n');
+      expect(text).not.toContain('по issues');
+      expect(text).not.toContain('сделал');
+      expect(text).not.toContain(PERSON_LINE_UNMATCHED);
+      expect(text).toContain(GITHUB_LINE_DISCONNECTED);
+    }
+
+    const connected = painted({ name: 'Андрей', place: personBacklogPlace('andrey', repositoryId, []) });
+    expect(connected[1]).toBe('Андрей по issues: сделал 0 · сейчас на нём 0 · дальше в репозитории 0');
   });
 
   it('R-890 срез 3.4 строится по логинам issue_assignees', async () => {
@@ -162,8 +206,8 @@ describe('строка человека на канвасе', () => {
 
     await sql`UPDATE users SET github_login = 'andrey' WHERE id = ${andreyId}::uuid`.execute(handle.db);
     const bare = await loadCanvasPerson(handle.db, bareProjectId, andreyId);
-    expect(bare.place).toEqual({ kind: PERSON_PLACE_SLICE, done: [], now: [], next: [] });
-    expect(painted(bare)[1]).toBe('Андрей по issues: сделал 0 · сейчас на нём 0 · дальше в репозитории 0');
+    expect(bare.place).toEqual({ kind: PERSON_PLACE_ABSENT });
+    expect(painted(bare)).toEqual(['ПРОЕКТ: Общественный сенсор · 17.09']);
   });
 });
 
