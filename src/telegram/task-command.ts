@@ -1,5 +1,5 @@
-import type { Bot } from 'grammy';
-import type { TaskCreation } from '../domain/tasks/create-task.ts';
+import { InlineKeyboard, type Bot } from 'grammy';
+import type { CreatedTask, OpenedTask, TaskCreation, TaskProjectChoice } from '../domain/tasks/create-task.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
@@ -10,8 +10,42 @@ export const TASK_OWN_TOPIC = 'Задачу заводят командой /tas
 /** Команда есть, формулировки нет — названия не из чего взять. */
 export const TASK_NEEDS_TITLE = 'После /task нужна формулировка: она станет названием.';
 
+/** В топике несколько проектов этого человека: задачу пишет кнопка. */
+export const TASK_PICK_PROJECT = 'Куда записать задачу?';
+
+const BUTTON_TEXT_LIMIT = 64;
+const PROJECT_DATA = /^tp:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+
+/** Ответ с кнопками проектов. Формулировка остаётся в команде, на которую отвечаем. */
+export interface TaskProjectScreen {
+  text: string;
+  projects: readonly TaskProjectChoice[];
+}
+
 export function taskCreatedReply(number: number, title: string): string {
   return `Задача ${number}. ${title}`;
+}
+
+export function taskProjectData(projectId: string): string {
+  return `tp:${projectId}`;
+}
+
+export function parseTaskProjectData(data: string): string | null {
+  return PROJECT_DATA.exec(data)?.[1] ?? null;
+}
+
+function buttonLabel(name: string): string {
+  return name.length > BUTTON_TEXT_LIMIT ? name.slice(0, BUTTON_TEXT_LIMIT) : name;
+}
+
+/** Кнопка на каждый проект топика. Подпись — имя проекта. */
+export function taskProjectKeyboard(projects: readonly TaskProjectChoice[]): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  projects.forEach((project, index) => {
+    if (index > 0) keyboard.row();
+    keyboard.text(buttonLabel(project.name), taskProjectData(project.projectId));
+  });
+  return keyboard;
 }
 
 /**
@@ -71,9 +105,30 @@ export function canvasRedrawFailure(error: unknown): 'duplicate' | 'full' | null
   return error.code === DOMAIN_ERROR.CANVAS_DUPLICATE ? 'duplicate' : 'full';
 }
 
+async function finishCreated(
+  created: CreatedTask,
+  idempotencyKey: string,
+  canvas: CanvasRedraw | undefined,
+): Promise<string> {
+  if (canvas !== undefined) {
+    await canvas.redraw({
+      projectId: created.task.projectId,
+      assigneeId: created.task.assigneeId,
+      causationId: created.eventId,
+      cause: idempotencyKey,
+    });
+  }
+  return taskCreatedReply(created.task.number, created.task.title);
+}
+
+function screenOf(opened: Extract<OpenedTask, { kind: 'choose' }>): TaskProjectScreen {
+  return { text: TASK_PICK_PROJECT, projects: opened.projects };
+}
+
 /**
  * Команда в топике заводит задачу и возвращает ответ.
  * Чужой топик, личка и пустая формулировка задачу не пишут.
+ * Несколько своих проектов в топике задачу не пишут: ответ — кнопки.
  */
 export async function replyToTaskCommand(
   place: TaskCommandPlace,
@@ -82,10 +137,10 @@ export async function replyToTaskCommand(
   title: string,
   actions: TaskCreation,
   canvas?: CanvasRedraw,
-): Promise<string | null> {
+): Promise<string | TaskProjectScreen | null> {
   if (from === undefined || from.is_bot) return null;
   try {
-    const created = await actions.create({
+    const opened = await actions.open({
       telegramUserId: String(from.id),
       chat: place.type ?? '',
       telegramChatId: place.id ?? '',
@@ -93,15 +148,37 @@ export async function replyToTaskCommand(
       title,
       idempotencyKey,
     });
-    if (canvas !== undefined) {
-      await canvas.redraw({
-        projectId: created.task.projectId,
-        assigneeId: created.task.assigneeId,
-        causationId: created.eventId,
-        cause: idempotencyKey,
-      });
-    }
-    return taskCreatedReply(created.task.number, created.task.title);
+    if (opened.kind === 'choose') return screenOf(opened);
+    return finishCreated({ task: opened.task, eventId: opened.eventId }, idempotencyKey, canvas);
+  } catch (error) {
+    if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
+    if (!(error instanceof DomainError)) throw error;
+    return replyOf(error);
+  }
+}
+
+/** Кнопка проекта дописывает задачу той команды `/task`, которая уже назвала формулировку. */
+export async function replyToTaskProject(
+  place: TaskCommandPlace,
+  from: TelegramAccount | undefined,
+  idempotencyKey: string,
+  title: string,
+  projectId: string,
+  actions: TaskCreation,
+  canvas?: CanvasRedraw,
+): Promise<string | null> {
+  if (from === undefined || from.is_bot) return null;
+  try {
+    const created = await actions.pick({
+      telegramUserId: String(from.id),
+      chat: place.type ?? '',
+      telegramChatId: place.id ?? '',
+      topicId: place.topicId ?? null,
+      title,
+      projectId,
+      idempotencyKey,
+    });
+    return finishCreated(created, idempotencyKey, canvas);
   } catch (error) {
     if (error instanceof DomainError) await noteCommandRejection(error, idempotencyKey, String(from.id));
     if (!(error instanceof DomainError)) throw error;
@@ -127,6 +204,50 @@ export function attachTaskCommand(bot: Bot, actions: TaskCreation, canvas?: Canv
       actions,
       canvas,
     );
-    if (reply !== null) await ctx.reply(reply);
+    if (reply === null) return;
+    if (typeof reply === 'string') {
+      await ctx.reply(reply);
+      return;
+    }
+    const messageId = ctx.message?.message_id;
+    await ctx.reply(reply.text, {
+      reply_markup: taskProjectKeyboard(reply.projects),
+      ...(messageId === undefined ? {} : { reply_parameters: { message_id: messageId } }),
+    });
+  });
+  bot.callbackQuery(/^tp:/, async (ctx) => {
+    traceHandler('task-project');
+    const projectId = parseTaskProjectData(ctx.callbackQuery.data);
+    const from = ctx.from;
+    const message = ctx.callbackQuery.message;
+    const quoted = message !== undefined && 'reply_to_message' in message ? message.reply_to_message : undefined;
+    const quotedText = quoted !== undefined && 'text' in quoted ? quoted.text : undefined;
+    const title = quotedText === undefined ? null : parseTaskCommand(quotedText);
+    const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+    let notice: { text: string } | undefined;
+    try {
+      if (projectId === null || title === null || from.is_bot) return;
+      const reply = await replyToTaskProject(
+        {
+          type: ctx.chat?.type,
+          id: ctx.chat === undefined ? undefined : String(ctx.chat.id),
+          topicId,
+        },
+        from,
+        ctx.callbackQuery.id,
+        title,
+        projectId,
+        actions,
+        canvas,
+      );
+      if (reply === TASK_NEEDS_TITLE || reply === CANVAS_FULL_REPLY) notice = { text: reply };
+      else if (typeof reply === 'string' && reply !== TASK_OWN_TOPIC) await ctx.reply(reply);
+    } catch (error) {
+      const failure = canvasRedrawFailure(error);
+      if (failure === null) throw error;
+      if (failure === 'full') notice = { text: CANVAS_FULL_REPLY };
+    } finally {
+      await ctx.answerCallbackQuery(notice);
+    }
   });
 }

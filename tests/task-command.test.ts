@@ -43,10 +43,14 @@ import { createUserRegistration } from '../src/infrastructure/users.ts';
 import { readProcessConfig, startProcess, type RunningProcess } from '../src/process.ts';
 import {
   parseTaskCommand,
+  parseTaskProjectData,
   replyToTaskCommand,
+  replyToTaskProject,
   TASK_NEEDS_TITLE,
   TASK_OWN_TOPIC,
+  TASK_PICK_PROJECT,
   taskCreatedReply,
+  taskProjectKeyboard,
 } from '../src/telegram/task-command.ts';
 import { TELEGRAM_WEBHOOK_PATH } from '../src/telegram/webhook.ts';
 import { testBotInfo } from './bot-info.ts';
@@ -289,7 +293,7 @@ describe('команда /task в топике исполнителя', () => {
     expect(formulation).toContain('github.com');
     expect(formulation).toContain('#12');
 
-    const lead: TopicOwner = { projectId: 'project-1', userId: 'user-vera', role: TASK_ASSIGNEE_LEAD };
+    const lead: TopicOwner = { projectId: 'project-1', userId: 'user-vera', name: 'Альфа', role: TASK_ASSIGNEE_LEAD };
     const stranger = fakeStore([lead]);
     const journal = memoryJournal();
     await expect(
@@ -305,7 +309,7 @@ describe('команда /task в топике исполнителя', () => {
     ).rejects.toMatchObject({ code: DOMAIN_ERROR.TASK_PLACE });
     expect(stranger.tasks).toEqual([]);
 
-    const viewer = fakeStore([{ projectId: 'project-1', userId: 'user-boris', role: 'viewer' }]);
+    const viewer = fakeStore([{ projectId: 'project-1', userId: 'user-boris', name: 'Альфа', role: 'viewer' }]);
     await expect(
       createTask(viewer.store, journal.journal, clock, {
         id: 'task-viewer',
@@ -632,5 +636,72 @@ describe('бот заводит задачу по /task', () => {
     const stored = await tasksOf(fixture.db);
     expect(stored.map((task) => task.title)).toEqual(['Сверстать отчёт']);
     expect(stored[0]?.assigneeId).toBe(fixture.borisId);
+  });
+
+  it('R-980 R-981 в одном топике несколько канвасов: задача появляется после кнопки проекта', async () => {
+    const fixture = await seed();
+    opened.push(fixture);
+    const membership = createMembership(fixture.db, silentLogger, clock);
+    await membership.add({
+      telegramUserId: String(rootAccount.id),
+      projectId: fixture.betaId,
+      targetTelegramUserId: String(borisAccount.id),
+      chat: 'private',
+      idempotencyKey: 'add-boris-beta',
+    });
+    await createChatBinding(fixture.db, silentLogger, clock).confirm({
+      telegramUserId: String(rootAccount.id),
+      projectId: fixture.betaId,
+      offer: forumAdmin,
+      idempotencyKey: 'bind-beta',
+    });
+    await sql`
+      UPDATE project_members
+      SET topic_id = ${borisTopic}
+      WHERE user_id = ${fixture.borisId}::uuid AND project_id = ${fixture.betaId}::uuid
+    `.execute(fixture.db);
+
+    const actions = createTaskActions(fixture.db, silentLogger, clock);
+    const offered = await replyToTaskCommand(place(borisTopic), borisAccount, '501', formulation, actions);
+    expect(offered).not.toBe(TASK_OWN_TOPIC);
+    if (offered === null || typeof offered === 'string') throw new Error('кнопок нет');
+    expect(offered.text).toBe(TASK_PICK_PROJECT);
+    expect(offered.projects).toEqual([
+      { projectId: fixture.alphaId, name: 'Альфа' },
+      { projectId: fixture.betaId, name: 'Бета' },
+    ]);
+    const rows = taskProjectKeyboard(offered.projects).inline_keyboard;
+    expect(rows.map((row) => row[0]?.text)).toEqual(['Альфа', 'Бета']);
+    const betaButton = rows[1]?.[0];
+    if (betaButton === undefined || !('callback_data' in betaButton)) throw new Error('кнопки нет');
+    expect(parseTaskProjectData(betaButton.callback_data)).toBe(fixture.betaId);
+    expect(await tasksOf(fixture.db)).toEqual([]);
+    expect(await createdEvents(fixture.db)).toEqual([]);
+
+    const redraws: string[] = [];
+    const title = parseTaskCommand(`/task ${formulation}`);
+    const created = await replyToTaskProject(
+      place(borisTopic),
+      borisAccount,
+      'cb-beta',
+      title ?? '',
+      fixture.betaId,
+      actions,
+      {
+        async redraw(input) {
+          redraws.push(input.projectId);
+        },
+      },
+    );
+    expect(created).toBe(taskCreatedReply(1, formulation));
+    const tasks = await tasksOf(fixture.db);
+    expect(tasks.map((task) => ({ projectId: task.projectId, title: task.title }))).toEqual([
+      { projectId: fixture.betaId, title: formulation },
+    ]);
+    expect(redraws).toEqual([fixture.betaId]);
+
+    const stolen = await replyToTaskProject(place(borisTopic), veraAccount, 'cb-vera', formulation, fixture.alphaId, actions);
+    expect(stolen).toBe(TASK_OWN_TOPIC);
+    expect(await tasksOf(fixture.db)).toHaveLength(1);
   });
 });

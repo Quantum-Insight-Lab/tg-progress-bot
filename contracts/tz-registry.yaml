@@ -1205,3 +1205,12 @@ atoms:
   R-977: { kind: view, scope: R-001 }
   R-978: { kind: view, scope: R-001 }
   R-979: { kind: view, scope: R-015 }
+  R-980: { kind: rule, scope: R-042 }
+  R-981: { kind: act, scope: R-027 }
+  R-982: { kind: rule, scope: R-042 }
+  R-983: { kind: rule, scope: R-042 }
+  R-984: { kind: rule, scope: R-027 }
+  R-985: { kind: act, scope: R-027 }
+  R-986: { kind: rule, scope: R-027 }
+  R-987: { kind: act, scope: R-027 }
+  R-988: { kind: rule, scope: R-027 }
