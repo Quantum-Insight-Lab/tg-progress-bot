@@ -34,7 +34,9 @@ import {
 } from '../domain/tasks/review-task.ts';
 import {
   createTask as decideCreate,
+  openTask as decideOpen,
   type CreatedTask,
+  type OpenedTask,
   type TaskCreation,
   type TaskDraft,
   type TaskStore,
@@ -55,6 +57,7 @@ import { publishBlockerDetected, type BlockerDetectStore } from '../domain/tasks
 import type { TaskPriority } from '../domain/tasks/status.ts';
 import { defineTask, type Task } from '../domain/tasks/task.ts';
 import { closesBlockerOnExit } from '../domain/tasks/transition.ts';
+import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import type { Logger } from '../domain/shared/logger.ts';
 import type { Database } from './database.ts';
@@ -73,7 +76,7 @@ function storeOf(trx: Transaction<Database>): TaskStore {
         .selectFrom('project_members')
         .innerJoin('projects', 'projects.id', 'project_members.project_id')
         .innerJoin('chats', 'chats.id', 'projects.chat_id')
-        .select(['project_members.project_id', 'project_members.user_id', 'project_members.role'])
+        .select(['project_members.project_id', 'project_members.user_id', 'project_members.role', 'projects.name'])
         .where('chats.telegram_chat_id', '=', telegramChatId)
         .where('project_members.topic_id', '=', String(topicId))
         .orderBy('project_members.id')
@@ -81,6 +84,7 @@ function storeOf(trx: Transaction<Database>): TaskStore {
       const owners: TopicOwner[] = rows.map((row) => ({
         projectId: row.project_id,
         userId: row.user_id,
+        name: row.name,
         role: row.role,
       }));
       return owners;
@@ -565,7 +569,23 @@ export function createBlockerAnswerActions(db: Kysely<Database>, logger: Logger,
   };
 }
 
-/** `/task`: строка `tasks` и `task.created` коммитятся одной транзакцией. */
+function taskInput(trx: Transaction<Database>, input: TaskDraft, projectId?: string) {
+  return findSender(trx, input.telegramUserId).then((sender) => {
+    const task = {
+      id: randomUUID(),
+      title: input.title,
+      sender,
+      chat: input.chat,
+      telegramChatId: input.telegramChatId,
+      topicId: input.topicId,
+      idempotencyKey: input.idempotencyKey,
+    };
+    if (projectId === undefined) return task;
+    return { ...task, projectId };
+  });
+}
+
+/** `/task`: строка `tasks` и `task.created` коммитятся одной транзакцией. Несколько проектов запись откладывают до кнопки. */
 export function createTaskActions(db: Kysely<Database>, logger: Logger, clock: Clock): TaskCreation {
   return {
     create(input: TaskDraft): Promise<CreatedTask> {
@@ -580,6 +600,20 @@ export function createTaskActions(db: Kysely<Database>, logger: Logger, clock: C
           topicId: input.topicId,
           idempotencyKey: input.idempotencyKey,
         });
+      });
+    },
+    open(input: TaskDraft): Promise<OpenedTask> {
+      return db.transaction().execute(async (trx) =>
+        decideOpen(storeOf(trx), createEventJournal(trx, logger), clock, await taskInput(trx, input)),
+      );
+    },
+    pick(input: TaskDraft & { projectId: string }): Promise<CreatedTask> {
+      return db.transaction().execute(async (trx) => {
+        const opened = await decideOpen(storeOf(trx), createEventJournal(trx, logger), clock, await taskInput(trx, input, input.projectId));
+        if (opened.kind === 'choose') {
+          throw new DomainError(DOMAIN_ERROR.TASK_AMBIGUOUS, 'топик совпал у нескольких проектов');
+        }
+        return { task: opened.task, eventId: opened.eventId };
       });
     },
   };

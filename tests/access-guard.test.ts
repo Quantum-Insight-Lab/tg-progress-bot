@@ -210,6 +210,8 @@ function bodyFor(handler: GuardedHandler, updateId: number, account: { id: numbe
       return messageBody(updateId, account, `${PROJECT_REPOSITORY_HEADING}\nАльфа`);
     case 'task':
       return messageBody(updateId, account, '/task Секрет', true);
+    case 'task-project':
+      return callbackBody(updateId, account, 'tp:00000000-0000-4000-8000-000000000010');
     case 'task-mark':
       return callbackBody(updateId, account, 'task:mark:1');
     case 'task-plan':
@@ -299,6 +301,7 @@ describe('INV-16 guard на входе всех обработчиков', () =>
     const spoken = new Set<GuardedHandler>([
       'chat-binding',
       'task',
+      'task-project',
       'task-mark',
       'task-plan',
       'task-review',

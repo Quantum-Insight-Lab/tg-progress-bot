@@ -124,6 +124,24 @@ const CASES: Record<GuardedHandler, HandlerCase> = {
     refusal: DOMAIN_ERROR.PROJECT_REPOSITORY_ACTOR,
   },
   task: { update: (id, from) => command(id, from, 'topic', '/task Секрет'), refusal: DOMAIN_ERROR.TASK_ASSIGNEE_ROLE },
+  'task-project': {
+    update: (id, from) => {
+      const update = callback(id, from, 'topic', `tp:${PROJECT_ID}`);
+      const query = update.callback_query;
+      if (query?.message !== undefined && 'text' in query.message) {
+        Object.assign(query.message, {
+          reply_to_message: {
+            message_id: 2,
+            date: 1700000000,
+            chat: query.message.chat,
+            text: '/task Секрет',
+          },
+        });
+      }
+      return update;
+    },
+    refusal: DOMAIN_ERROR.TASK_ASSIGNEE_ROLE,
+  },
   'task-mark': { update: (id, from) => callback(id, from, 'topic', 'task:mark:1'), refusal: DOMAIN_ERROR.TASK_MARK_ACTOR },
   'task-plan': { update: (id, from) => callback(id, from, 'topic', 'task:plan:1'), refusal: DOMAIN_ERROR.TASK_PLAN_ACTOR },
   'task-review': { update: (id, from) => callback(id, from, 'topic', 'task:confirm:1'), refusal: DOMAIN_ERROR.TASK_CONFIRM_ACTOR },

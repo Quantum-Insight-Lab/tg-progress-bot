@@ -15,6 +15,7 @@ export const GUARDED_HANDLERS = [
   'installation-repositories',
   'project-repository',
   'task',
+  'task-project',
   'task-mark',
   'task-plan',
   'task-review',

@@ -104,7 +104,7 @@ describe('задача не связана с GitHub ни текстом, ни �
     expect(parseTaskCommand(`/task ${formulation}`)).toBe(formulation);
     expect(parseTaskCommand('/task #12')).toBe('#12');
 
-    const owner: TopicOwner = { projectId, userId, role: TASK_ASSIGNEE_MEMBER };
+    const owner: TopicOwner = { projectId, userId, name: 'Альфа', role: TASK_ASSIGNEE_MEMBER };
     const placed = fakeStore([owner]);
     const journal = memoryJournal();
     const created = await createTask(placed.store, journal.journal, clock, {
@@ -141,7 +141,7 @@ describe('задача не связана с GitHub ни текстом, ни �
   });
 
   it('INV-04 чужой топик задачу ему не создаёт, шага «выберите issue» нет', async () => {
-    const owner: TopicOwner = { projectId, userId, role: TASK_ASSIGNEE_MEMBER };
+    const owner: TopicOwner = { projectId, userId, name: 'Альфа', role: TASK_ASSIGNEE_MEMBER };
     const placed = fakeStore([owner]);
     const journal = memoryJournal();
     await expect(
