@@ -306,6 +306,30 @@ describe('P-1 P-2 состав канваса и шапка', () => {
     expect(linesOf(gap)).toEqual([header, 'уже сделано: срез', 'github']);
   });
 
+  it('R-990 блок свёрнут, пока его не раскрыли', () => {
+    expect(composed.blocks.some((block) => block.type === 'expandable_blockquote')).toBe(true);
+  });
+
+  it('R-991 первая строка блока — строка человека, она видна и свёрнутым', () => {
+    const fold = composed.blocks.find((block) => block.type === 'expandable_blockquote');
+    if (fold?.type !== 'expandable_blockquote') throw new Error('нет раскрывающегося блока');
+    expect(visibleLine(fold.text).split('\n')[0]).toBe('человек');
+  });
+
+  it('R-993 строка GitHub, расхождение и динамика под блоком и видны сразу', () => {
+    const fold = composed.blocks.find((block) => block.type === 'expandable_blockquote');
+    if (fold?.type !== 'expandable_blockquote') throw new Error('нет раскрывающегося блока');
+    const inside = visibleLine(fold.text);
+    expect(inside).not.toContain('github');
+    expect(inside).not.toContain('расхождение');
+    expect(inside).not.toContain('динамика');
+    const outside = composed.blocks.filter((block) => block.type === 'paragraph').map((block) => visibleLine(block.text));
+    const githubAt = outside.indexOf('github');
+    expect(githubAt).toBeGreaterThan(-1);
+    expect(outside.indexOf('расхождение')).toBeGreaterThan(githubAt);
+    expect(outside.indexOf('динамика')).toBeGreaterThan(outside.indexOf('расхождение'));
+  });
+
   it('R-976 срез issues в раскрывающемся блоке, строка GitHub снаружи', () => {
     const fold = composed.blocks.find((block) => block.type === 'expandable_blockquote');
     expect(fold?.type).toBe('expandable_blockquote');

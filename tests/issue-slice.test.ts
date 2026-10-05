@@ -75,6 +75,15 @@ describe('срез issues на канвасе', () => {
     expect(lines).toContain('#4 архитектура проекта;');
   });
 
+  it('R-992 внутри блока порядок срезов: «В работе», «Далее», «Сделано»', () => {
+    const working = lines.indexOf('В работе');
+    const ahead = lines.indexOf('Далее');
+    const doneAt = lines.indexOf('Сделано');
+    expect(working).toBeGreaterThan(-1);
+    expect(ahead).toBeGreaterThan(working);
+    expect(doneAt).toBeGreaterThan(ahead);
+  });
+
   it('R-117 «В работе»', () => {
     expect(lines).toContain(SLICE_IN_PROGRESS_HEADING);
     expect(lines).toContain('В работе');

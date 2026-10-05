@@ -15,6 +15,13 @@ describe('час человека вместо имени зоны', () => {
     expect(isLocalHour('14:13')).toBe(false);
   });
 
+  it('R-998 город по сдвигу не выбирается', () => {
+    const stored = offsetFromLocalHour(14, atSevenUtc);
+    expect(stored).toBe('+420');
+    expect(stored).not.toContain('/');
+    expect(offsetLabel(stored)).toBe('UTC+7');
+  });
+
   it('R-968 четырнадцать при UTC 7 — сдвиг +7 часов, город не выбирается', () => {
     expect(offsetFromLocalHour(14, atSevenUtc)).toBe('+420');
     expect(offsetFromLocalHour(1, new Date('2026-01-01T22:00:00.000Z'))).toBe('+180');

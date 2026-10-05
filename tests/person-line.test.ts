@@ -181,6 +181,42 @@ describe('строка человека на канвасе', () => {
     expect(connected[1]).toBe('Андрей по issues: сделал 0 · сейчас на нём 0 · дальше в репозитории 0');
   });
 
+  it('R-995 раскрывающийся блок без строки человека и без срезов не появляется', () => {
+    const prepared = prepareCanvasMessage({
+      projectName: 'Пустой',
+      canvasDate: '2026-09-17',
+      sections: {
+        person: personLineParagraphs(personLineFromPlace({ name: 'Андрей', place: { kind: PERSON_PLACE_ABSENT } })),
+        inProgress: [],
+        next: [],
+        done: [],
+        github: githubSectionParagraphs(null),
+      },
+    });
+    if (prepared.status !== 'ready') throw new Error('канвас не собрался');
+    expect(prepared.message.blocks.some((block) => block.type === 'expandable_blockquote')).toBe(false);
+  });
+
+  it('R-996 у подключённого репозитория строка остаётся', () => {
+    const lines = painted({ name: 'Андрей', place: personBacklogPlace('andrey', repositoryId, []) });
+    expect(lines[1]).toBe('Андрей по issues: сделал 0 · сейчас на нём 0 · дальше в репозитории 0');
+  });
+
+  it('R-997 строка GitHub по-прежнему говорит «репозиторий не подключён»', () => {
+    const prepared = prepareCanvasMessage({
+      projectName: 'Пустой',
+      canvasDate: '2026-09-17',
+      sections: {
+        person: personLineParagraphs(personLineFromPlace({ name: 'Андрей', place: { kind: PERSON_PLACE_ABSENT } })),
+        github: githubSectionParagraphs(null),
+      },
+    });
+    if (prepared.status !== 'ready') throw new Error('канвас не собрался');
+    const github = prepared.message.blocks.find((block) => block.type === 'paragraph' && visible(block.text) === GITHUB_LINE_DISCONNECTED);
+    expect(github).toBeDefined();
+    expect(prepared.message.blocks.some((block) => block.type === 'expandable_blockquote')).toBe(false);
+  });
+
   it('R-890 срез 3.4 строится по логинам issue_assignees', async () => {
     const handle = await openDb();
     opened.push(handle);
