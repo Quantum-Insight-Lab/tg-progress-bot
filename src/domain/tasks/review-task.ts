@@ -1,6 +1,7 @@
 import { emit, EVENT_TYPES, type EmitResult, type EventJournal } from '../../events/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { taskOfCanvasButton, type CanvasButtonLookup } from './canvas-button.ts';
 import { TASK_ASSIGNEE_LEAD, TASK_SOURCE, TASK_SUBJECT, TASK_TOPIC_CHAT } from './create-task.ts';
 import { type GithubFact, tasksFromGithub } from './github-origin.ts';
 import { defineUnlinked } from './github-link.ts';
@@ -12,9 +13,8 @@ import { TASK_TRANSITION_CONFIRM, TASK_TRANSITION_RETURN, transitionTask } from 
  * Порт подтверждения внутри уже открытой транзакции.
  * Роль и число руководителей приходят строкой и числом: контекст проектов сюда не импортируется.
  */
-export interface TaskReviewStore {
+export interface TaskReviewStore extends CanvasButtonLookup {
   sender(telegramUserId: string): Promise<{ id: string } | null>;
-  tasksInTopic(telegramChatId: string, topicId: number, taskNumber: number): Promise<Task[]>;
   membership(projectId: string, userId: string): Promise<{ role: string } | null>;
   leadCount(projectId: string): Promise<number>;
   openBlocker(taskId: string): Promise<boolean>;
@@ -29,6 +29,7 @@ export interface TaskReviewPress {
   chat: string;
   telegramChatId: string;
   topicId: number | null;
+  messageId?: number;
   taskNumber: number;
   act: string;
   idempotencyKey: string;
@@ -123,17 +124,14 @@ export async function pressTaskReview(
   if (sender === null) {
     throw new DomainError(DOMAIN_ERROR.TASK_CONFIRM_ACTOR, 'нет права подтверждать');
   }
-  const found = await store.tasksInTopic(input.telegramChatId, topicId, input.taskNumber);
-  if (found.length === 0) {
-    throw new DomainError(DOMAIN_ERROR.TASK_REVIEW_ABSENT, 'задачи с этим номером в топике нет');
-  }
-  if (found.length > 1) {
-    throw new DomainError(DOMAIN_ERROR.TASK_AMBIGUOUS, 'топик совпал у нескольких проектов');
-  }
-  const task = found[0];
-  if (task === undefined) {
-    throw new DomainError(DOMAIN_ERROR.TASK_REVIEW_ABSENT, 'задачи с этим номером в топике нет');
-  }
+  const absent = new DomainError(DOMAIN_ERROR.TASK_REVIEW_ABSENT, 'задачи с этим номером в топике нет');
+  const located = {
+    telegramChatId: input.telegramChatId,
+    topicId,
+    messageId: input.messageId,
+    taskNumber: input.taskNumber,
+  };
+  const task = await taskOfCanvasButton(store, located, absent);
   const prior = await store.seen(idempotencyKey);
   if (prior !== null) {
     return { task, eventId: prior.eventId, applied: false, closesBlocker: false };
@@ -154,11 +152,7 @@ export async function pressTaskReview(
     occurredAt: now,
   });
   if (published.status === 'duplicate') {
-    const again = await store.tasksInTopic(input.telegramChatId, topicId, input.taskNumber);
-    const current = again.length === 1 ? again[0] : task;
-    if (current === undefined) {
-      throw new DomainError(DOMAIN_ERROR.TASK_REVIEW_ABSENT, 'задачи с этим номером в топике нет');
-    }
+    const current = await taskOfCanvasButton(store, located, absent);
     return { task: current, eventId: published.row.id, applied: false, closesBlocker: false };
   }
   const next = defineUnlinked({

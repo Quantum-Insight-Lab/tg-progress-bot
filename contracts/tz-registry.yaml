@@ -1228,3 +1228,20 @@ atoms:
   R-1000: { kind: rule, scope: R-033 }
   R-1001: { kind: view, scope: R-022 }
   R-1002: { kind: view, scope: R-022 }
+
+  # Кнопка на канвасе меняет задачу этого канваса
+  R-1003: { kind: rule, scope: R-018 }
+  R-1004: { kind: rule, scope: R-018 }
+  R-1005: { kind: rule, scope: R-018 }
+  R-1006: { kind: rule, scope: R-018 }
+  R-1007: { kind: rule, scope: R-018 }
+  R-1008: { kind: rule, scope: R-018 }
+  R-1009: { kind: rule, scope: R-018 }
+  R-1010: { kind: rule, scope: R-018 }
+
+  # Вопрос о блокере относится к своей задаче
+  R-1011: { kind: view, scope: R-024 }
+  R-1012: { kind: rule, scope: R-024 }
+  R-1013: { kind: rule, scope: R-024 }
+  R-1014: { kind: rule, scope: R-024 }
+  R-1015: { kind: entity, scope: R-024 }

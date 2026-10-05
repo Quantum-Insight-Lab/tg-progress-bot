@@ -2,7 +2,7 @@ import type { Bot } from 'grammy';
 import type { BlockerAnswering, BlockerReasonResult, NoBlockerResult } from '../domain/tasks/blocker-answer.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { blockerQuestionReply, parseNoBlockerData } from '../projections/blocker-question.ts';
-import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
+import { callbackMessageId, canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
 
 interface TelegramAccount {
@@ -90,6 +90,7 @@ export async function replyToNoBlocker(
       chat: place.type ?? '',
       telegramChatId: place.id ?? '',
       topicId: place.topicId ?? null,
+      ...(place.messageId === undefined ? {} : { messageId: place.messageId }),
       taskNumber,
       idempotencyKey,
     });
@@ -137,6 +138,7 @@ export function attachBlockerAnswer(bot: Bot, actions: BlockerAnswering, canvas?
     const from = ctx.from;
     const message = ctx.callbackQuery.message;
     const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+    const messageId = callbackMessageId(message);
     let notice: { text: string } | undefined;
     try {
       if (taskNumber === null || from.is_bot) return;
@@ -145,6 +147,7 @@ export function attachBlockerAnswer(bot: Bot, actions: BlockerAnswering, canvas?
           type: ctx.chat?.type,
           id: ctx.chat === undefined ? undefined : String(ctx.chat.id),
           topicId,
+          ...(messageId === undefined ? {} : { messageId }),
         },
         from,
         ctx.callbackQuery.id,

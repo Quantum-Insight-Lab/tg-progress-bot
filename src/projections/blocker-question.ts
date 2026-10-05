@@ -3,9 +3,12 @@ import { taskDayMark } from './tasks-block.ts';
 /** Кнопка под вопросом о блокере. Нажатие разбирает следующий акт. */
 export const NO_BLOCKER_LABEL = 'нет блокера';
 
-/** «N не двигается K-й день, что мешает?» */
-export function blockerQuestionText(taskNumber: number, day: number): string {
-  return `${String(taskNumber)} не двигается ${taskDayMark(day)}, что мешает?`;
+/** «N не двигается K-й день, что мешает?» Имя проекта стоит перед номером, когда оно есть. */
+export function blockerQuestionText(taskNumber: number, day: number, projectName?: string): string {
+  const line = `${String(taskNumber)} не двигается ${taskDayMark(day)}, что мешает?`;
+  const name = projectName?.trim() ?? '';
+  if (name.length === 0) return line;
+  return `${name}: ${line}`;
 }
 
 /** Адрес кнопки «нет блокера» на задаче в топике исполнителя. */
@@ -13,15 +16,15 @@ export function noBlockerButton(taskNumber: number): { label: string; callbackDa
   return { label: NO_BLOCKER_LABEL, callbackData: `task:noblock:${String(taskNumber)}` };
 }
 
-const QUESTION = /^([1-9]\d*) не двигается ([1-9]\d*)-й день, что мешает\?$/;
+const QUESTION = /^(?:(.+): )?([1-9]\d*) не двигается ([1-9]\d*)-й день, что мешает\?$/;
 const NO_BLOCKER_DATA = /^task:noblock:([1-9]\d*)$/;
 
 /** Вопрос бота о блокере. Чужой текст вопросом не считается. */
 export function parseBlockerQuestion(text: string): { taskNumber: number; day: number } | null {
   const match = QUESTION.exec(text.trim());
   if (match === null) return null;
-  const taskNumber = Number(match[1]);
-  const day = Number(match[2]);
+  const taskNumber = Number(match[2]);
+  const day = Number(match[3]);
   if (!Number.isSafeInteger(taskNumber) || !Number.isSafeInteger(day)) return null;
   return { taskNumber, day };
 }

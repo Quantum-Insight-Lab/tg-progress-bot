@@ -266,7 +266,7 @@ describe('блокер задачи', () => {
 
     const handle = await openSchema();
     opened.push(handle);
-    expect(await columnNames(handle.db)).toEqual(['asked_at', 'id', 'reason', 'resolved_at', 'task_id']);
+    expect(await columnNames(handle.db)).toEqual(['asked_at', 'id', 'message_id', 'reason', 'resolved_at', 'task_id']);
     await seedSchema(handle.db);
     await insertBlocker(handle.db, blocker);
     await insertBlocker(handle.db, defineBlocker({ ...openRow, id: '00000000-0000-4000-8000-0000000000e2', taskId: otherTaskId, reason: null }));

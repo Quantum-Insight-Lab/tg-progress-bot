@@ -5,7 +5,7 @@ import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
 import { TASK_PRIORITY_ACTION } from '../projections/tasks-block.ts';
-import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
+import { callbackMessageId, canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const STEER_DATA = new RegExp(
   `^task:(${TASK_TRANSITION_PLAN}|${TASK_TRANSITION_RESUME}|${TASK_PRIORITY_ACTION}):([1-9]\\d*)$`,
@@ -61,6 +61,7 @@ export async function replyToTaskPlan(
       chat: place.type ?? '',
       telegramChatId: place.id ?? '',
       topicId: place.topicId ?? null,
+      ...(place.messageId === undefined ? {} : { messageId: place.messageId }),
       taskNumber,
       act,
       idempotencyKey,
@@ -84,6 +85,7 @@ export function attachTaskPlan(bot: Bot, actions: TaskPlanning, canvas?: CanvasR
       const from = ctx.from;
       const message = ctx.callbackQuery.message;
       const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+      const messageId = callbackMessageId(message);
       let notice: { text: string } | undefined;
       try {
         if (parsed === null || from.is_bot) return;
@@ -92,6 +94,7 @@ export function attachTaskPlan(bot: Bot, actions: TaskPlanning, canvas?: CanvasR
             type: ctx.chat?.type,
             id: ctx.chat === undefined ? undefined : String(ctx.chat.id),
             topicId,
+            ...(messageId === undefined ? {} : { messageId }),
           },
           from,
           ctx.callbackQuery.id,

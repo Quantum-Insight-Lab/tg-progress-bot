@@ -168,6 +168,9 @@ function markStore(trx: Transaction<Database>): TaskMarkStore {
     tasksInTopic(telegramChatId, topicId, taskNumber) {
       return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
     },
+    taskOnCanvas(telegramChatId, topicId, messageId, taskNumber) {
+      return lockTaskOnCanvas(trx, telegramChatId, topicId, messageId, taskNumber);
+    },
     async saveStatus(task, from) {
       return writeStatus(trx, task, from);
     },
@@ -286,6 +289,78 @@ function lockTasksInTopic(trx: Transaction<Database>, telegramChatId: string, to
     .then((rows) => rows.map((row) => taskFromRow(row)));
 }
 
+function lockTaskOnCanvas(
+  trx: Transaction<Database>,
+  telegramChatId: string,
+  topicId: number,
+  messageId: number,
+  taskNumber: number,
+): Promise<Task[]> {
+  return trx
+    .selectFrom('tasks')
+    .innerJoin('canvases', (join) =>
+      join.onRef('canvases.project_id', '=', 'tasks.project_id').onRef('canvases.assignee_id', '=', 'tasks.assignee_id'),
+    )
+    .innerJoin('projects', 'projects.id', 'tasks.project_id')
+    .innerJoin('chats', 'chats.id', 'projects.chat_id')
+    .select([
+      'tasks.id',
+      'tasks.project_id',
+      'tasks.number',
+      'tasks.title',
+      'tasks.status',
+      'tasks.priority',
+      'tasks.assignee_id',
+      'tasks.created_at',
+      'tasks.updated_at',
+      'tasks.completed_at',
+    ])
+    .where('chats.telegram_chat_id', '=', telegramChatId)
+    .where('canvases.topic_id', '=', String(topicId))
+    .where('canvases.message_id', '=', String(messageId))
+    .where('tasks.number', '=', taskNumber)
+    .orderBy('tasks.id')
+    .forUpdate()
+    .execute()
+    .then((rows) => rows.map((row) => taskFromRow(row)));
+}
+
+function lockTaskOfQuestion(
+  trx: Transaction<Database>,
+  telegramChatId: string,
+  topicId: number,
+  messageId: number,
+): Promise<Task | null> {
+  return trx
+    .selectFrom('tasks')
+    .innerJoin('blockers', 'blockers.task_id', 'tasks.id')
+    .innerJoin('projects', 'projects.id', 'tasks.project_id')
+    .innerJoin('chats', 'chats.id', 'projects.chat_id')
+    .innerJoin('project_members', (join) =>
+      join.onRef('project_members.project_id', '=', 'tasks.project_id').onRef('project_members.user_id', '=', 'tasks.assignee_id'),
+    )
+    .select([
+      'tasks.id',
+      'tasks.project_id',
+      'tasks.number',
+      'tasks.title',
+      'tasks.status',
+      'tasks.priority',
+      'tasks.assignee_id',
+      'tasks.created_at',
+      'tasks.updated_at',
+      'tasks.completed_at',
+    ])
+    .where('chats.telegram_chat_id', '=', telegramChatId)
+    .where('project_members.topic_id', '=', String(topicId))
+    .where('blockers.message_id', '=', String(messageId))
+    .where('blockers.resolved_at', 'is', null)
+    .orderBy('tasks.id')
+    .forUpdate()
+    .executeTakeFirst()
+    .then((row) => (row === undefined ? null : taskFromRow(row)));
+}
+
 function reviewStore(trx: Transaction<Database>): TaskReviewStore {
   return {
     async sender(telegramUserId) {
@@ -293,6 +368,9 @@ function reviewStore(trx: Transaction<Database>): TaskReviewStore {
     },
     tasksInTopic(telegramChatId, topicId, taskNumber) {
       return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
+    },
+    taskOnCanvas(telegramChatId, topicId, messageId, taskNumber) {
+      return lockTaskOnCanvas(trx, telegramChatId, topicId, messageId, taskNumber);
     },
     async membership(projectId, userId) {
       const row = await trx
@@ -338,6 +416,9 @@ function planStore(trx: Transaction<Database>): TaskPlanStore {
     tasksInTopic(telegramChatId, topicId, taskNumber) {
       return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
     },
+    taskOnCanvas(telegramChatId, topicId, messageId, taskNumber) {
+      return lockTaskOnCanvas(trx, telegramChatId, topicId, messageId, taskNumber);
+    },
     async seen(idempotencyKey) {
       const row = await trx
         .selectFrom('events')
@@ -372,6 +453,9 @@ function cancelStore(trx: Transaction<Database>): TaskCancelStore {
     },
     tasksInTopic(telegramChatId, topicId, taskNumber) {
       return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
+    },
+    taskOnCanvas(telegramChatId, topicId, messageId, taskNumber) {
+      return lockTaskOnCanvas(trx, telegramChatId, topicId, messageId, taskNumber);
     },
     async membership(projectId, userId) {
       const row = await trx
@@ -524,6 +608,9 @@ function answerStore(trx: Transaction<Database>): BlockerAnswerStore {
     },
     tasksInTopic(telegramChatId, topicId, taskNumber) {
       return lockTasksInTopic(trx, telegramChatId, topicId, taskNumber);
+    },
+    taskOfQuestion(telegramChatId, topicId, messageId) {
+      return lockTaskOfQuestion(trx, telegramChatId, topicId, messageId);
     },
     async openBlocker(taskId) {
       const row = await trx

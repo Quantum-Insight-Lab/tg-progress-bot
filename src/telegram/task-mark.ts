@@ -4,7 +4,7 @@ import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
 import { TASK_MARK_ACTION } from '../projections/tasks-block.ts';
-import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
+import { callbackMessageId, canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const MARK_DATA = new RegExp(`^task:${TASK_MARK_ACTION}:([1-9]\\d*)$`);
 
@@ -56,6 +56,7 @@ export async function replyToTaskMark(
       chat: place.type ?? '',
       telegramChatId: place.id ?? '',
       topicId: place.topicId ?? null,
+      ...(place.messageId === undefined ? {} : { messageId: place.messageId }),
       taskNumber,
       idempotencyKey,
     });
@@ -76,6 +77,7 @@ export function attachTaskMark(bot: Bot, actions: TaskMarking, canvas?: CanvasRe
     const from = ctx.from;
     const message = ctx.callbackQuery.message;
     const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+    const messageId = callbackMessageId(message);
     let notice: { text: string } | undefined;
     try {
       if (number === null || from.is_bot) return;
@@ -84,6 +86,7 @@ export function attachTaskMark(bot: Bot, actions: TaskMarking, canvas?: CanvasRe
           type: ctx.chat?.type,
           id: ctx.chat === undefined ? undefined : String(ctx.chat.id),
           topicId,
+          ...(messageId === undefined ? {} : { messageId }),
         },
         from,
         ctx.callbackQuery.id,

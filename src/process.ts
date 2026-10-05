@@ -27,7 +27,7 @@ import { createProjectSettings } from './infrastructure/settings.ts';
 import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
 import { carryOpenCanvases } from './infrastructure/carry-canvas.ts';
-import { detectStaleTasks } from './infrastructure/detect-blocker.ts';
+import { detectStaleTasks, rememberBlockerQuestion } from './infrastructure/detect-blocker.ts';
 import { noticeProjectDivergence } from './infrastructure/divergence.ts';
 import { noticeStalePullRequests } from './infrastructure/pr-stall.ts';
 import { takeProgressSnapshots } from './infrastructure/progress-snapshot.ts';
@@ -337,12 +337,14 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachBlockerAnswer(bot, createBlockerAnswerActions(config.db, logger, config.clock), redrawTaskCanvas);
     detectStale = (now) =>
       detectStaleTasks(database, logger, now, async (hit) => {
-        await sendBlockerQuestion(bot.api, {
+        const messageId = await sendBlockerQuestion(bot.api, {
           chatId: hit.telegramChatId,
           messageThreadId: hit.topicId,
           taskNumber: hit.taskNumber,
           day: hit.day,
+          projectName: hit.projectName,
         });
+        await rememberBlockerQuestion(database, hit.blockerId, messageId);
         await canvas.show({
           projectId: hit.projectId,
           assigneeId: hit.assigneeId,

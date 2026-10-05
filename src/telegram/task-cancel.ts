@@ -4,7 +4,7 @@ import { TASK_TRANSITION_CANCEL } from '../domain/tasks/transition.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
 import { noteCommandRejection } from './rejection.ts';
 import { traceHandler, traceRefusal } from './update-log.ts';
-import { canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
+import { callbackMessageId, canvasRedrawFailure, CANVAS_FULL_REPLY, type CanvasRedraw, type TaskCommandPlace } from './task-command.ts';
 
 const CANCEL_DATA = new RegExp(`^task:${TASK_TRANSITION_CANCEL}:([1-9]\\d*)$`);
 
@@ -56,6 +56,7 @@ export async function replyToTaskCancel(
       chat: place.type ?? '',
       telegramChatId: place.id ?? '',
       topicId: place.topicId ?? null,
+      ...(place.messageId === undefined ? {} : { messageId: place.messageId }),
       taskNumber,
       idempotencyKey,
     });
@@ -76,6 +77,7 @@ export function attachTaskCancel(bot: Bot, actions: TaskCancelling, canvas?: Can
     const from = ctx.from;
     const message = ctx.callbackQuery.message;
     const topicId = message !== undefined && 'message_thread_id' in message ? message.message_thread_id : undefined;
+    const messageId = callbackMessageId(message);
     let notice: { text: string } | undefined;
     try {
       if (taskNumber === null || from.is_bot) return;
@@ -84,6 +86,7 @@ export function attachTaskCancel(bot: Bot, actions: TaskCancelling, canvas?: Can
           type: ctx.chat?.type,
           id: ctx.chat === undefined ? undefined : String(ctx.chat.id),
           topicId,
+          ...(messageId === undefined ? {} : { messageId }),
         },
         from,
         ctx.callbackQuery.id,

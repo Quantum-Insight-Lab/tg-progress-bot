@@ -67,6 +67,14 @@ export interface TaskCommandPlace {
   type: string | undefined;
   id: string | undefined;
   topicId: number | undefined;
+  messageId?: number;
+}
+
+/** Сообщение callback. Проект кнопки берётся из канваса с этим `message_id`. */
+export function callbackMessageId(message: object | undefined): number | undefined {
+  if (message === undefined || !('message_id' in message)) return undefined;
+  const messageId = message.message_id;
+  return typeof messageId === 'number' ? messageId : undefined;
 }
 
 function replyOf(error: DomainError): string | null {

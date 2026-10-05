@@ -1,6 +1,7 @@
 import { emit, EVENT_TYPES, type EmitResult, type EventJournal } from '../../events/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { taskOfCanvasButton, type CanvasButtonLookup } from './canvas-button.ts';
 import { TASK_ACTOR_ROLE, TASK_SOURCE, TASK_SUBJECT, TASK_TOPIC_CHAT } from './create-task.ts';
 import { defineUnlinked } from './github-link.ts';
 import type { TaskStatus } from './status.ts';
@@ -11,9 +12,8 @@ import { markActFor, TASK_TRANSITION_CHECK, TASK_TRANSITION_UNCHECK, transitionT
  * Порт галочки внутри уже открытой транзакции.
  * Исполнитель приходит строкой id, контекст проектов сюда не импортируется.
  */
-export interface TaskMarkStore {
+export interface TaskMarkStore extends CanvasButtonLookup {
   sender(telegramUserId: string): Promise<{ id: string } | null>;
-  tasksInTopic(telegramChatId: string, topicId: number, taskNumber: number): Promise<Task[]>;
   saveStatus(task: Task, from: TaskStatus): Promise<boolean>;
 }
 
@@ -23,6 +23,7 @@ export interface TaskMarkPress {
   chat: string;
   telegramChatId: string;
   topicId: number | null;
+  messageId?: number;
   taskNumber: number;
   idempotencyKey: string;
 }
@@ -44,6 +45,7 @@ export interface TaskMarkDraft {
   chat: string;
   telegramChatId: string;
   topicId: number | null;
+  messageId?: number;
   taskNumber: number;
   idempotencyKey: string;
 }
@@ -104,17 +106,12 @@ export async function pressTaskMark(
   if (sender === null) {
     throw new DomainError(DOMAIN_ERROR.TASK_MARK_ACTOR, 'галочку ставит исполнитель');
   }
-  const found = await store.tasksInTopic(input.telegramChatId, topicId, input.taskNumber);
-  if (found.length === 0) {
-    throw new DomainError(DOMAIN_ERROR.TASK_MARK_ABSENT, 'задачи с этим номером в топике нет');
-  }
-  if (found.length > 1) {
-    throw new DomainError(DOMAIN_ERROR.TASK_AMBIGUOUS, 'топик совпал у нескольких проектов');
-  }
-  const task = found[0];
-  if (task === undefined) {
-    throw new DomainError(DOMAIN_ERROR.TASK_MARK_ABSENT, 'задачи с этим номером в топике нет');
-  }
+  const absent = new DomainError(DOMAIN_ERROR.TASK_MARK_ABSENT, 'задачи с этим номером в топике нет');
+  const task = await taskOfCanvasButton(
+    store,
+    { telegramChatId: input.telegramChatId, topicId, messageId: input.messageId, taskNumber: input.taskNumber },
+    absent,
+  );
   if (task.assigneeId !== sender.id) {
     throw new DomainError(DOMAIN_ERROR.TASK_MARK_ACTOR, 'галочку ставит исполнитель');
   }
@@ -128,11 +125,11 @@ export async function pressTaskMark(
     occurredAt: now,
   });
   if (published.status === 'duplicate') {
-    const again = await store.tasksInTopic(input.telegramChatId, topicId, input.taskNumber);
-    const current = again.length === 1 ? again[0] : task;
-    if (current === undefined) {
-      throw new DomainError(DOMAIN_ERROR.TASK_MARK_ABSENT, 'задачи с этим номером в топике нет');
-    }
+    const current = await taskOfCanvasButton(
+      store,
+      { telegramChatId: input.telegramChatId, topicId, messageId: input.messageId, taskNumber: input.taskNumber },
+      absent,
+    );
     return { task: current, eventId: published.row.id, applied: false, closesBlocker: false };
   }
   const next = defineUnlinked({

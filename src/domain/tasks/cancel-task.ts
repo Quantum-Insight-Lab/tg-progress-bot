@@ -1,6 +1,7 @@
 import { emit, EVENT_TYPES, type EmitResult, type EventJournal } from '../../events/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { taskOfCanvasButton, type CanvasButtonLookup } from './canvas-button.ts';
 import { TASK_ACTOR_ROLE, TASK_ASSIGNEE_LEAD, TASK_SOURCE, TASK_SUBJECT, TASK_TOPIC_CHAT } from './create-task.ts';
 import { defineUnlinked } from './github-link.ts';
 import type { TaskStatus } from './status.ts';
@@ -24,9 +25,8 @@ export const TASK_CANCEL_SYSTEM_SOURCE = 'system';
  * Порт «отменить» внутри уже открытой транзакции.
  * Роль приходит строкой: контекст проектов сюда не импортируется.
  */
-export interface TaskCancelStore {
+export interface TaskCancelStore extends CanvasButtonLookup {
   sender(telegramUserId: string): Promise<{ id: string } | null>;
-  tasksInTopic(telegramChatId: string, topicId: number, taskNumber: number): Promise<Task[]>;
   membership(projectId: string, userId: string): Promise<{ role: string } | null>;
   /** Уже записанный ключ. Повтор не переводит статус заново. */
   seen(idempotencyKey: string): Promise<{ eventId: string } | null>;
@@ -39,6 +39,7 @@ export interface TaskCancelPress {
   chat: string;
   telegramChatId: string;
   topicId: number | null;
+  messageId?: number;
   taskNumber: number;
   idempotencyKey: string;
 }
@@ -119,13 +120,8 @@ function publishCancel(
   });
 }
 
-async function taskNow(store: TaskCancelStore, telegramChatId: string, topicId: number, taskNumber: number, fallback: Task): Promise<Task> {
-  const again = await store.tasksInTopic(telegramChatId, topicId, taskNumber);
-  const current = again.length === 1 ? again[0] : fallback;
-  if (current === undefined) {
-    throw new DomainError(DOMAIN_ERROR.TASK_CANCEL_ABSENT, 'задачи с этим номером в топике нет');
-  }
-  return current;
+function absentTask(): DomainError {
+  return new DomainError(DOMAIN_ERROR.TASK_CANCEL_ABSENT, 'задачи с этим номером в топике нет');
 }
 
 /**
@@ -154,17 +150,13 @@ export async function pressTaskCancel(
   if (sender === null) {
     throw new DomainError(DOMAIN_ERROR.TASK_CANCEL_ACTOR, 'снять задачу может руководитель или исполнитель');
   }
-  const found = await store.tasksInTopic(input.telegramChatId, topicId, input.taskNumber);
-  if (found.length === 0) {
-    throw new DomainError(DOMAIN_ERROR.TASK_CANCEL_ABSENT, 'задачи с этим номером в топике нет');
-  }
-  if (found.length > 1) {
-    throw new DomainError(DOMAIN_ERROR.TASK_AMBIGUOUS, 'топик совпал у нескольких проектов');
-  }
-  const task = found[0];
-  if (task === undefined) {
-    throw new DomainError(DOMAIN_ERROR.TASK_CANCEL_ABSENT, 'задачи с этим номером в топике нет');
-  }
+  const located = {
+    telegramChatId: input.telegramChatId,
+    topicId,
+    messageId: input.messageId,
+    taskNumber: input.taskNumber,
+  };
+  const task = await taskOfCanvasButton(store, located, absentTask());
   const member = await store.membership(task.projectId, sender.id);
   const actorRole = cancelActor(sender.id, task.assigneeId, member === null ? null : member.role);
   const prior = await store.seen(idempotencyKey);
@@ -185,7 +177,7 @@ export async function pressTaskCancel(
     causationId: null,
   });
   if (published.status === 'duplicate') {
-    const current = await taskNow(store, input.telegramChatId, topicId, input.taskNumber, task);
+    const current = await taskOfCanvasButton(store, located, absentTask());
     return { task: current, eventId: published.row.id, applied: false, closesBlocker: false };
   }
   const next = defineUnlinked({ ...task, status: move.to, updatedAt: now.toISOString(), completedAt: null });
