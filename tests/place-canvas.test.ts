@@ -122,7 +122,7 @@ function shown(canvasDate: string, tasks: readonly CanvasTaskLine[] = [], plan: 
     tasks,
     plan,
     backlogShare: null,
-    person: { name: 'Борис', place: { kind: 'unmatched' } },
+    person: { name: 'Борис', place: { kind: 'absent' } },
     issueSlice: { done: [], inProgress: [], next: [] },
     github: null,
     blockers: { reasons: [], pullRequests: [], defaultBranchCiRed: false },
