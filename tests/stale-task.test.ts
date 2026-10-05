@@ -179,8 +179,10 @@ async function run(db: Kysely<Database>, at: Date): Promise<Hit[]> {
       hits.push({
         detected: {
           projectId: '',
+          projectName: '',
           assigneeId: '',
           taskId: '',
+          blockerId: '',
           eventId: '',
           telegramChatId: String(chatId),
           topicId: extra?.message_thread_id ?? 0,
@@ -199,6 +201,7 @@ async function run(db: Kysely<Database>, at: Date): Promise<Hit[]> {
       messageThreadId: hit.topicId,
       taskNumber: hit.taskNumber,
       day: hit.day,
+      projectName: hit.projectName,
     });
     const sent = hits[hits.length - 1];
     if (sent !== undefined) sent.detected = hit;
@@ -306,7 +309,7 @@ describe('застой задачи', () => {
     await seed(handle.db);
     const hits = await run(handle.db, now);
     expect(hits).toHaveLength(1);
-    expect(hits[0]?.text).toBe('7 не двигается 3-й день, что мешает?');
+    expect(hits[0]?.text).toBe('Альфа: 7 не двигается 3-й день, что мешает?');
     expect(hits[0]?.button).toEqual({ label: 'нет блокера', callbackData: 'task:noblock:7' });
     expect(hits[0]?.detected.telegramChatId).toBe(telegramChatId);
     expect(hits[0]?.detected.topicId).toBe(topic);

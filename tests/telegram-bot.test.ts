@@ -44,7 +44,7 @@ describe('единственный клиент Telegram', () => {
         return { message_id: 1 } as Awaited<ReturnType<Api['sendMessage']>>;
       },
     } satisfies Pick<Api, 'sendMessage'>;
-    await sendBlockerQuestion(api, { chatId: '-100', messageThreadId: 7, taskNumber: 1, day: 3 });
+    await sendBlockerQuestion(api, { chatId: '-100', messageThreadId: 7, taskNumber: 1, day: 3, projectName: 'Альфа' });
     await sendReviewReminder(api, { chatId: '-100', messageThreadId: 7, taskNumber: 1, leads: [] });
     expect(sent).toEqual([false, false]);
   });

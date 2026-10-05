@@ -10,8 +10,10 @@ import { commitBlockerDetected } from './tasks.ts';
 /** Вопрос, который A-28 уже записал. Доставка — снаружи транзакции. */
 export interface DetectedBlocker {
   projectId: string;
+  projectName: string;
   assigneeId: string;
   taskId: string;
+  blockerId: string;
   eventId: string;
   telegramChatId: string;
   topicId: number;
@@ -31,6 +33,7 @@ interface CandidateRow {
   updated_at: Date | string;
   completed_at: Date | string | null;
   timezone: string;
+  project_name: string;
   topic_id: string | null;
   telegram_chat_id: string | null;
 }
@@ -90,6 +93,7 @@ async function candidates(db: Kysely<Database> | Transaction<Database>): Promise
            tasks.updated_at,
            tasks.completed_at,
            projects.timezone,
+           projects.name AS project_name,
            project_members.topic_id::text AS topic_id,
            chats.telegram_chat_id::text AS telegram_chat_id
     FROM tasks
@@ -127,6 +131,7 @@ async function lockTask(trx: Transaction<Database>, taskId: string): Promise<Can
            tasks.updated_at,
            tasks.completed_at,
            projects.timezone,
+           projects.name AS project_name,
            project_members.topic_id::text AS topic_id,
            chats.telegram_chat_id::text AS telegram_chat_id
     FROM tasks
@@ -163,9 +168,10 @@ async function detectOne(
       now,
     });
     if (decision === null) return null;
+    const blockerId = randomUUID();
     const recorded = await commitBlockerDetected(trx, logger, {
       task,
-      blockerId: randomUUID(),
+      blockerId,
       day: decision.day,
       idempotencyKey: decision.idempotencyKey,
       occurredAt: now,
@@ -173,8 +179,10 @@ async function detectOne(
     if (!recorded.applied) return null;
     return {
       projectId: task.projectId,
+      projectName: row.project_name,
       assigneeId: task.assigneeId,
       taskId: task.id,
+      blockerId,
       eventId: recorded.eventId,
       telegramChatId: chatId,
       topicId: topic,
@@ -209,4 +217,15 @@ export async function detectStaleTasks(
   const first = failures[0];
   if (first instanceof Error) throw first;
   throw new Error('застой не записан');
+}
+
+/** Сообщение вопроса связывается с уже записанным блокером. Повтор ту же строку не переписывает. */
+export async function rememberBlockerQuestion(db: Kysely<Database>, blockerId: string, messageId: number): Promise<void> {
+  if (!Number.isInteger(messageId) || messageId <= 0) return;
+  await sql`
+    UPDATE blockers
+    SET message_id = ${messageId}
+    WHERE id = ${blockerId}::uuid
+      AND message_id IS NULL
+  `.execute(db);
 }

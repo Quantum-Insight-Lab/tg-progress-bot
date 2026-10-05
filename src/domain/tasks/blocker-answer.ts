@@ -16,6 +16,8 @@ import { TASK_TRANSITION_NO_BLOCKER, transitionTask } from './transition.ts';
 export interface BlockerAnswerStore {
   sender(telegramUserId: string): Promise<{ id: string } | null>;
   tasksInTopic(telegramChatId: string, topicId: number, taskNumber: number): Promise<Task[]>;
+  /** Задача открытого блокера, вопрос которого ушёл этим сообщением. Нет строки — `null`. */
+  taskOfQuestion(telegramChatId: string, topicId: number, messageId: number): Promise<Task | null>;
   openBlocker(taskId: string): Promise<Blocker | null>;
   seen(idempotencyKey: string): Promise<{ eventId: string } | null>;
   saveReason(blocker: Blocker): Promise<boolean>;
@@ -48,6 +50,7 @@ export interface NoBlockerPress {
   chat: string;
   telegramChatId: string;
   topicId: number | null;
+  messageId?: number;
   taskNumber: number;
   idempotencyKey: string;
 }
@@ -102,15 +105,45 @@ function placeOf(input: { chat: string; topicId: number | null; taskNumber: numb
   return { topicId, idempotencyKey };
 }
 
-async function taskInTopic(
+function questionMessageId(messageId: number | null | undefined): number | undefined {
+  if (messageId === undefined || messageId === null) return undefined;
+  if (!Number.isInteger(messageId) || messageId <= 0) return undefined;
+  return messageId;
+}
+
+async function taskForAnswer(
   store: BlockerAnswerStore,
-  input: { telegramUserId: string; telegramChatId: string; topicId: number; taskNumber: number },
+  input: {
+    telegramUserId: string;
+    telegramChatId: string;
+    topicId: number;
+    taskNumber: number;
+    questionMessageId: number | null | undefined;
+  },
 ): Promise<{ senderId: string; task: Task }> {
   const sender = await store.sender(input.telegramUserId);
   if (sender === null) {
     throw new DomainError(DOMAIN_ERROR.BLOCKER_ACTOR, 'на вопрос о блокере отвечает исполнитель');
   }
-  const found = await store.tasksInTopic(input.telegramChatId, input.topicId, input.taskNumber);
+  const messageId = questionMessageId(input.questionMessageId);
+  const asked = messageId === undefined ? null : await store.taskOfQuestion(input.telegramChatId, input.topicId, messageId);
+  const task = asked ?? (await taskInTopic(store, input.telegramChatId, input.topicId, input.taskNumber));
+  if (asked !== null && task.number !== input.taskNumber) {
+    throw new DomainError(DOMAIN_ERROR.BLOCKER_ABSENT, 'задачи с этим номером в топике нет');
+  }
+  if (task.assigneeId !== sender.id) {
+    throw new DomainError(DOMAIN_ERROR.BLOCKER_ACTOR, 'на вопрос о блокере отвечает исполнитель');
+  }
+  return { senderId: sender.id, task };
+}
+
+async function taskInTopic(
+  store: BlockerAnswerStore,
+  telegramChatId: string,
+  topicId: number,
+  taskNumber: number,
+): Promise<Task> {
+  const found = await store.tasksInTopic(telegramChatId, topicId, taskNumber);
   if (found.length === 0) {
     throw new DomainError(DOMAIN_ERROR.BLOCKER_ABSENT, 'задачи с этим номером в топике нет');
   }
@@ -121,10 +154,7 @@ async function taskInTopic(
   if (task === undefined) {
     throw new DomainError(DOMAIN_ERROR.BLOCKER_ABSENT, 'задачи с этим номером в топике нет');
   }
-  if (task.assigneeId !== sender.id) {
-    throw new DomainError(DOMAIN_ERROR.BLOCKER_ACTOR, 'на вопрос о блокере отвечает исполнитель');
-  }
-  return { senderId: sender.id, task };
+  return task;
 }
 
 function publishDeclared(
@@ -177,11 +207,12 @@ export async function declareBlockerReason(
     questionTaskNumber: input.questionTaskNumber,
     taskNumber: input.taskNumber,
   });
-  const { senderId, task } = await taskInTopic(store, {
+  const { senderId, task } = await taskForAnswer(store, {
     telegramUserId: input.telegramUserId,
     telegramChatId: input.telegramChatId,
     topicId: place.topicId,
     taskNumber: input.taskNumber,
+    questionMessageId: input.replyToMessageId,
   });
   const open = await store.openBlocker(task.id);
   if (open === null || !isOpenBlocker(open)) {
@@ -217,11 +248,12 @@ export async function pressNoBlocker(
   input: NoBlockerPress,
 ): Promise<NoBlockerResult> {
   const place = placeOf(input);
-  const { senderId, task } = await taskInTopic(store, {
+  const { senderId, task } = await taskForAnswer(store, {
     telegramUserId: input.telegramUserId,
     telegramChatId: input.telegramChatId,
     topicId: place.topicId,
     taskNumber: input.taskNumber,
+    questionMessageId: input.messageId,
   });
   const prior = await store.seen(place.idempotencyKey);
   if (prior !== null) return { task, eventId: prior.eventId, applied: false, closesBlocker: false };

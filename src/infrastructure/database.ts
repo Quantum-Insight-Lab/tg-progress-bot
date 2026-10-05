@@ -104,6 +104,8 @@ export interface BlockersTable {
   reason: string | null;
   asked_at: Date;
   resolved_at: Date | null;
+  /** Пусто, пока вопрос в топик не отправлен. */
+  message_id: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 /** Репозиторий установки GitHub App (E-9). Ключ — id GitHub, не проект. */

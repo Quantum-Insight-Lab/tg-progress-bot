@@ -1,6 +1,7 @@
 import { emit, EVENT_TYPES, type EmitResult, type EventJournal } from '../../events/index.ts';
 import type { Clock } from '../shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../shared/errors.ts';
+import { taskOfCanvasButton, type CanvasButtonLookup } from './canvas-button.ts';
 import { TASK_ACTOR_ROLE, TASK_SOURCE, TASK_SUBJECT, TASK_TOPIC_CHAT } from './create-task.ts';
 import { defineUnlinked } from './github-link.ts';
 import { nextPriority, prioritySetOnCanvas, type TaskPriority, type TaskStatus } from './status.ts';
@@ -14,9 +15,8 @@ export const TASK_PRIORITY_ACT = 'priority';
  * Порт «в план», «в работу» и слова приоритета внутри уже открытой транзакции.
  * Исполнитель приходит строкой id, контекст проектов сюда не импортируется.
  */
-export interface TaskPlanStore {
+export interface TaskPlanStore extends CanvasButtonLookup {
   sender(telegramUserId: string): Promise<{ id: string } | null>;
-  tasksInTopic(telegramChatId: string, topicId: number, taskNumber: number): Promise<Task[]>;
   /** Уже записанный ключ. Повтор не меняет задачу заново. */
   seen(idempotencyKey: string): Promise<{ eventId: string } | null>;
   saveStatus(task: Task, from: TaskStatus): Promise<boolean>;
@@ -29,6 +29,7 @@ export interface TaskPlanPress {
   chat: string;
   telegramChatId: string;
   topicId: number | null;
+  messageId?: number;
   taskNumber: number;
   act: string;
   idempotencyKey: string;
@@ -92,19 +93,8 @@ function publishPlan(
   throw new DomainError(DOMAIN_ERROR.TASK_TRANSITION, 'переход статуса не разрешён');
 }
 
-async function taskNow(
-  store: TaskPlanStore,
-  telegramChatId: string,
-  topicId: number,
-  taskNumber: number,
-  fallback: Task,
-): Promise<Task> {
-  const again = await store.tasksInTopic(telegramChatId, topicId, taskNumber);
-  const current = again.length === 1 ? again[0] : fallback;
-  if (current === undefined) {
-    throw new DomainError(DOMAIN_ERROR.TASK_PLAN_ABSENT, 'задачи с этим номером в топике нет');
-  }
-  return current;
+function absentTask(): DomainError {
+  return new DomainError(DOMAIN_ERROR.TASK_PLAN_ABSENT, 'задачи с этим номером в топике нет');
 }
 
 /**
@@ -140,17 +130,13 @@ export async function pressTaskPlan(
       '«в план», «в работу» и слово приоритета нажимает только исполнитель',
     );
   }
-  const found = await store.tasksInTopic(input.telegramChatId, topicId, input.taskNumber);
-  if (found.length === 0) {
-    throw new DomainError(DOMAIN_ERROR.TASK_PLAN_ABSENT, 'задачи с этим номером в топике нет');
-  }
-  if (found.length > 1) {
-    throw new DomainError(DOMAIN_ERROR.TASK_AMBIGUOUS, 'топик совпал у нескольких проектов');
-  }
-  const task = found[0];
-  if (task === undefined) {
-    throw new DomainError(DOMAIN_ERROR.TASK_PLAN_ABSENT, 'задачи с этим номером в топике нет');
-  }
+  const located = {
+    telegramChatId: input.telegramChatId,
+    topicId,
+    messageId: input.messageId,
+    taskNumber: input.taskNumber,
+  };
+  const task = await taskOfCanvasButton(store, located, absentTask());
   assigneeOnly(sender.id, task.assigneeId);
   const prior = await store.seen(idempotencyKey);
   if (prior !== null) {
@@ -171,7 +157,7 @@ export async function pressTaskPlan(
       previousPriority: task.priority,
     });
     if (published.status === 'duplicate') {
-      const current = await taskNow(store, input.telegramChatId, topicId, input.taskNumber, task);
+      const current = await taskOfCanvasButton(store, located, absentTask());
       return { task: current, eventId: published.row.id, applied: false, closesBlocker: false };
     }
     const next = defineUnlinked({ ...task, priority, updatedAt: now.toISOString() });
@@ -189,7 +175,7 @@ export async function pressTaskPlan(
     occurredAt: now,
   });
   if (published.status === 'duplicate') {
-    const current = await taskNow(store, input.telegramChatId, topicId, input.taskNumber, task);
+    const current = await taskOfCanvasButton(store, located, absentTask());
     return { task: current, eventId: published.row.id, applied: false, closesBlocker: false };
   }
   const next = defineUnlinked({ ...task, status: move.to, updatedAt: now.toISOString() });

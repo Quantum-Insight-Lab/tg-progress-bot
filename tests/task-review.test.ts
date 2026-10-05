@@ -172,6 +172,9 @@ function memoryStore(
       async tasksInTopic() {
         return [current];
       },
+      async taskOnCanvas() {
+        return [current];
+      },
       async membership() {
         return options.role === null ? null : { role: options.role };
       },

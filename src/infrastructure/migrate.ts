@@ -78,7 +78,12 @@ export function readCanvasItemsMigration(root = process.cwd()): string {
 
 /** Таблица блокеров задач: причина, вопрос и закрытие. Строк CI и PR нет. */
 export function readBlockersMigration(root = process.cwd()): string {
-  return readFileSync(join(root, 'migrations', '016_blockers.sql'), 'utf8');
+  return `${readFileSync(join(root, 'migrations', '016_blockers.sql'), 'utf8')}\n${readBlockerQuestionMigration(root)}`;
+}
+
+/** `blockers.message_id`: сообщение вопроса. Пусто, пока вопрос не отправлен. */
+export function readBlockerQuestionMigration(root = process.cwd()): string {
+  return readFileSync(join(root, 'migrations', '025_blocker_question_message.sql'), 'utf8');
 }
 
 /** Таблица issues: поля зеркала и constraint'ы состояния. Природный ключ этой миграцией не задаётся. */
