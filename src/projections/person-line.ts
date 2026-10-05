@@ -11,21 +11,24 @@ export interface PersonLineSlice {
   next: number;
 }
 
-export type PersonCanvasLine = { kind: 'unmatched' } | ({ kind: 'slice' } & PersonLineSlice);
+export type PersonCanvasLine = { kind: 'unmatched' } | { kind: 'absent' } | ({ kind: 'slice' } & PersonLineSlice);
 
-/** Место, которое уже посчитал домен: списки номеров или отсутствие логина. */
+/** Место, которое уже посчитал домен: списки номеров, отсутствие логина или репозитория. */
 export interface PersonLinePlace {
   name: string;
   place:
     | { kind: 'unmatched' }
+    | { kind: 'absent' }
     | { kind: 'slice'; done: readonly number[]; now: readonly number[]; next: readonly number[] };
 }
 
 /**
  * «имя по issues: сделал N · сейчас на нём N · дальше в репозитории N».
  * Без логина строка целиком — «нет сопоставления с GitHub».
+ * Без репозитория строки нет.
  */
 export function personLineParagraphs(line: PersonCanvasLine): CanvasParagraph[] {
+  if (line.kind === 'absent') return [];
   if (line.kind === 'unmatched') {
     return [{ pieces: [{ kind: 'bold', text: PERSON_LINE_UNMATCHED }] }];
   }
@@ -47,6 +50,7 @@ export function personLineParagraphs(line: PersonCanvasLine): CanvasParagraph[] 
 /** Числа строки — длины среза. Логин assignee в текст не попадает. */
 export function personLineFromPlace(person: PersonLinePlace): PersonCanvasLine {
   if (person.place.kind === 'unmatched') return { kind: 'unmatched' };
+  if (person.place.kind === 'absent') return { kind: 'absent' };
   return {
     kind: 'slice',
     name: person.name,

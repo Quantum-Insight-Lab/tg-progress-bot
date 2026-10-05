@@ -16,6 +16,9 @@ import {
 /** Среза нет: логин не записан. */
 export const PERSON_PLACE_UNMATCHED = 'unmatched';
 
+/** Среза нет: репозиторий проекта не подключён. */
+export const PERSON_PLACE_ABSENT = 'absent';
+
 /** Срез есть: сделал, сейчас, дальше. */
 export const PERSON_PLACE_SLICE = 'slice';
 
@@ -39,6 +42,11 @@ export interface PersonPlaceUnmatched {
   kind: typeof PERSON_PLACE_UNMATCHED;
 }
 
+/** Репозиторий не подключён: места в бэклоге нет. */
+export interface PersonPlaceAbsent {
+  kind: typeof PERSON_PLACE_ABSENT;
+}
+
 /**
  * Место одного человека в одном репозитории.
  * Номера — issues этого репозитория, каждый один раз.
@@ -53,7 +61,7 @@ export interface PersonPlaceSlice {
   next: readonly number[];
 }
 
-export type PersonBacklogPlace = PersonPlaceUnmatched | PersonPlaceSlice;
+export type PersonBacklogPlace = PersonPlaceUnmatched | PersonPlaceAbsent | PersonPlaceSlice;
 
 type IssueSlot = 'open' | 'completed' | 'outside';
 
@@ -188,7 +196,8 @@ export function placeChangesTaskStatus(): false {
 /**
  * Место человека в проекте по issues одного репозитория.
  * Issue относится к человеку, если среди assignees есть его текущий `github_login`.
- * Без логина среза нет. Пустой репозиторий при записанном логине — пустой срез.
+ * Без репозитория места нет: это не пустой срез и не «нет сопоставления».
+ * Без логина у подключённого репозитория среза нет. Пустой подключённый репозиторий при записанном логине — пустой срез.
  * Закрытый как `not_planned` не попадает ни в одну строку.
  */
 export function personBacklogPlace(
@@ -202,8 +211,7 @@ export function personBacklogPlace(
     if (issues.length !== 0) {
       throw new DomainError(DOMAIN_ERROR.REPOSITORY_ID, 'без репозитория issues в срез человека не входят');
     }
-    if (login === null) return { kind: PERSON_PLACE_UNMATCHED };
-    return { kind: PERSON_PLACE_SLICE, done: [], now: [], next: [] };
+    return { kind: PERSON_PLACE_ABSENT };
   }
   const rows = classify(repository, issues);
   if (login === null) return { kind: PERSON_PLACE_UNMATCHED };
