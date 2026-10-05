@@ -152,6 +152,19 @@ export function dynamicsSampleDates(anchor: string): string[] {
 }
 
 /**
+ * Точки динамики на канвасе.
+ * Без репозитория записанный снимок точкой не становится: строки нет.
+ * У подключённого репозитория пустая доля остаётся пустой, не нулём.
+ */
+export function canvasDynamicsPoints(
+  repositoryId: string | null,
+  points: readonly RecordedSnapshot[],
+): RecordedSnapshot[] {
+  if (repositoryId === null || repositoryId.trim().length === 0) return [];
+  return points;
+}
+
+/**
  * Точки на заданных датах.
  * Даты без снимка пропускаются: соседнее число на пропуск не ставится.
  * Записанная пустая доля остаётся пустой.

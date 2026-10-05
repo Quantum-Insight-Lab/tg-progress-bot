@@ -2,7 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { Kysely, PGliteDialect, sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DYNAMICS_POINTS, DYNAMICS_STEP } from '../src/config/constants.ts';
-import { dynamicsAt, dynamicsSampleDates } from '../src/domain/progress/snapshot.ts';
+import { canvasDynamicsPoints, dynamicsAt, dynamicsSampleDates } from '../src/domain/progress/snapshot.ts';
 import { calendarDaysBetween } from '../src/domain/shared/project-time.ts';
 import { EVENT_TYPES, EVENT_VERSIONS } from '../src/events/index.ts';
 import type { Database } from '../src/infrastructure/database.ts';
@@ -11,10 +11,13 @@ import { loadCanvasDynamics } from '../src/infrastructure/canvas-dynamics.ts';
 import {
   readEventsMigration,
   readProgressSnapshotsMigration,
+  readProjectRepositoryMigration,
   readProjectsMigration,
+  readRepositoriesMigration,
 } from '../src/infrastructure/migrate.ts';
 import type { CanvasRichText } from '../src/projections/canvas-message.ts';
 import { divergenceLineParagraphs } from '../src/projections/divergence-line.ts';
+import { NO_DATA_SHARE, noDataShareParagraphs } from '../src/projections/backlog-line.ts';
 import { DYNAMICS_NO_DATA, dynamicsLineParagraphs, dynamicsLineText } from '../src/projections/dynamics-line.ts';
 import { githubSectionParagraphs } from '../src/projections/github-line.ts';
 import { prepareCanvasMessage } from '../src/telegram/canvas-fit.ts';
@@ -176,4 +179,73 @@ describe('строка динамики на канвасе', () => {
     expect(dynamicsLineText(loaded)).not.toContain('03.09 — 0%');
     expect(dynamicsLineText(loaded)).not.toContain('99');
   });
+
+  it('INV-02 без репозитория строка динамики не печатается, пустая доля подключённого — «Нет данных»', () => {
+    const empty = [{ date: '2026-10-05', progress: null }];
+    expect(canvasDynamicsPoints(null, empty)).toEqual([]);
+    expect(canvasDynamicsPoints('11', empty)).toEqual(empty);
+    expect(canvasDynamicsPoints('11', empty)[0]?.progress).toBeNull();
+  });
+
+  it('R-1001 если репозиторий не подключён, строка динамики не печатается', async () => {
+    const handle = await openLinkedDb();
+    opened.push(handle);
+    await sql`
+      INSERT INTO projects (id, name, description, timezone, created_at)
+      VALUES (${projectId}::uuid, 'Пустой', '', 'Europe/Moscow', '2026-10-05T00:00:00.000Z'::timestamptz)
+    `.execute(handle.db);
+    await insertSnapshot(handle.db, '11', '2026-10-05', null);
+    const stored = await sql<{ n: number }>`SELECT CAST(count(*) AS int) AS n FROM progress_snapshots`.execute(handle.db);
+    expect(Number(stored.rows[0]?.n)).toBe(1);
+    expect(await loadCanvasDynamics(handle.db, projectId, '2026-10-05')).toEqual([]);
+
+    const prepared = prepareCanvasMessage({
+      projectName: 'Пустой',
+      canvasDate: '2026-10-05',
+      sections: {
+        backlog: noDataShareParagraphs(null),
+        dynamics: dynamicsLineParagraphs(canvasDynamicsPoints(null, [{ date: '2026-10-05', progress: null }])),
+      },
+    });
+    if (prepared.status !== 'ready') throw new Error('канвас не собрался');
+    const text = prepared.message.blocks.map((block) => visible(block.text)).join('\n');
+    expect(text).toContain(`░░░░░░░░░░ ${NO_DATA_SHARE}`);
+    expect(text).not.toContain('05.10 —');
+  });
+
+  it('R-1002 у подключённого репозитория пустая доля в динамике остаётся «Нет данных», не 0%', async () => {
+    const handle = await openLinkedDb();
+    opened.push(handle);
+    await sql`
+      INSERT INTO repositories (id, owner, name) VALUES ('11', 'lab', 'aeon')
+    `.execute(handle.db);
+    await sql`
+      INSERT INTO projects (id, name, description, timezone, created_at, repository_id)
+      VALUES (${projectId}::uuid, 'Альфа', '', 'Europe/Moscow', '2026-10-05T00:00:00.000Z'::timestamptz, '11')
+    `.execute(handle.db);
+    await insertSnapshot(handle.db, '12', '2026-10-05', null);
+    const loaded = await loadCanvasDynamics(handle.db, projectId, '2026-10-05');
+    expect(loaded).toEqual([{ date: '2026-10-05', progress: null }]);
+    const line = dynamicsLineText(canvasDynamicsPoints('11', loaded));
+    expect(line).toBe(`05.10 — ${DYNAMICS_NO_DATA}`);
+    expect(line).not.toContain('0%');
+  });
 });
+
+async function openLinkedDb(): Promise<Handle> {
+  const pglite = new PGlite();
+  await pglite.exec(readEventsMigration());
+  await pglite.exec(readProjectsMigration());
+  await pglite.exec(readRepositoriesMigration());
+  await pglite.exec(readProjectRepositoryMigration());
+  await pglite.exec(readProgressSnapshotsMigration());
+  const db = new Kysely<Database>({
+    dialect: new PGliteDialect({ pglite, onCreateConnection: assumeJournalRole }),
+  });
+  return {
+    db,
+    async close() {
+      await db.destroy();
+    },
+  };
+}
