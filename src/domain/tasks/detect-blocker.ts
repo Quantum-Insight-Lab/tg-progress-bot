@@ -106,6 +106,15 @@ export function decideStaleBlock(input: {
   };
 }
 
+/**
+ * Вопрос о блокере уходит после канваса этих суток.
+ * Правка уже стоящего канваса порядок не меняет: новым сообщением становится вопрос.
+ */
+export async function askAfterCanvas<T>(placeCanvas: () => Promise<void>, ask: () => Promise<T>): Promise<T> {
+  await placeCanvas();
+  return ask();
+}
+
 export interface BlockerDetectStore {
   seen(idempotencyKey: string): Promise<{ eventId: string } | null>;
   insertBlocker(blocker: Blocker): Promise<void>;

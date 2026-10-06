@@ -3,9 +3,9 @@ import { taskDayMark } from './tasks-block.ts';
 /** Кнопка под вопросом о блокере. Нажатие разбирает следующий акт. */
 export const NO_BLOCKER_LABEL = 'нет блокера';
 
-/** «N не двигается K-й день, что мешает?» Имя проекта стоит перед номером, когда оно есть. */
+/** «задача N не двигается K-й день, что мешает?» Имя проекта стоит перед этой фразой, когда оно есть. */
 export function blockerQuestionText(taskNumber: number, day: number, projectName?: string): string {
-  const line = `${String(taskNumber)} не двигается ${taskDayMark(day)}, что мешает?`;
+  const line = `задача ${String(taskNumber)} не двигается ${taskDayMark(day)}, что мешает?`;
   const name = projectName?.trim() ?? '';
   if (name.length === 0) return line;
   return `${name}: ${line}`;
@@ -16,7 +16,7 @@ export function noBlockerButton(taskNumber: number): { label: string; callbackDa
   return { label: NO_BLOCKER_LABEL, callbackData: `task:noblock:${String(taskNumber)}` };
 }
 
-const QUESTION = /^(?:(.+): )?([1-9]\d*) не двигается ([1-9]\d*)-й день, что мешает\?$/;
+const QUESTION = /^(?:(.+): )?(?:задача )?([1-9]\d*) не двигается ([1-9]\d*)-й день, что мешает\?$/;
 const NO_BLOCKER_DATA = /^task:noblock:([1-9]\d*)$/;
 
 /** Вопрос бота о блокере. Чужой текст вопросом не считается. */

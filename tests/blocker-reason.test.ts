@@ -212,7 +212,7 @@ describe('причина блокера и «нет блокера»', () => {
   });
 
   it('INV-11 причина — только reply на вопрос бота об этой задаче', () => {
-    expect(blockerQuestionText(7, questionDay)).toBe('7 не двигается 3-й день, что мешает?');
+    expect(blockerQuestionText(7, questionDay)).toBe('задача 7 не двигается 3-й день, что мешает?');
     expect(
       blockerQuestionReply({
         replyToMessageId: 15,
