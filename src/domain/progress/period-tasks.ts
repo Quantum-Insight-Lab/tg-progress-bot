@@ -78,6 +78,30 @@ function enteredOnce(entered: readonly string[], status: string): boolean {
   return false;
 }
 
+function countsAsCancelled(statusAtStart: string | null, entered: readonly string[]): boolean {
+  return statusAtStart !== ENTERED_CANCELLED && enteredOnce(entered, ENTERED_CANCELLED);
+}
+
+function eachPeriodTask(
+  facts: readonly PeriodTaskCounterFact[],
+  visit: (key: string, statusAtStart: string | null, entered: readonly string[]) => void,
+): void {
+  const seen = new Set<string>();
+  for (const fact of facts) {
+    if (fact.kind !== PERIOD_TASK_COUNTER_TASK) {
+      factKey(fact.key, DOMAIN_ERROR.PERIOD_FACT_KEY, 'У факта периода есть id');
+      continue;
+    }
+    const key = factKey(fact.key, DOMAIN_ERROR.PERIOD_TASK_KEY, 'У задачи периода есть id');
+    if (seen.has(key)) {
+      throw new DomainError(DOMAIN_ERROR.PERIOD_TASK_DUPLICATE, 'Задача периода встречается один раз');
+    }
+    seen.add(key);
+    const start = fact.statusAtStart === null ? null : statusWord(fact.statusAtStart);
+    visit(key, start, fact.entered.map(statusWord));
+  }
+}
+
 /**
  * Счётчики задач за период.
  * «Подтверждено» — задача входила в `DONE` и на начало ещё не была `DONE`.
@@ -91,26 +115,26 @@ export function periodTaskCounters(facts: readonly PeriodTaskCounterFact[]): Per
   let created = 0;
   let cancelled = 0;
   let blocked = 0;
-  const seen = new Set<string>();
 
-  for (const fact of facts) {
-    if (fact.kind !== PERIOD_TASK_COUNTER_TASK) {
-      factKey(fact.key, DOMAIN_ERROR.PERIOD_FACT_KEY, 'У факта периода есть id');
-      continue;
-    }
-    const key = factKey(fact.key, DOMAIN_ERROR.PERIOD_TASK_KEY, 'У задачи периода есть id');
-    if (seen.has(key)) {
-      throw new DomainError(DOMAIN_ERROR.PERIOD_TASK_DUPLICATE, 'Задача периода встречается один раз');
-    }
-    seen.add(key);
-
-    const start = fact.statusAtStart === null ? null : statusWord(fact.statusAtStart);
-    const entered = fact.entered.map(statusWord);
+  eachPeriodTask(facts, (_key, start, entered) => {
     if (start === null) created += 1;
     if (start !== ENTERED_DONE && enteredOnce(entered, ENTERED_DONE)) confirmed += 1;
-    if (start !== ENTERED_CANCELLED && enteredOnce(entered, ENTERED_CANCELLED)) cancelled += 1;
+    if (countsAsCancelled(start, entered)) cancelled += 1;
     if (start !== ENTERED_BLOCKED && enteredOnce(entered, ENTERED_BLOCKED)) blocked += 1;
-  }
+  });
 
   return { confirmed, created, cancelled, blocked };
+}
+
+/**
+ * Задачи, вошедшие в счётчик «отменено».
+ * Уже снятая на начало периода без нового входа сюда не входит.
+ * Порядок — порядок фактов.
+ */
+export function periodCancelledKeys(facts: readonly PeriodTaskCounterFact[]): string[] {
+  const keys: string[] = [];
+  eachPeriodTask(facts, (key, start, entered) => {
+    if (countsAsCancelled(start, entered)) keys.push(key);
+  });
+  return keys;
 }

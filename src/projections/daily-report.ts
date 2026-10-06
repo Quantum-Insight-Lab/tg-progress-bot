@@ -9,7 +9,7 @@ import {
 } from './report-backlog-block.ts';
 import { reportDivergenceLines } from './report-divergence-line.ts';
 import { reportGithubBlock, type ReportGithubCi } from './report-github-block.ts';
-import { reportTasksLine, type ReportTaskCounters } from './report-tasks-line.ts';
+import { reportCancelledLines, reportTasksLine, type ReportCancelledLine, type ReportTaskCounters } from './report-tasks-line.ts';
 import {
   reportWorkLines,
   type ReportNextLineTask,
@@ -70,6 +70,7 @@ export interface DailyReportProject {
   memberIds: readonly string[];
   backlog: ReportProjectBacklogView;
   tasks: ReportTaskCounters;
+  cancelled: readonly ReportCancelledLine[];
   now: readonly (ReportNowLineTask & { assigneeId: string })[];
   next: readonly (ReportNextLineTask & { assigneeId: string })[];
   risk: ReportRiskView;
@@ -219,6 +220,7 @@ function projectBlock(
   const lines = [
     ...reportProjectBacklogLines(project.backlog),
     reportTasksLine(project.tasks),
+    ...reportCancelledLines(project.cancelled),
     ...reportWorkLines({
       now: workFor(project.now, audience, memberId),
       next: workFor(project.next, audience, memberId).slice(0, REPORT_NEXT_TASKS),

@@ -37,13 +37,14 @@ const emptyRisk = { reasons: [], defaultBranchCiRed: false, pullRequests: [] };
 function project(
   backlog: ReportProjectBacklogView,
   memberIds: readonly string[],
-  extra: Partial<Pick<DailyReportProject, 'chatId' | 'tasks' | 'now' | 'next' | 'risk' | 'divergence' | 'repository'>> = {},
+  extra: Partial<Pick<DailyReportProject, 'chatId' | 'tasks' | 'cancelled' | 'now' | 'next' | 'risk' | 'divergence' | 'repository'>> = {},
 ): DailyReportProject {
   return {
     chatId: extra.chatId ?? 'group',
     memberIds,
     backlog,
     tasks: extra.tasks ?? quietTasks,
+    cancelled: extra.cancelled ?? [],
     now: extra.now ?? [],
     next: extra.next ?? [],
     risk: extra.risk ?? emptyRisk,
@@ -90,6 +91,27 @@ const teamText = [
 ].join('\n');
 
 describe('ежедневный отчёт', () => {
+  it('R-1019 R-1023 «Снято» стоит под строкой «Задачи» и пропадает, когда снимать нечего', () => {
+    const withRemoved = project(sensorBacklog, ['ann'], {
+      tasks: { confirmed: 1, created: 2, cancelled: 1, blocked: 1 },
+      cancelled: [{ number: 6, title: 'Кнопка «Добавить задачу» к канвасу', cancelledByName: 'Максим' }],
+      now: sensor.now,
+      next: sensor.next,
+      risk: sensor.risk,
+    });
+    const text = dailyReport(view('team', null, [withRemoved]));
+    const tasksAt = text.indexOf('Задачи:');
+    const removedAt = text.indexOf('Снято: 6 — Кнопка «Добавить задачу» к канвасу — Максим');
+    const nowAt = text.indexOf('Сейчас:');
+    expect(tasksAt).toBeGreaterThan(-1);
+    expect(removedAt).toBeGreaterThan(tasksAt);
+    expect(nowAt).toBeGreaterThan(removedAt);
+    expect(text).toContain('отменено 1');
+    const quiet = dailyReport(view('team', null, [sensor]));
+    expect(quiet).toContain('отменено 0');
+    expect(quiet).not.toContain('Снято');
+  });
+
   it('R-654 «Отчёт — что изменилось за сутки»', () => {
     const text = dailyReport(view('team', null, [sensor]));
     expect(text).toBe(teamText);
