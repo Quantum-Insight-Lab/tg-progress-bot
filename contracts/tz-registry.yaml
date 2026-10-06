@@ -1245,3 +1245,6 @@ atoms:
   R-1013: { kind: rule, scope: R-024 }
   R-1014: { kind: rule, scope: R-024 }
   R-1015: { kind: entity, scope: R-024 }
+  R-1016: { kind: view, scope: R-024 }
+  R-1017: { kind: rule, scope: R-024 }
+  R-1018: { kind: rule, scope: R-024 }

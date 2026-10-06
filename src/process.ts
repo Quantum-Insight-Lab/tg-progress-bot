@@ -24,6 +24,7 @@ import { createProjectCreation } from './infrastructure/projects.ts';
 import { createProjectRepository } from './infrastructure/connect-repository.ts';
 import { createInstallationRepositories } from './infrastructure/installation-repositories.ts';
 import { createProjectSettings } from './infrastructure/settings.ts';
+import { askAfterCanvas } from './domain/tasks/detect-blocker.ts';
 import { CANVAS_DESTINATION_TOPIC } from './domain/tasks/place-canvas.ts';
 import { createCanvasPlacement, type CanvasHome } from './infrastructure/canvas.ts';
 import { carryOpenCanvases } from './infrastructure/carry-canvas.ts';
@@ -337,23 +338,30 @@ export async function startProcess(config: ProcessConfig): Promise<RunningProces
     attachBlockerAnswer(bot, createBlockerAnswerActions(config.db, logger, config.clock), redrawTaskCanvas);
     detectStale = (now) =>
       detectStaleTasks(database, logger, now, async (hit) => {
-        const messageId = await sendBlockerQuestion(bot.api, {
-          chatId: hit.telegramChatId,
-          messageThreadId: hit.topicId,
-          taskNumber: hit.taskNumber,
-          day: hit.day,
-          projectName: hit.projectName,
-        });
-        await rememberBlockerQuestion(database, hit.blockerId, messageId);
-        await canvas.show({
-          projectId: hit.projectId,
-          assigneeId: hit.assigneeId,
-          destination: CANVAS_DESTINATION_TOPIC,
-          causationId: hit.eventId,
-          cause: null,
-          send: deliverCanvas.send,
-          edit: deliverCanvas.edit,
-        });
+        await askAfterCanvas(
+          () =>
+            canvas
+              .show({
+                projectId: hit.projectId,
+                assigneeId: hit.assigneeId,
+                destination: CANVAS_DESTINATION_TOPIC,
+                causationId: hit.eventId,
+                cause: null,
+                send: deliverCanvas.send,
+                edit: deliverCanvas.edit,
+              })
+              .then(() => undefined),
+          async () => {
+            const messageId = await sendBlockerQuestion(bot.api, {
+              chatId: hit.telegramChatId,
+              messageThreadId: hit.topicId,
+              taskNumber: hit.taskNumber,
+              day: hit.day,
+              projectName: hit.projectName,
+            });
+            await rememberBlockerQuestion(database, hit.blockerId, messageId);
+          },
+        );
       });
     noticePullRequests = (now) => noticeStalePullRequests(database, logger, now);
     takeSnapshots = (now) => takeProgressSnapshots(database, logger, now); // pragma: allowlist secret

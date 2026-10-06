@@ -7,6 +7,7 @@ import type { Clock } from '../src/domain/shared/clock.ts';
 import { DOMAIN_ERROR, DomainError } from '../src/domain/shared/errors.ts';
 import { projectCalendarDate, projectDaysBetween } from '../src/domain/shared/project-time.ts';
 import {
+  askAfterCanvas,
   blockerDetectedKey,
   decideStaleBlock,
   lastBlockerQuestionAt,
@@ -293,10 +294,23 @@ describe('застой задачи', () => {
     expect(again?.day).toBe(taskCanvasDay(projectCalendarDate(created, 'Europe/Moscow'), projectCalendarDate(twoDaysLater, 'Europe/Moscow')));
   });
 
+  it('INV-10 R-1017 R-1018 вопрос уходит после канваса суток и остаётся последним', async () => {
+    const sent: string[] = [];
+    await askAfterCanvas(
+      async () => {
+        sent.push('canvas');
+      },
+      async () => {
+        sent.push('question');
+      },
+    );
+    expect(sent).toEqual(['canvas', 'question']);
+  });
+
   it('R-254 «7 не двигается 3-й день, что мешает?»', () => {
     const day = taskCanvasDay(projectCalendarDate(created, 'Europe/Moscow'), projectCalendarDate(now, 'Europe/Moscow'));
     expect(day).toBe(STALE_DAYS + 1);
-    expect(blockerQuestionText(7, day)).toBe('7 не двигается 3-й день, что мешает?');
+    expect(blockerQuestionText(7, day)).toBe('задача 7 не двигается 3-й день, что мешает?');
   });
 
   it('R-255 с кнопкой «нет блокера»', () => {
@@ -309,7 +323,7 @@ describe('застой задачи', () => {
     await seed(handle.db);
     const hits = await run(handle.db, now);
     expect(hits).toHaveLength(1);
-    expect(hits[0]?.text).toBe('Альфа: 7 не двигается 3-й день, что мешает?');
+    expect(hits[0]?.text).toBe('Альфа: задача 7 не двигается 3-й день, что мешает?');
     expect(hits[0]?.button).toEqual({ label: 'нет блокера', callbackData: 'task:noblock:7' });
     expect(hits[0]?.detected.telegramChatId).toBe(telegramChatId);
     expect(hits[0]?.detected.topicId).toBe(topic);

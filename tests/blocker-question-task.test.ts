@@ -54,11 +54,27 @@ describe('вопрос о блокере', () => {
     await Promise.all(opened.splice(0).map((item) => item.close()));
   });
 
+  it('R-1016 перед номером стоит слово «задача»', () => {
+    expect(blockerQuestionText(2, 4, 'progress-bot')).toBe('progress-bot: задача 2 не двигается 4-й день, что мешает?');
+    expect(parseBlockerQuestion('progress-bot: задача 2 не двигается 4-й день, что мешает?')).toEqual({
+      taskNumber: 2,
+      day: 4,
+    });
+  });
+
   it('R-1011 в вопросе о блокере, кроме номера, стоит имя проекта', () => {
     const text = blockerQuestionText(1, 3, 'ЭКГ-патч');
-    expect(text).toBe('ЭКГ-патч: 1 не двигается 3-й день, что мешает?');
+    expect(text).toBe('ЭКГ-патч: задача 1 не двигается 3-й день, что мешает?');
     expect(parseBlockerQuestion(text)).toEqual({ taskNumber: 1, day: 3 });
-    expect(blockerQuestionText(7, 3)).toBe('7 не двигается 3-й день, что мешает?');
+    expect(blockerQuestionText(7, 3)).toBe('задача 7 не двигается 3-й день, что мешает?');
+    expect(parseBlockerQuestion('progress-bot: задача 2 не двигается 4-й день, что мешает?')).toEqual({
+      taskNumber: 2,
+      day: 4,
+    });
+    expect(parseBlockerQuestion('progress-bot: 2 не двигается 4-й день, что мешает?')).toEqual({
+      taskNumber: 2,
+      day: 4,
+    });
   });
 
   it('INV-11 R-1012 R-1013 R-1014 R-1015 вопрос относится к задаче, о которой задан', async () => {
