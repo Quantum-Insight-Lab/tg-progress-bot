@@ -192,6 +192,7 @@ export interface ReportProjectFacts {
   chatId: string;
   memberIds: readonly string[];
   tasks: ReportTaskFacts;
+  cancelled: readonly { number: number; title: string; cancelledByName: string }[];
   backlog: ReportBacklogFacts;
   now: readonly ReportNowFact[];
   next: readonly ReportNextFact[];

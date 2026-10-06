@@ -29,7 +29,7 @@ import {
 import { LEAD_ROLE, MEMBER_ROLE } from '../domain/projects/member.ts';
 import { BACKLOG_ISSUE_COMPLETED, BACKLOG_ISSUE_CLOSED, BACKLOG_ISSUE_OPEN } from '../domain/progress/backlog-share.ts';
 import { PERIOD_FACT_ISSUE, periodBacklog, type PeriodBacklog, type PeriodFact } from '../domain/progress/period-backlog.ts';
-import { periodTaskCounters, PERIOD_TASK_COUNTER_TASK, type PeriodTaskCounterTask } from '../domain/progress/period-tasks.ts';
+import { periodCancelledKeys, periodTaskCounters, PERIOD_TASK_COUNTER_TASK, type PeriodTaskCounterTask } from '../domain/progress/period-tasks.ts';
 import { reportCurrent, REPORT_CURRENT_TASK } from '../domain/progress/report-current.ts';
 import { projectCalendarDate, projectDaysBetween } from '../domain/shared/project-time.ts';
 import {
@@ -40,7 +40,9 @@ import {
   TASK_STATUS_PLANNED,
   TASK_STATUS_REVIEW,
 } from '../domain/tasks/status.ts';
+import { TASK_CANCEL_SYSTEM_ACTOR } from '../domain/tasks/cancel-task.ts';
 import { EVENT_TYPES } from '../events/index.ts';
+import { REPORT_CANCELLED_BY_SYSTEM } from '../projections/report-tasks-line.ts';
 import type { Clock } from '../domain/shared/clock.ts';
 import type { Logger } from '../domain/shared/logger.ts';
 import { DOMAIN_ERROR, DomainError } from '../domain/shared/errors.ts';
@@ -72,6 +74,7 @@ interface TaskEvent {
   taskId: string;
   type: string;
   at: Date;
+  actorId: string;
 }
 
 const STATUS_EVENT: Record<string, string> = {
@@ -261,8 +264,8 @@ async function taskRows(db: Kysely<Database>, projectIds: readonly string[]): Pr
 
 async function taskEvents(db: Kysely<Database>, taskIds: readonly string[]): Promise<TaskEvent[]> {
   if (taskIds.length === 0) return [];
-  const found = await sql<{ event_type: string; created_at: Date | string; subject_id: string; payload: unknown }>`
-    SELECT event_type, created_at, subject_id, payload
+  const found = await sql<{ event_type: string; created_at: Date | string; subject_id: string; actor_id: string; payload: unknown }>`
+    SELECT event_type, created_at, subject_id, actor_id, payload
     FROM events
     WHERE event_type IN (${sql.join(COUNTER_EVENTS.map((type) => sql`${type}`))})
       AND (
@@ -275,7 +278,7 @@ async function taskEvents(db: Kysely<Database>, taskIds: readonly string[]): Pro
   for (const row of found.rows) {
     const taskId = taskIdOf(row.event_type, row.subject_id, row.payload);
     if (taskId === null || !taskIds.includes(taskId)) continue;
-    events.push({ taskId, type: row.event_type, at: instantOf(row.created_at) });
+    events.push({ taskId, type: row.event_type, at: instantOf(row.created_at), actorId: row.actor_id });
   }
   return events;
 }
@@ -364,6 +367,36 @@ async function divergenceOn(db: Kysely<Database>, projectIds: readonly string[],
     if (row.date === projectCalendarDate(now, timezone)) active.add(row.project_id);
   }
   return active;
+}
+
+function cancellerOf(taskId: string, events: readonly TaskEvent[], periodStart: Date, periodEnd: Date, names: ReadonlyMap<string, string>): string {
+  const mark = events.find(
+    (event) =>
+      event.taskId === taskId &&
+      event.type === EVENT_TYPES.TASK_CANCELLED &&
+      event.at.getTime() >= periodStart.getTime() &&
+      event.at.getTime() <= periodEnd.getTime(),
+  );
+  const actorId = mark?.actorId ?? TASK_CANCEL_SYSTEM_ACTOR;
+  if (actorId === TASK_CANCEL_SYSTEM_ACTOR) return REPORT_CANCELLED_BY_SYSTEM;
+  return names.get(actorId) ?? actorId;
+}
+
+function removedLine(
+  key: string,
+  tasks: readonly TaskRow[],
+  events: readonly TaskEvent[],
+  names: ReadonlyMap<string, string>,
+  periodStart: Date,
+  periodEnd: Date,
+): { number: number; title: string; cancelledByName: string } {
+  const task = tasks.find((item) => item.id === key);
+  if (task === undefined) throw new Error('снятая задача периода не найдена');
+  return {
+    number: whole(task.number),
+    title: task.title,
+    cancelledByName: cancellerOf(task.id, events, periodStart, periodEnd, names),
+  };
 }
 
 function counterOf(task: TaskRow, events: readonly TaskEvent[], periodStart: Date, periodEnd: Date): PeriodTaskCounterTask {
@@ -542,7 +575,10 @@ async function projectFacts(
   const tasks = await taskRows(db, section.projectIds);
   const events = await taskEvents(db, tasks.map((task) => task.id));
   const reasons = await reasonsOf(db, tasks.map((task) => task.id));
-  const names = await namesOf(db, [...new Set(tasks.map((task) => task.assignee_id))]);
+  const cancellers = events
+    .filter((event) => event.type === EVENT_TYPES.TASK_CANCELLED && event.actorId !== TASK_CANCEL_SYSTEM_ACTOR)
+    .map((event) => event.actorId);
+  const names = await namesOf(db, [...new Set([...tasks.map((task) => task.assignee_id), ...cancellers])]);
   const repositoryIds = [...new Set(rows.rows.map((row) => row.repository_id).filter((id): id is string => id !== null))];
   const repositories = await repositoriesOf(db, repositoryIds, section.periodStart, section.periodEnd);
   const periodStart = new Date(section.periodStart);
@@ -555,7 +591,11 @@ async function projectFacts(
     const row = rows.rows.find((item) => item.id === ref.id);
     const timezone = row?.timezone ?? 'UTC';
     const ownTasks = tasks.filter((task) => task.project_id === ref.id);
-    const counters = periodTaskCounters(ownTasks.map((task) => counterOf(task, events, periodStart, periodEnd)));
+    const counted = ownTasks.map((task) => counterOf(task, events, periodStart, periodEnd));
+    const counters = periodTaskCounters(counted);
+    const cancelled = periodCancelledKeys(counted)
+      .map((key) => removedLine(key, ownTasks, events, names, periodStart, periodEnd))
+      .sort((left, right) => left.number - right.number);
     const current = reportCurrent(
       ownTasks.map((task) => ({
         kind: REPORT_CURRENT_TASK,
@@ -581,6 +621,7 @@ async function projectFacts(
           ? [...ref.memberIds, section.memberId]
           : ref.memberIds,
       tasks: counters,
+      cancelled,
       backlog: repositoryId === null ? emptyReportBacklog() : backlogFacts(backlogs.get(repositoryId) ?? periodBacklog([])),
       now: current.now.map((task) => ({
         number: task.number,

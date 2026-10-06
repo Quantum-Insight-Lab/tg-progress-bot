@@ -1248,3 +1248,10 @@ atoms:
   R-1016: { kind: view, scope: R-024 }
   R-1017: { kind: rule, scope: R-024 }
   R-1018: { kind: rule, scope: R-024 }
+
+  # Снятые задачи в отчёте
+  R-1019: { kind: view, scope: R-030 }
+  R-1020: { kind: view, scope: R-030 }
+  R-1021: { kind: view, scope: R-030 }
+  R-1022: { kind: rule, scope: R-030 }
+  R-1023: { kind: view, scope: R-030 }

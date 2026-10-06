@@ -32,6 +32,7 @@ function viewOf(document: ReportDocument): DailyReportView {
         confirmedOn: [],
       },
       tasks: project.tasks,
+      cancelled: project.cancelled,
       now: project.now,
       next: project.next,
       risk: {

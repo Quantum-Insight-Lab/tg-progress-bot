@@ -3,6 +3,7 @@ import {
   PERIOD_TASK_COUNTER_COMMIT,
   PERIOD_TASK_COUNTER_ISSUE,
   PERIOD_TASK_COUNTER_TASK,
+  periodCancelledKeys,
   periodTaskCounters,
   type PeriodTaskCounterFact,
   type PeriodTaskCounterTask,
@@ -51,6 +52,18 @@ describe('счётчики задач отчёта за период', () => {
     ]);
     expect(report.created).toBe(2);
     expect(report.confirmed).toBe(0);
+  });
+
+  it('INV-25 R-1022 список снятых — те же задачи, что вошли в счётчик, включая снятие участника', () => {
+    const facts: PeriodTaskCounterFact[] = [
+      task('button', 'IN_PROGRESS', ['CANCELLED']),
+      task('removed-member', 'PLANNED', ['CANCELLED']),
+      task('already', 'CANCELLED', []),
+      task('open', 'IN_PROGRESS', []),
+      { kind: PERIOD_TASK_COUNTER_ISSUE, key: 'issue-1', stateReason: 'completed' },
+    ];
+    expect(periodCancelledKeys(facts)).toEqual(['button', 'removed-member']);
+    expect(periodCancelledKeys(facts)).toHaveLength(periodTaskCounters(facts).cancelled);
   });
 
   it('INV-25 отменено — переход в CANCELLED, уже снятая на начало не считается без нового входа', () => {
